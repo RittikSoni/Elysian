@@ -5,18 +5,41 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
-class RSNewVideoPlayerScreen extends StatefulWidget {
+class YTFull extends StatefulWidget {
   final String? mediaUrl;
 
-  const RSNewVideoPlayerScreen({super.key, this.mediaUrl});
+  const YTFull({super.key, this.mediaUrl});
 
   @override
-  State<RSNewVideoPlayerScreen> createState() => _RSNewVideoPlayerScreenState();
+  State<YTFull> createState() => _YTFullState();
 }
 
-class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
-  late VideoPlayerController _controller;
+class _YTFullState extends State<YTFull> {
+  late YoutubePlayerController _controller;
+
+  late TextEditingController _idController;
+  late TextEditingController _seekToController;
+
+  late PlayerState _playerState;
+  late YoutubeMetaData _videoMetaData;
+  bool _muted = false;
+  bool _isPlayerReady = false;
+
+  final List<String> _ids = [
+    'QdBZY2fkU-0',
+    'nPt8bK2gbaU',
+    'gQDByCdjUXw',
+    'iLnmTe5Q2Qw',
+    // '_WoCV4c6XOE',
+    // 'KmzdUe0RSJo',
+    // '6jZDSSZZxjQ',
+    // 'p2lYr3vM_1w',
+    // '7QUtEmBT_-w',
+    // '34_PXCzGw1M',
+  ];
+
   VideoPlayerController? _adController;
 
   // UI state
@@ -37,6 +60,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
   ];
+
   int _nextAdIndex = 0;
   bool _inAdBreak = false;
   int _adSecondsRemaining = 0;
@@ -69,46 +93,71 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
     _initVolumeAndBrightness();
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(
-        widget.mediaUrl ??
-            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    _controller = YoutubePlayerController(
+      initialVideoId: _ids.first,
+
+      flags: const YoutubePlayerFlags(
+        mute: false,
+        autoPlay: true,
+        disableDragSeek: true,
+        loop: true,
+        isLive: false,
+        forceHD: false,
+        enableCaption: true,
+        hideControls: true,
       ),
-    );
+    )..addListener(listener);
+    _idController = TextEditingController();
+    _seekToController = TextEditingController();
+    _videoMetaData = const YoutubeMetaData();
+    _playerState = PlayerState.unknown;
     initializeVid();
+  }
+
+  void listener() {
+    if (_isPlayerReady && mounted && !_controller.value.isFullScreen) {
+      setState(() {
+        _playerState = _controller.value.playerState;
+        _videoMetaData = _controller.metadata;
+        print('caleeedd111');
+      });
+    }
+    // Timer.periodic(
+    //   Duration(seconds: 1),
+    //   (timer) => setState(() {
+    //     print('caleeedd');
+    //   }),
+    // );
   }
 
   void initializeVid() async {
     await Future.delayed(Duration(seconds: 2));
-    _controller
-      ..initialize().then((_) {
-        // Calculate ad positions 10%, 25, 50%, 80%
-        final total_duration = _controller.value.duration;
+    if (_controller.value.isReady) {
+      // Calculate ad positions 10%, 25, 50%, 80%
+      final total_duration = _controller.value.metaData.duration;
 
-        setState(() {
-          _adPositions.addAll([
-            Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.1).toInt(),
-            ),
-            Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.25).toInt(),
-            ),
-            Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.5).toInt(),
-            ),
-            Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.8).toInt(),
-            ),
-          ]);
-          _controller.play();
-        });
-      })
-      ..addListener(() {
+      setState(() {
+        _adPositions.addAll([
+          // Duration(milliseconds: (total_duration.inMilliseconds * 0.1).toInt()),
+          // Duration(
+          //   milliseconds: (total_duration.inMilliseconds * 0.25).toInt(),
+          // ),
+          Duration(milliseconds: (total_duration.inMilliseconds * 0.5).toInt()),
+          // Duration(milliseconds: (total_duration.inMilliseconds * 0.8).toInt()),
+        ]);
+        _controller.play();
+      });
+
+      _controller.addListener(() {
         // TODO: Uncomment this to trigger ad break
         _onMainVideoUpdate();
         // Trigger UI rebuild for timeline
         if (!_inAdBreak) setState(() {});
       });
+    } else {
+      // Handle error if video is not initialized
+      print("Video player not initialized");
+    }
   }
 
   void _onMainVideoUpdate() {
@@ -137,7 +186,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
       ..initialize().then((_) {
         setState(() {
           _adController!.play();
-          _adSecondsRemaining = 30; // Set ad duration to 30 seconds
+          _adSecondsRemaining = 3; // Set ad duration to 30 seconds
           // _adSecondsRemaining = _adController!.value.duration.inSeconds;
         });
 
@@ -202,8 +251,30 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 _adController != null &&
                 _adController!.value.isInitialized)
               VideoPlayer(_adController!)
-            else if (!_inAdBreak && _controller.value.isInitialized)
-              VideoPlayer(_controller)
+            else if (!_inAdBreak)
+              YoutubePlayer(
+                controller: _controller,
+                showVideoProgressIndicator: true,
+
+                progressIndicatorColor: Colors.amber,
+                progressColors: const ProgressBarColors(
+                  playedColor: Colors.amber,
+                  handleColor: Colors.amberAccent,
+                ),
+                onReady: () {
+                  _controller.addListener(listener);
+                },
+
+                onEnded: (metaData) {
+                  int currentVideoIndex = _ids.indexOf(
+                    _controller.metadata.videoId,
+                  );
+                  if (currentVideoIndex + 1 < _ids.length) {
+                    currentVideoIndex++;
+                    _controller.load(_ids[currentVideoIndex]);
+                  }
+                },
+              )
             else
               const Center(child: CircularProgressIndicator()),
 
@@ -400,11 +471,10 @@ class _ControlBarState extends State<ControlBar> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context
-        .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+    final state = context.findAncestorStateOfType<_YTFullState>()!;
     final controller = state._controller;
     final position = controller.value.position;
-    final duration = controller.value.duration;
+    final duration = controller.value.metaData.duration;
 
     // compute slider values
     final maxMillis = duration.inMilliseconds.toDouble();
@@ -496,8 +566,8 @@ class _ControlBarState extends State<ControlBar> {
                 // speed menu...
                 PopupMenuButton<double>(
                   color: Colors.black,
-                  initialValue: controller.value.playbackSpeed,
-                  onSelected: (s) => controller.setPlaybackSpeed(s),
+                  initialValue: controller.value.playbackRate,
+                  onSelected: (s) => controller.setPlaybackRate(s),
                   itemBuilder: (_) {
                     const textStyle = TextStyle(
                       fontSize: 15,
@@ -532,7 +602,7 @@ class _ControlBarState extends State<ControlBar> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        "(${controller.value.playbackSpeed}x)",
+                        "(${controller.value.playbackRate}x)",
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -607,10 +677,9 @@ class GestureDetectorOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context
-        .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+    final state = context.findAncestorStateOfType<_YTFullState>()!;
 
-    void _startHideTimer() {
+    void startHideTimer() {
       state._hideTimer?.cancel(); // Cancel any existing timer
 
       state._hideTimer = Timer(Duration(seconds: 3), () {
@@ -620,7 +689,7 @@ class GestureDetectorOverlay extends StatelessWidget {
       });
     }
 
-    void _toggleControls() {
+    void toggleControls() {
       state.setState(() {
         state._showControls = !state._showControls;
       });
@@ -634,7 +703,7 @@ class GestureDetectorOverlay extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: _toggleControls,
+      onTap: toggleControls,
       onDoubleTapDown: (d) {
         state.setState(() {
           final width = MediaQuery.of(context).size.width;
@@ -683,7 +752,7 @@ class GestureDetectorOverlay extends StatelessWidget {
           state._showSliderOverlay(isVolume: false);
         }
       },
-      child: Container(color: Colors.transparent),
+      child: Container(color: Colors.black.withValues(alpha: 0.1)),
     );
   }
 }
@@ -693,8 +762,7 @@ class PlayPauseControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context
-        .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+    final state = context.findAncestorStateOfType<_YTFullState>()!;
     final controller = state._controller;
     final iconSize = 120.0;
 
@@ -722,7 +790,7 @@ class PlayPauseControlBar extends StatelessWidget {
               ),
 
               // Play/Pause button listens to controller.value changes
-              ValueListenableBuilder<VideoPlayerValue>(
+              ValueListenableBuilder<YoutubePlayerValue>(
                 valueListenable: controller,
                 builder: (context, value, child) {
                   return IconButton(
@@ -773,7 +841,7 @@ class _EpisodeListOverlayState extends State<EpisodeListOverlay>
     with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext ctx) {
-    final state = ctx.findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+    final state = ctx.findAncestorStateOfType<_YTFullState>()!;
     return Positioned(
       right: 0,
       top: 0,
@@ -884,7 +952,16 @@ class CustomEpisodeCard extends StatelessWidget {
       primary: false,
       itemCount: 12,
       itemBuilder: (_, index) => GestureDetector(
-        onTap: () {},
+        onTap: () {
+          final state = context.findAncestorStateOfType<_YTFullState>()!;
+          int currentVideoIndex = state._ids.indexOf(
+            state._controller.metadata.videoId,
+          );
+          if (currentVideoIndex + 1 < state._ids.length) {
+            currentVideoIndex++;
+            state._controller.load(state._ids[currentVideoIndex]);
+          }
+        },
         child: Container(
           margin: EdgeInsets.symmetric(vertical: 0, horizontal: 0),
           decoration: BoxDecoration(),

@@ -1,5 +1,7 @@
 import 'package:elysian/models/content_model.dart';
 import 'package:elysian/video_player/video_player_full.dart';
+import 'package:elysian/video_player/yt_full.dart';
+import 'package:elysian/video_player/yt_player.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 import 'package:video_player/video_player.dart';
@@ -21,8 +23,7 @@ class ContentHeader extends StatelessWidget {
 class _MobileContentHeader extends StatelessWidget {
   final Content featuredContent;
 
-  const _MobileContentHeader({Key? key, required this.featuredContent})
-    : super(key: key);
+  const _MobileContentHeader({required this.featuredContent});
 
   @override
   Widget build(BuildContext context) {
@@ -96,12 +97,14 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
   bool isMuted = true;
   @override
   void initState() {
+    super.initState();
     _videoController =
-        VideoPlayerController.network(widget.featuredContent.videoUrl)
+        VideoPlayerController.networkUrl(
+            Uri.parse(widget.featuredContent.videoUrl),
+          )
           ..initialize().then((_) => setState(() {}))
           ..setVolume(0)
           ..play();
-    super.initState();
   }
 
   @override
@@ -234,7 +237,8 @@ class _PlayButton extends StatelessWidget {
       child: ElevatedButton.icon(
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => RSNewVideoPlayerScreen()),
+          MaterialPageRoute(builder: (context) => YTFull()),
+          // MaterialPageRoute(builder: (context) => RSNewVideoPlayerScreen()),
         ),
         icon: const Icon(Icons.play_arrow),
         label: const Text('Play.....'),
