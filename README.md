@@ -1,16 +1,22 @@
-# Elysian
+<p align="center">
+  <picture>
+    <source srcset="./assets/images/logo.png" type="image/png">
+    <img src="./assets/images/logo.png" alt="Elysian: An open-source OTT platform" width="180" />
+  </picture>
+</p>
 
-A new Flutter project.
+# Elysian : OTT platform
 
-## Getting Started
+**Luxury Streaming. Timeless Stories.**
 
-This project is a starting point for a Flutter application.
+Welcome to **Elysian** — a sanctuary of premium storytelling. Immerse yourself in a world where cinema feels heavenly, and every frame is curated for an elevated viewing experience.
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 📄 License
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+Enjoy the serene world of Elysian!
