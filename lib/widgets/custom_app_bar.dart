@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 class CustomAppBar extends StatelessWidget {
   final double scrollOffset;
 
-  const CustomAppBar({Key? key, this.scrollOffset = 0.0}) : super(key: key);
+  const CustomAppBar({super.key, this.scrollOffset = 0.0});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
-      color: Colors.black.withOpacity(
-        (scrollOffset / 350).clamp(0, 1).toDouble(),
+      color: Colors.black.withValues(
+        alpha: (scrollOffset / 350).clamp(0, 1).toDouble(),
       ),
       child: Responsive(
         mobile: _MobileCustomAppBar(),
@@ -23,7 +23,7 @@ class CustomAppBar extends StatelessWidget {
 }
 
 class _MobileCustomAppBar extends StatelessWidget {
-  const _MobileCustomAppBar({Key? key}) : super(key: key);
+  const _MobileCustomAppBar();
 
   @override
   Widget build(BuildContext context) {
@@ -38,17 +38,17 @@ class _MobileCustomAppBar extends StatelessWidget {
               children: [
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('TV Shows'),
+                  onTap: () => {},
                   title: 'TV Shows',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('Movies'),
+                  onTap: () {},
                   title: 'Movies',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('My List'),
+                  onTap: () => {},
                   title: 'My List',
                 ),
               ],
@@ -74,27 +74,27 @@ class _DesktopCustomAppBar extends StatelessWidget {
               children: [
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('Home'),
+                  onTap: () {},
                   title: 'Home',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('TV Shows'),
+                  onTap: () => {},
                   title: 'TV Shows',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('Movies'),
+                  onTap: () {},
                   title: 'Movies',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('My List'),
+                  onTap: () => {},
                   title: 'My List',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('Latest'),
+                  onTap: () {},
                   title: 'Latest',
                 ),
               ],
@@ -107,31 +107,31 @@ class _DesktopCustomAppBar extends StatelessWidget {
               children: [
                 IconButton(
                   padding: EdgeInsets.zero,
-                  onPressed: () => print('search'),
+                  onPressed: () {},
                   icon: Icon(Icons.search),
                   iconSize: 28.0,
                   color: Colors.white,
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('KIDS'),
+                  onTap: () {},
                   title: 'KIDS',
                 ),
                 _AppBarButton(
                   // ignore: avoid_print
-                  onTap: () => print('DVD'),
+                  onTap: () {},
                   title: 'DVD',
                 ),
                 IconButton(
                   padding: EdgeInsets.zero,
-                  onPressed: () => print('Giftcard'),
+                  onPressed: () {},
                   icon: Icon(Icons.card_giftcard),
                   iconSize: 28.0,
                   color: Colors.white,
                 ),
                 IconButton(
                   padding: EdgeInsets.zero,
-                  onPressed: () => print('notification'),
+                  onPressed: () {},
                   icon: Icon(Icons.notifications),
                   iconSize: 28.0,
                   color: Colors.white,
@@ -149,8 +149,7 @@ class _AppBarButton extends StatelessWidget {
   final String title;
   final Function onTap;
 
-  const _AppBarButton({Key? key, required this.title, required this.onTap})
-    : super(key: key);
+  const _AppBarButton({required this.title, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

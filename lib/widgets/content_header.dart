@@ -1,7 +1,6 @@
+import 'package:elysian/components/reusable_btn.dart';
 import 'package:elysian/models/content_model.dart';
-import 'package:elysian/video_player/video_player_full.dart';
 import 'package:elysian/video_player/yt_full.dart';
-import 'package:elysian/video_player/yt_player.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 import 'package:video_player/video_player.dart';
@@ -63,16 +62,12 @@ class _MobileContentHeader extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              VericalIconButton(
-                icon: Icons.add,
-                title: 'Add',
-                onTap: () => print('ADD'),
-              ),
+              VericalIconButton(icon: Icons.add, title: 'Add', onTap: () {}),
               _PlayButton(),
               VericalIconButton(
                 icon: Icons.info_outline,
                 title: 'info',
-                onTap: () => print('info'),
+                onTap: () {},
               ),
             ],
           ),
@@ -85,8 +80,7 @@ class _MobileContentHeader extends StatelessWidget {
 class _DesktopContentHeader extends StatefulWidget {
   final Content featuredContent;
 
-  const _DesktopContentHeader({Key? key, required this.featuredContent})
-    : super(key: key);
+  const _DesktopContentHeader({required this.featuredContent});
 
   @override
   State<_DesktopContentHeader> createState() => _DesktopContentHeaderState();
@@ -102,9 +96,12 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
         VideoPlayerController.networkUrl(
             Uri.parse(widget.featuredContent.videoUrl),
           )
-          ..initialize().then((_) => setState(() {}))
-          ..setVolume(0)
-          ..play();
+          ..initialize().then(
+            (_) => setState(() {
+              _videoController.setVolume(0);
+              _videoController.play();
+            }),
+          );
   }
 
   @override
@@ -189,30 +186,27 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
                   children: [
                     _PlayButton(),
                     const SizedBox(width: 60.0),
-                    ElevatedButton.icon(
-                      onPressed: () => print('Moreinfo'),
-                      icon: const Icon(Icons.info_outline),
-                      label: const Text(
-                        'More Info',
-                        style: TextStyle(
-                          fontSize: 16.0,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ReusableButton(
+                      onTap: () {},
+                      leading: const Icon(
+                        Icons.info_outline,
+                        color: Colors.white,
                       ),
+                      label: 'More Info',
                     ),
                     const SizedBox(width: 20.0),
                     if (_videoController.value.isInitialized)
-                      IconButton(
-                        onPressed: () => setState(() {
+                      ReusableButton(
+                        variant: ReusableButtonVariant.outline,
+                        onTap: () => setState(() {
                           isMuted
-                              ? _videoController.setVolume(100)
+                              ? _videoController.setVolume(1)
                               : _videoController.setVolume(0);
                           isMuted = _videoController.value.volume == 0;
                         }),
-                        icon: Icon(
+                        leading: Icon(
                           isMuted ? Icons.volume_off : Icons.volume_up,
                           color: Colors.white,
-                          size: 30.0,
                         ),
                       ),
                   ],
@@ -234,14 +228,16 @@ class _PlayButton extends StatelessWidget {
           ? const EdgeInsets.fromLTRB(15, 5, 20, 5)
           : const EdgeInsets.fromLTRB(25, 10, 30, 10),
 
-      child: ElevatedButton.icon(
-        onPressed: () => Navigator.push(
+      child: ReusableButton(
+        variant: ReusableButtonVariant.secondary,
+
+        onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => YTFull()),
           // MaterialPageRoute(builder: (context) => RSNewVideoPlayerScreen()),
         ),
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Play.....'),
+        leading: Icon(Icons.play_arrow, color: Colors.white),
+        label: 'Play',
       ),
     );
   }

@@ -1,5 +1,6 @@
+// ignore_for_file: invalid_use_of_protected_member, unused_element
+
 import 'dart:async';
-import 'package:elysian/video_player/yt_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -29,7 +30,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   Timer? _hideTimer;
 
   // Ad state
-  List<Duration> _adPositions = [];
+  final List<Duration> _adPositions = [];
 
   final List<String> _adUrls = [
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
@@ -83,21 +84,21 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _controller
       ..initialize().then((_) {
         // Calculate ad positions 10%, 25, 50%, 80%
-        final total_duration = _controller.value.duration;
+        final totalDuration = _controller.value.duration;
 
         setState(() {
           _adPositions.addAll([
             Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.1).toInt(),
+              milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
             ),
             Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.25).toInt(),
+              milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
             ),
             Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.5).toInt(),
+              milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
             ),
             Duration(
-              milliseconds: (total_duration.inMilliseconds * 0.8).toInt(),
+              milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
             ),
           ]);
           _controller.play();
@@ -391,10 +392,10 @@ class ControlBar extends StatefulWidget {
   const ControlBar({super.key, required this.formatTime});
 
   @override
-  _ControlBarState createState() => _ControlBarState();
+  ControlBarState createState() => ControlBarState();
 }
 
-class _ControlBarState extends State<ControlBar> {
+class ControlBarState extends State<ControlBar> {
   bool _isDragging = false;
   double _dragValue = 0;
 
@@ -610,7 +611,7 @@ class GestureDetectorOverlay extends StatelessWidget {
     final state = context
         .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
 
-    void _startHideTimer() {
+    void startHideTimer() {
       state._hideTimer?.cancel(); // Cancel any existing timer
 
       state._hideTimer = Timer(Duration(seconds: 3), () {
@@ -620,7 +621,7 @@ class GestureDetectorOverlay extends StatelessWidget {
       });
     }
 
-    void _toggleControls() {
+    void toggleControls() {
       state.setState(() {
         state._showControls = !state._showControls;
       });
@@ -634,7 +635,7 @@ class GestureDetectorOverlay extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: _toggleControls,
+      onTap: toggleControls,
       onDoubleTapDown: (d) {
         state.setState(() {
           final width = MediaQuery.of(context).size.width;

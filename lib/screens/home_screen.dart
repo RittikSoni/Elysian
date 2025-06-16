@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   late ScrollController _scrollController;
   double _scollOffset = 0.0;
   @override
@@ -35,8 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        child: CustomAppBar(scrollOffset: _scollOffset),
         preferredSize: Size(MediaQuery.of(context).size.width, 50),
+        child: CustomAppBar(scrollOffset: _scollOffset),
       ),
       body: CustomScrollView(
         controller: _scrollController,

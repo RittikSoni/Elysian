@@ -1,5 +1,7 @@
+// ignore_for_file: invalid_use_of_protected_member, unused_element
+
 import 'dart:async';
-import 'package:elysian/video_player/yt_player.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -19,13 +21,7 @@ class YTFull extends StatefulWidget {
 class _YTFullState extends State<YTFull> {
   late YoutubePlayerController _controller;
 
-  late TextEditingController _idController;
-  late TextEditingController _seekToController;
-
-  late PlayerState _playerState;
-  late YoutubeMetaData _videoMetaData;
-  bool _muted = false;
-  bool _isPlayerReady = false;
+  final bool _isPlayerReady = false;
 
   final List<String> _ids = [
     'QdBZY2fkU-0',
@@ -52,7 +48,7 @@ class _YTFullState extends State<YTFull> {
   Timer? _hideTimer;
 
   // Ad state
-  List<Duration> _adPositions = [];
+  final List<Duration> _adPositions = [];
 
   final List<String> _adUrls = [
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
@@ -107,20 +103,12 @@ class _YTFullState extends State<YTFull> {
         hideControls: true,
       ),
     )..addListener(listener);
-    _idController = TextEditingController();
-    _seekToController = TextEditingController();
-    _videoMetaData = const YoutubeMetaData();
-    _playerState = PlayerState.unknown;
     initializeVid();
   }
 
   void listener() {
     if (_isPlayerReady && mounted && !_controller.value.isFullScreen) {
-      setState(() {
-        _playerState = _controller.value.playerState;
-        _videoMetaData = _controller.metadata;
-        print('caleeedd111');
-      });
+      setState(() {});
     }
     // Timer.periodic(
     //   Duration(seconds: 1),
@@ -134,7 +122,7 @@ class _YTFullState extends State<YTFull> {
     await Future.delayed(Duration(seconds: 2));
     if (_controller.value.isReady) {
       // Calculate ad positions 10%, 25, 50%, 80%
-      final total_duration = _controller.value.metaData.duration;
+      final totalDuration = _controller.value.metaData.duration;
 
       setState(() {
         _adPositions.addAll([
@@ -142,7 +130,7 @@ class _YTFullState extends State<YTFull> {
           // Duration(
           //   milliseconds: (total_duration.inMilliseconds * 0.25).toInt(),
           // ),
-          Duration(milliseconds: (total_duration.inMilliseconds * 0.5).toInt()),
+          Duration(milliseconds: (totalDuration.inMilliseconds * 0.5).toInt()),
           // Duration(milliseconds: (total_duration.inMilliseconds * 0.8).toInt()),
         ]);
         _controller.play();
@@ -156,7 +144,7 @@ class _YTFullState extends State<YTFull> {
       });
     } else {
       // Handle error if video is not initialized
-      print("Video player not initialized");
+      debugPrint("Video player not initialized");
     }
   }
 
@@ -462,10 +450,10 @@ class ControlBar extends StatefulWidget {
   const ControlBar({super.key, required this.formatTime});
 
   @override
-  _ControlBarState createState() => _ControlBarState();
+  ControlBarState createState() => ControlBarState();
 }
 
-class _ControlBarState extends State<ControlBar> {
+class ControlBarState extends State<ControlBar> {
   bool _isDragging = false;
   double _dragValue = 0;
 
