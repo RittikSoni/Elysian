@@ -182,34 +182,43 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
                   ),
                 ),
                 const SizedBox(height: 20.0),
-                Row(
-                  children: [
-                    _PlayButton(),
-                    const SizedBox(width: 60.0),
-                    ReusableButton(
-                      onTap: () {},
-                      leading: const Icon(
-                        Icons.info_outline,
-                        color: Colors.white,
-                      ),
-                      label: 'More Info',
-                    ),
-                    const SizedBox(width: 20.0),
-                    if (_videoController.value.isInitialized)
-                      ReusableButton(
-                        variant: ReusableButtonVariant.outline,
-                        onTap: () => setState(() {
-                          isMuted
-                              ? _videoController.setVolume(1)
-                              : _videoController.setVolume(0);
-                          isMuted = _videoController.value.volume == 0;
-                        }),
-                        leading: Icon(
-                          isMuted ? Icons.volume_off : Icons.volume_up,
-                          color: Colors.white,
+                SizedBox(
+                  width: Responsive.isDesktop(context) ? 500 : 300,
+                  height: 50,
+                  child: Row(
+                    children: [
+                      Expanded(child: _PlayButton()),
+                      SizedBox(width: 10.0),
+                      Expanded(
+                        child: ReusableButton(
+                          onTap: () {},
+                          leading: const Icon(
+                            Icons.info_outline,
+                            color: Colors.white,
+                          ),
+                          label: 'More Info',
                         ),
                       ),
-                  ],
+                      SizedBox(width: 10.0),
+
+                      if (_videoController.value.isInitialized)
+                        Expanded(
+                          child: ReusableButton(
+                            variant: ReusableButtonVariant.outline,
+                            onTap: () => setState(() {
+                              isMuted
+                                  ? _videoController.setVolume(1)
+                                  : _videoController.setVolume(0);
+                              isMuted = _videoController.value.volume == 0;
+                            }),
+                            leading: Icon(
+                              isMuted ? Icons.volume_off : Icons.volume_up,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -223,22 +232,16 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
 class _PlayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: !Responsive.isDesktop(context)
-          ? const EdgeInsets.fromLTRB(15, 5, 20, 5)
-          : const EdgeInsets.fromLTRB(25, 10, 30, 10),
+    return ReusableButton(
+      variant: ReusableButtonVariant.secondary,
 
-      child: ReusableButton(
-        variant: ReusableButtonVariant.secondary,
-
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => YTFull()),
-          // MaterialPageRoute(builder: (context) => RSNewVideoPlayerScreen()),
-        ),
-        leading: Icon(Icons.play_arrow, color: Colors.white),
-        label: 'Play',
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => YTFull()),
+        // MaterialPageRoute(builder: (context) => RSNewVideoPlayerScreen()),
       ),
+      leading: Icon(Icons.play_arrow, color: Colors.white),
+      label: 'Play',
     );
   }
 }
