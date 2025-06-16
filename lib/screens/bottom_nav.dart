@@ -6,10 +6,10 @@ class BottomNav extends StatefulWidget {
   const BottomNav({super.key});
 
   @override
-  _BottomNavState createState() => _BottomNavState();
+  BottomNavState createState() => BottomNavState();
 }
 
-class _BottomNavState extends State<BottomNav> {
+class BottomNavState extends State<BottomNav> {
   final List<Widget> _screens = [
     HomeScreen(key: PageStorageKey('homeScreen')),
     Scaffold(),

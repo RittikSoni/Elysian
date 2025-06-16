@@ -28,7 +28,7 @@ class _PreviewsState extends State<Previews> {
             ),
           ),
         ),
-        Container(
+        SizedBox(
           height: 165.0,
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -38,7 +38,7 @@ class _PreviewsState extends State<Previews> {
               final Content content = widget.contentList[index];
 
               return GestureDetector(
-                onTap: () => print(content.name),
+                onTap: () {},
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -74,13 +74,13 @@ class _PreviewsState extends State<Previews> {
                       ),
                     ),
                     Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
                       child: SizedBox(
                         height: 60,
                         child: Image.asset(content.titleImageUrl),
                       ),
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
                     ),
                   ],
                 ),

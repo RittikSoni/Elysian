@@ -30,7 +30,7 @@ class ContentList extends StatelessWidget {
               ),
             ),
           ),
-          Container(
+          SizedBox(
             height: isOriginals ? 550.0 : 220.0,
             child: ListView.builder(
               padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
@@ -39,7 +39,7 @@ class ContentList extends StatelessWidget {
               itemBuilder: (BuildContext context, int index) {
                 final Content content = contentList[index];
                 return GestureDetector(
-                  onTap: () => print(content.name),
+                  onTap: () {},
                   child: Container(
                     margin: EdgeInsets.symmetric(horizontal: 8.0),
                     height: isOriginals ? 400.0 : 200.0,
