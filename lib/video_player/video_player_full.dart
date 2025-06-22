@@ -105,7 +105,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
         });
       })
       ..addListener(() {
-        // TODO: Uncomment this to trigger ad break
+        /// trigger ad break
         _onMainVideoUpdate();
         // Trigger UI rebuild for timeline
         if (!_inAdBreak) setState(() {});
