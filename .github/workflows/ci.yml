@@ -1,0 +1,29 @@
+name: Flutter Lint
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint:
+    name: Format & Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your code
+      - uses: actions/checkout@v4
+
+      # 2. Set up Flutter SDK
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # 3. Enforce Dart/Flutter formatting
+      - name: Check formatting
+        run: flutter format --set-exit-if-changed .
+
+      # 4. Static analysis
+      - name: Run analyzer
+        run: flutter analyze --no-fatal-infos
