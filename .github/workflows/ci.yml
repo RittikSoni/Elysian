@@ -1,29 +1,40 @@
+# .github/workflows/ci.yml
 name: Flutter Lint
 
 on:
   push:
-    branches: ["**"]
+    branches: ["**"] # run on every push, any branch
   pull_request:
-    branches: ["**"]
+    branches: ["main", "develop"] # and on PRs targeting your protected branches
 
 jobs:
   lint:
-    name: Format & Analyze
+    name: 🧹 Format & Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: true
 
     steps:
-      # 1. Check out your code
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # 2. Set up Flutter SDK
-      - uses: subosito/flutter-action@v2
+      - name: Cache pub dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
 
-      # 3. Enforce Dart/Flutter formatting
-      - name: Check formatting
-        run: dart format --set-exit-if-changed .
+      - name: Install dependencies
+        run: flutter pub get
 
-      # 4. Static analysis
+      - name: Check formatting
+        run: flutter format --set-exit-if-changed .
+
       - name: Run analyzer
         run: flutter analyze --no-fatal-warnings
