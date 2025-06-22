@@ -1,0 +1,97 @@
+# .github/workflows/ci.yml
+name: Flutter CI
+
+# 1. Only run when Flutter/Dart files or pubspec change
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "lib/**/*.dart"
+      - "test/**/*.dart"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+  pull_request:
+    branches: ["main", "develop"]
+    paths:
+      - "lib/**/*.dart"
+      - "test/**/*.dart"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+# 2. Cancel in-flight runs on the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # A. Lint & Analyze (lightweight, runs first)
+  lint:
+    name: 🧹 Lint & Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # only latest commit
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get --offline
+
+      - name: Check formatting
+        run: flutter format --set-exit-if-changed .
+
+      - name: Run static analysis
+        run: flutter analyze --no-fatal-warnings
+
+  # B. Unit Tests (can run in parallel once lint passes)
+  # unit-tests:
+  #   name: ✅ Unit Tests
+  #   runs-on: ubuntu-latest
+  #   needs: lint
+  #   timeout-minutes: 15
+  #   strategy:
+  #     fail-fast: true
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 1
+
+  #     - name: Cache pub dependencies
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ~/.pub-cache
+  #         key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.yaml') }}
+
+  #     - name: Setup Flutter
+  #       uses: subosito/flutter-action@v2
+  #       with:
+  #         channel: stable
+
+  #     - name: Install dependencies
+  #       run: flutter pub get --offline
+
+  #     - name: Run tests & collect coverage
+  #       run: flutter test --coverage
+
+  #     - name: Upload coverage report
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: coverage-report
+  #         path: coverage/
+# (Future C. Widget & Integration Tests on macOS or Android emulator)
+# (Future D. Manual Build & Release workflows)
