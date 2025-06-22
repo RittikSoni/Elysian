@@ -25,69 +25,114 @@ concurrency:
 
 env:
   FLUTTER_CHANNEL: stable
-  CACHE_KEY: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
 
 jobs:
-  build:
-    name: 🚀 Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - target: android
-            os: ubuntu-latest
-            run: "flutter build apk --release"
-            artifact: "build/app/outputs/**/*.apk"
-            when: ${{ github.event.inputs.include-android == 'true' }}
-          - target: ios
-            os: macos-latest
-            run: "flutter build ios --simulator"
-            artifact: "build/ios/ipa/**/*.app"
-            needs-approval: true
-            when: ${{ github.event.inputs.include-ios == 'true' }}
-          - target: web
-            os: ubuntu-latest
-            run: "flutter build web --release"
-            artifact: "build/web/"
-            when: ${{ github.event.inputs.include-web == 'true' }}
-
-    # skip any matrix entry where `when` is false
-    if: matrix.when
-
-    # require approval if iOS
-    environment: ${{ matrix.needs-approval && 'production' || '' }}
+  build-android:
+    if: ${{ github.event.inputs.include-android == 'true' }}
+    name: 🤖 Android AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - &checkout
-        name: Checkout (shallow)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Cache pub (and Gradle for Android)
+      - name: Cache Pub & Gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
             ~/.gradle
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml', 'android/**/build.gradle') }}
 
-      - &setup_flutter
-        name: Setup Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Install deps (offline)
+      - name: Install dependencies
         run: flutter pub get --offline
 
-      - name: Build ${{ matrix.target }}
-        run: ${{ matrix.run }}
+      - name: Build Android AppBundle
+        run: flutter build appbundle --release
 
-      - name: Upload ${{ matrix.target }} artifact
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-${{ github.event.inputs.release-tag }}
-          path: ${{ matrix.artifact }}
+          name: android-aab-${{ github.event.inputs.release-tag }}
+          path: build/app/outputs/**/*.aab
+
+  build-ios:
+    if: ${{ github.event.inputs.include-ios == 'true' }}
+    name: 📱 iOS IPA
+    runs-on: macos-latest
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cache Pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+
+      - name: Install dependencies
+        run: flutter pub get --offline
+
+      # Insert Fastlane Match or provisioning logic here if needed
+
+      - name: Build iOS IPA
+        run: flutter build ipa --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.release-tag }}
+          path: build/ios/ipa/**/*.ipa
+
+  build-web:
+    if: ${{ github.event.inputs.include-web == 'true' }}
+    name: 🌐 Web Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cache Pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+
+      - name: Install dependencies
+        run: flutter pub get --offline
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Upload Web Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle-${{ github.event.inputs.release-tag }}
+          path: build/web/
