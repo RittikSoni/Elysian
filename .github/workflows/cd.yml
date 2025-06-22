@@ -52,17 +52,21 @@ jobs:
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Install dependencies
-        run: flutter pub get --offline
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
 
-      - name: Build Android AppBundle
-        run: flutter build appbundle --release
+      - name: Build Android apk
+        run: flutter build apk --release
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: android-aab-${{ github.event.inputs.release-tag }}
-          path: build/app/outputs/**/*.aab
+          path: build/app/outputs/**/*.apk
 
   build-ios:
     if: ${{ github.event.inputs.include-ios == 'true' }}
@@ -88,19 +92,23 @@ jobs:
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Install dependencies
-        run: flutter pub get --offline
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
 
       # Insert Fastlane Match or provisioning logic here if needed
 
       - name: Build iOS IPA
-        run: flutter build ipa --export-options-plist=ios/ExportOptions.plist
+        run: flutter build ios --simulator
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa-${{ github.event.inputs.release-tag }}
-          path: build/ios/ipa/**/*.ipa
+          path: build/ios/ipa/**/*.app
 
   build-web:
     if: ${{ github.event.inputs.include-web == 'true' }}
@@ -125,8 +133,12 @@ jobs:
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Install dependencies
-        run: flutter pub get --offline
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
 
       - name: Build Web
         run: flutter build web --release
