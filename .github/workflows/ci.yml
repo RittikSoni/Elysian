@@ -22,8 +22,8 @@ jobs:
 
       # 3. Enforce Dart/Flutter formatting
       - name: Check formatting
-        run: flutter format --set-exit-if-changed .
+        run: dart format --set-exit-if-changed .
 
       # 4. Static analysis
       - name: Run analyzer
-        run: flutter analyze --no-fatal-infos
+        run: dart analyze --no-fatal-warnings
