@@ -139,7 +139,7 @@ class _YTFullState extends State<YTFull> {
       });
 
       _controller.addListener(() {
-        // TODO: Uncomment this to trigger ad break
+        // trigger ad break
         _onMainVideoUpdate();
         // Trigger UI rebuild for timeline
         if (!_inAdBreak) setState(() {});
