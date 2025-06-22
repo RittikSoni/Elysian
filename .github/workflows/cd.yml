@@ -1,72 +1,150 @@
 name: CD
 
-# only manual trigger
 on:
   workflow_dispatch:
     inputs:
       release-tag:
         description: "Semantic version (e.g. v1.2.0)"
         required: true
+      include-android:
+        description: "Build Android?"
+        required: false
+        default: "true"
+      include-ios:
+        description: "Build iOS?"
+        required: false
+        default: "true"
+      include-web:
+        description: "Build Web?"
+        required: false
+        default: "true"
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_CHANNEL: stable
 
 jobs:
-  build-and-release:
-    name: 🚀 Build & Release
-    runs-on: macos-latest
-    environment:
-      name: production
-      # require reviewers in repo Settings → Environments → production
-    timeout-minutes: 30
+  build-android:
+    if: ${{ github.event.inputs.include-android == 'true' }}
+    name: 🤖 Android AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          fetch-depth: 1
 
-      - name: Cache pub & Gradle
-        uses: actions/cache@v3
+      - name: Cache Pub & Gradle
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
             ~/.gradle
-          key: ${{ runner.os }}-build-${{ hashFiles('**/pubspec.*', 'android/**/build.gradle') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml', 'android/**/build.gradle') }}
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Build Android AAB
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
+
+      - name: Build Android apk
         run: flutter build apk --release
 
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ github.event.inputs.release-tag }}
+          path: build/app/outputs/**/*.apk
+
+  build-ios:
+    if: ${{ github.event.inputs.include-ios == 'true' }}
+    name: 📱 iOS IPA
+    runs-on: macos-latest
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cache Pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
+
+      # Insert Fastlane Match or provisioning logic here if needed
+
       - name: Build iOS IPA
-        run: flutter build ios --simulator --release --no-codesign
+        run: flutter build ios --simulator
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.release-tag }}
+          path: build/ios/ipa/**/*.app
+
+  build-web:
+    if: ${{ github.event.inputs.include-web == 'true' }}
+    name: 🌐 Web Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Cache Pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+
+      - name: Install dependencies (try offline, fallback online)
+        run: |
+          if ! flutter pub get --offline; then
+            echo "⚠️ Cache miss – falling back to online pub get"
+            flutter pub get
+          fi
 
       - name: Build Web
         run: flutter build web --release
 
-      - name: Upload Artifacts
+      - name: Upload Web Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-${{ github.event.inputs.release-tag }}
-          path: |
-            build/app/outputs/**/*.apk
-            build/ios/ipa/**/*.app
-            build/web/
-
-    #   - name: Create GitHub Release
-    #     uses: softprops/action-gh-release@v1
-    #     with:
-    #       tag_name: ${{ github.event.inputs.release-tag }}
-    #       name: Release ${{ github.event.inputs.release-tag }}
-    #     env:
-    #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    #   - name: Notify Slack (optional)
-    #     if: success()
-    #     uses: 8398a7/action-slack@v3
-    #     with:
-    #       payload: |
-    #         { "text": "🚀 Release ${{ github.event.inputs.release-tag }} succeeded!" }
-    #     env:
-    #       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          name: web-bundle-${{ github.event.inputs.release-tag }}
+          path: build/web/
