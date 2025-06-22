@@ -1,72 +1,93 @@
 name: CD
 
-# only manual trigger
 on:
   workflow_dispatch:
     inputs:
       release-tag:
         description: "Semantic version (e.g. v1.2.0)"
         required: true
+      include-android:
+        description: "Build Android?"
+        required: false
+        default: "true"
+      include-ios:
+        description: "Build iOS?"
+        required: false
+        default: "true"
+      include-web:
+        description: "Build Web?"
+        required: false
+        default: "true"
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_CHANNEL: stable
+  CACHE_KEY: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
 
 jobs:
-  build-and-release:
-    name: 🚀 Build & Release
-    runs-on: macos-latest
-    environment:
-      name: production
-      # require reviewers in repo Settings → Environments → production
+  build:
+    name: 🚀 Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: android
+            os: ubuntu-latest
+            run: "flutter build apk --release"
+            artifact: "build/app/outputs/**/*.apk"
+            when: ${{ github.event.inputs.include-android == 'true' }}
+          - target: ios
+            os: macos-latest
+            run: "flutter build ios --simulator"
+            artifact: "build/ios/ipa/**/*.app"
+            needs-approval: true
+            when: ${{ github.event.inputs.include-ios == 'true' }}
+          - target: web
+            os: ubuntu-latest
+            run: "flutter build web --release"
+            artifact: "build/web/"
+            when: ${{ github.event.inputs.include-web == 'true' }}
+
+    # skip any matrix entry where `when` is false
+    if: matrix.when
+
+    # require approval if iOS
+    environment: ${{ matrix.needs-approval && 'production' || '' }}
+
     steps:
-      - name: Checkout code
+      - &checkout
+        name: Checkout (shallow)
         uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          fetch-depth: 1
 
-      - name: Cache pub & Gradle
-        uses: actions/cache@v3
+      - name: Cache pub (and Gradle for Android)
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
             ~/.gradle
-          key: ${{ runner.os }}-build-${{ hashFiles('**/pubspec.*', 'android/**/build.gradle') }}
+          key: ${{ env.CACHE_KEY }}
 
-      - name: Install dependencies
-        run: flutter pub get
+      - &setup_flutter
+        name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
 
-      - name: Build Android AAB
-        run: flutter build apk --release
+      - name: Install deps (offline)
+        run: flutter pub get --offline
 
-      - name: Build iOS IPA
-        run: flutter build ios --simulator --release --no-codesign
+      - name: Build ${{ matrix.target }}
+        run: ${{ matrix.run }}
 
-      - name: Build Web
-        run: flutter build web --release
-
-      - name: Upload Artifacts
+      - name: Upload ${{ matrix.target }} artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-${{ github.event.inputs.release-tag }}
-          path: |
-            build/app/outputs/**/*.apk
-            build/ios/ipa/**/*.app
-            build/web/
-
-    #   - name: Create GitHub Release
-    #     uses: softprops/action-gh-release@v1
-    #     with:
-    #       tag_name: ${{ github.event.inputs.release-tag }}
-    #       name: Release ${{ github.event.inputs.release-tag }}
-    #     env:
-    #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    #   - name: Notify Slack (optional)
-    #     if: success()
-    #     uses: 8398a7/action-slack@v3
-    #     with:
-    #       payload: |
-    #         { "text": "🚀 Release ${{ github.event.inputs.release-tag }} succeeded!" }
-    #     env:
-    #       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          name: ${{ matrix.target }}-${{ github.event.inputs.release-tag }}
+          path: ${{ matrix.artifact }}
