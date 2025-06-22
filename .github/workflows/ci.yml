@@ -26,4 +26,4 @@ jobs:
 
       # 4. Static analysis
       - name: Run analyzer
-        run: dart analyze --no-fatal-warnings
+        run: flutter analyze --no-fatal-warnings
