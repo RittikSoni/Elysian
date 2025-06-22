@@ -8,7 +8,6 @@ class NetflixUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("App started");
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
