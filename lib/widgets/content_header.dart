@@ -1,5 +1,7 @@
 import 'package:elysian/components/reusable_btn.dart';
+
 import 'package:elysian/models/content_model.dart';
+import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/video_player/yt_full.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
@@ -86,7 +88,8 @@ class _DesktopContentHeader extends StatefulWidget {
   State<_DesktopContentHeader> createState() => _DesktopContentHeaderState();
 }
 
-class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
+class _DesktopContentHeaderState extends State<_DesktopContentHeader>
+    with RouteAware, WidgetsBindingObserver {
   late VideoPlayerController _videoController;
   bool isMuted = true;
   @override
@@ -102,6 +105,38 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader> {
               _videoController.play();
             }),
           );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void didPushNext() {
+    _videoController.pause();
+  }
+
+  @override
+  void didPopNext() {
+    if (_videoController.value.isInitialized) {
+      _videoController.play();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _videoController.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      // only resume if the route is still active
+      final ModalRoute<dynamic>? route = ModalRoute.of(context);
+      if (route?.isCurrent == true && _videoController.value.isInitialized) {
+        _videoController.play();
+      }
+    }
   }
 
   @override

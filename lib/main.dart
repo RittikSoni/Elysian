@@ -1,3 +1,4 @@
+import 'package:elysian/utils/kroute.dart';
 import 'package:flutter/material.dart';
 import 'screens/screens.dart';
 
@@ -16,6 +17,8 @@ class NetflixUI extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       title: 'Elysian',
+      navigatorKey: navigatorKey,
+      navigatorObservers: [routeObserver],
       home: BottomNav(),
     );
   }
