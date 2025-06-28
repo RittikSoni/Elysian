@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:elysian/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -91,7 +92,6 @@ class _YTFullState extends State<YTFull> {
     _initVolumeAndBrightness();
     _controller = YoutubePlayerController(
       initialVideoId: _ids.first,
-
       flags: const YoutubePlayerFlags(
         mute: false,
         autoPlay: true,
@@ -829,24 +829,16 @@ class _EpisodeListOverlayState extends State<EpisodeListOverlay>
     with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext ctx) {
-    final state = ctx.findAncestorStateOfType<_YTFullState>()!;
     return Positioned(
       right: 0,
       top: 0,
       child: Container(
         width: MediaQuery.of(ctx).size.width / 2,
-        margin: EdgeInsets.only(bottom: 80),
-        decoration: BoxDecoration(color: const Color.fromARGB(223, 0, 0, 0)),
-        child: Column(
-          children: [
-            SizedBox(height: 290, child: EpisodeViewMovieScreen()),
-            TextButton(
-              child: Text("Close", style: TextStyle(color: Colors.white)),
-              onPressed: () =>
-                  state.setState(() => state._showEpisodeList = false),
-            ),
-          ],
+        margin: EdgeInsets.only(
+          bottom: Responsive.isMobile(context) ? 120 : 80,
         ),
+        decoration: BoxDecoration(color: const Color.fromARGB(223, 0, 0, 0)),
+        child: Column(children: [Expanded(child: EpisodeViewMovieScreen())]),
       ),
     );
   }
@@ -866,12 +858,25 @@ class EpisodeViewMovieScreen extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 12.0),
-            child: Text(
-              'Seasons',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Seasons',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, color: Colors.white),
+                  onPressed: () {
+                    final state = context
+                        .findAncestorStateOfType<_YTFullState>()!;
+                    state.setState(() => state._showEpisodeList = false);
+                  },
+                ),
+              ],
             ),
           ),
           DefaultTabController(
