@@ -108,7 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa-${{ github.event.inputs.release-tag }}
-          path: build/ios/ipa/**/*.app
+          path: build/ios/iphonesimulator/*.app
 
   build-web:
     if: ${{ github.event.inputs.include-web == 'true' }}
