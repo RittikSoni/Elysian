@@ -2,10 +2,10 @@ import 'package:elysian/utils/kroute.dart';
 import 'package:flutter/material.dart';
 import 'screens/screens.dart';
 
-void main() => runApp(NetflixUI());
+void main() => runApp(Elysian());
 
-class NetflixUI extends StatelessWidget {
-  const NetflixUI({super.key});
+class Elysian extends StatelessWidget {
+  const Elysian({super.key});
 
   @override
   Widget build(BuildContext context) {
