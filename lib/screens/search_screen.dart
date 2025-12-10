@@ -1,5 +1,7 @@
 import 'package:elysian/data/data.dart';
 import 'package:elysian/models/models.dart';
+import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/link_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -14,7 +16,8 @@ class SearchScreen extends StatefulWidget {
 
 class SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<Content> _searchResults = [];
+  List<Content> _contentResults = [];
+  List<SavedLink> _linkResults = [];
   bool _isSearching = false;
   late ScrollController _scrollController;
   double _scrollOffset = 0.0;
@@ -43,28 +46,46 @@ class SearchScreenState extends State<SearchScreen> {
     if (query.isEmpty) {
       setState(() {
         _isSearching = false;
-        _searchResults = [];
+        _contentResults = [];
+        _linkResults = [];
       });
     } else {
       setState(() {
         _isSearching = true;
-        _searchResults = _performSearch(query);
+        _performSearch(query);
       });
     }
   }
 
-  List<Content> _performSearch(String query) {
+  Future<void> _performSearch(String query) async {
+    // Search content
     final allContent = [
       ...previews,
       ...myList,
       ...originals,
       ...trending,
     ];
-    return allContent
+    final contentResults = allContent
         .where((content) =>
             content.name.toLowerCase().contains(query) ||
             content.description.toLowerCase().contains(query))
         .toList();
+
+    // Search saved links
+    final allLinks = await StorageService.getSavedLinks();
+    final linkResults = allLinks
+        .where((link) =>
+            link.title.toLowerCase().contains(query) ||
+            (link.description?.toLowerCase().contains(query) ?? false) ||
+            link.url.toLowerCase().contains(query))
+        .toList();
+
+    if (mounted) {
+      setState(() {
+        _contentResults = contentResults;
+        _linkResults = linkResults;
+      });
+    }
   }
 
   int _getCrossAxisCount(BuildContext context) {
@@ -185,7 +206,7 @@ class SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             )
-          else if (_searchResults.isEmpty)
+          else if (_contentResults.isEmpty && _linkResults.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
@@ -214,40 +235,88 @@ class SearchScreenState extends State<SearchScreen> {
               padding: EdgeInsets.symmetric(
                 horizontal: isDesktop ? 40.0 : 20.0,
               ),
-              sliver: SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _getCrossAxisCount(context),
-                        childAspectRatio: 0.7,
-                        crossAxisSpacing: 10.0,
-                        mainAxisSpacing: 10.0,
-                      ),
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final content = _searchResults[index];
-                        return GestureDetector(
-                          onTap: () {
-                            // Handle content tap
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4.0),
-                              image: DecorationImage(
-                                image: AssetImage(content.imageUrl),
-                                fit: BoxFit.cover,
-                              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Saved Links Section
+                  if (_linkResults.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Saved Links',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20.0,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        );
-                      },
+                          const SizedBox(height: 16.0),
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _linkResults.length,
+                              itemBuilder: (context, index) {
+                                final link = _linkResults[index];
+                                return _buildLinkCard(link, isDesktop);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                  ],
+                  // Content Section
+                  if (_contentResults.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Content',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16.0),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: _getCrossAxisCount(context),
+                              childAspectRatio: 0.7,
+                              crossAxisSpacing: 10.0,
+                              mainAxisSpacing: 10.0,
+                            ),
+                            itemCount: _contentResults.length,
+                            itemBuilder: (context, index) {
+                              final content = _contentResults[index];
+                              return GestureDetector(
+                                onTap: () {
+                                  // Handle content tap
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4.0),
+                                    image: DecorationImage(
+                                      image: AssetImage(content.imageUrl),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ]),
               ),
             ),
           SliverPadding(
@@ -256,6 +325,119 @@ class SearchScreenState extends State<SearchScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildLinkCard(SavedLink link, bool isDesktop) {
+    return GestureDetector(
+      onTap: () {
+        LinkHandler.openLink(
+          context,
+          link.url,
+          linkType: link.type,
+          title: link.title,
+          description: link.description,
+        );
+      },
+      child: Container(
+        width: isDesktop ? 300 : 250,
+        margin: const EdgeInsets.only(right: 12.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Row(
+          children: [
+            // Thumbnail
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8.0),
+                bottomLeft: Radius.circular(8.0),
+              ),
+              child: link.thumbnailUrl != null
+                  ? Image.network(
+                      link.thumbnailUrl!,
+                      width: 120,
+                      height: 200,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 120,
+                        height: 200,
+                        color: Colors.grey[800],
+                        child: const Icon(Icons.link, color: Colors.grey),
+                      ),
+                    )
+                  : Container(
+                      width: 120,
+                      height: 200,
+                      color: Colors.grey[800],
+                      child: const Icon(Icons.link, color: Colors.grey),
+                    ),
+            ),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      link.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (link.description != null) ...[
+                      const SizedBox(height: 8.0),
+                      Text(
+                        link.description!,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12.0,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8.0),
+                    Text(
+                      _getLinkTypeLabel(link.type),
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 11.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLinkTypeLabel(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return 'YouTube';
+      case LinkType.instagram:
+        return 'Instagram';
+      case LinkType.vimeo:
+        return 'Vimeo';
+      case LinkType.googledrive:
+        return 'Google Drive';
+      case LinkType.directVideo:
+        return 'Video';
+      case LinkType.web:
+        return 'Web';
+      case LinkType.unknown:
+        return 'Link';
+    }
   }
 }
 

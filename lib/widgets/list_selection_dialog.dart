@@ -129,7 +129,7 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         title: title,
         thumbnailUrl: thumbnailUrl,
         type: linkType,
-        listId: listId,
+        listIds: [listId], // Convert single listId to listIds
         savedAt: DateTime.now(),
       );
 

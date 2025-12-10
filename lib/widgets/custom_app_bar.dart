@@ -1,4 +1,5 @@
 import 'package:elysian/assets.dart';
+import 'package:elysian/screens/lists_management_screen.dart';
 import 'package:elysian/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
@@ -55,7 +56,14 @@ class _MobileCustomAppBar extends StatelessWidget {
                   title: 'Movies',
                 ),
                 _AppBarButton(
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListsManagementScreen(),
+                      ),
+                    );
+                  },
                   title: 'My List',
                 ),
               ],
@@ -99,7 +107,14 @@ class _DesktopCustomAppBar extends StatelessWidget {
                   title: 'Movies',
                 ),
                 _AppBarButton(
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListsManagementScreen(),
+                      ),
+                    );
+                  },
                   title: 'My List',
                 ),
                 _AppBarButton(

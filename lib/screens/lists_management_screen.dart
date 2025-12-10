@@ -255,7 +255,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
             thumbnailUrl: link.thumbnailUrl,
             description: link.description,
             type: link.type,
-            listId: updatedList.id,
+            listIds: [updatedList.id], // Convert single listId to listIds
             savedAt: link.savedAt,
           );
           await StorageService.saveLink(updatedLink);

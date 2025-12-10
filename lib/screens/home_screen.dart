@@ -3,6 +3,8 @@ import 'package:elysian/main.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/saved_links_list.dart';
+import 'package:elysian/widgets/user_lists_widget.dart';
+import 'package:elysian/widgets/list_content_section.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -19,6 +21,7 @@ class HomeScreenState extends State<HomeScreen> {
   late ScrollController _scrollController;
   double _scollOffset = 0.0;
   List<SavedLink> _savedLinks = [];
+  List<UserList> _userLists = [];
 
   @override
   void initState() {
@@ -39,8 +42,10 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSavedLinks() async {
     try {
       final links = await StorageService.getSavedLinks();
+      final lists = await StorageService.getUserLists();
       setState(() {
         _savedLinks = links;
+        _userLists = lists;
       });
     } catch (e) {
       // Handle error silently
@@ -96,10 +101,33 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SliverToBoxAdapter(
+            key: PageStorageKey('userLists'),
+            child: UserListsWidget(
+              onRefresh: _loadSavedLinks,
+            ),
+          ),
+          // Separate sections for each list
+          ..._userLists.map((list) {
+            final listLinks = _savedLinks
+                .where((link) => link.listIds.contains(list.id))
+                .toList();
+            if (listLinks.isEmpty) {
+              return const SliverToBoxAdapter(child: SizedBox.shrink());
+            }
+            return SliverToBoxAdapter(
+              key: PageStorageKey('list_${list.id}'),
+              child: ListContentSection(
+                list: list,
+                links: listLinks,
+                onRefresh: _loadSavedLinks,
+              ),
+            );
+          }).toList(),
+          SliverToBoxAdapter(
             key: PageStorageKey('savedLinks'),
             child: SavedLinksList(
               savedLinks: _savedLinks,
-              title: 'Saved Links',
+              title: 'All Saved Links',
               onRefresh: _loadSavedLinks,
             ),
           ),

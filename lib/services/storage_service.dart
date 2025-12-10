@@ -19,21 +19,36 @@ class StorageService {
 
   static Future<List<SavedLink>> getSavedLinksByList(String listId) async {
     final allLinks = await getSavedLinks();
-    return allLinks.where((link) => link.listId == listId).toList();
+    return allLinks.where((link) => link.listIds.contains(listId)).toList();
   }
 
   static Future<void> saveLink(SavedLink link) async {
     final prefs = await SharedPreferences.getInstance();
     final links = await getSavedLinks();
     
-    // Check if link already exists
-    if (links.any((l) => l.url == link.url && l.listId == link.listId)) {
-      return; // Already saved
+    // Check if link already exists (by ID)
+    final existingIndex = links.indexWhere((l) => l.id == link.id);
+    if (existingIndex != -1) {
+      // Update existing link
+      links[existingIndex] = link;
+    } else {
+      // Check if same URL exists in any of the same lists
+      final duplicateExists = links.any((l) => 
+        l.url == link.url && 
+        l.listIds.any((id) => link.listIds.contains(id))
+      );
+      if (!duplicateExists) {
+        links.add(link);
+      } else {
+        return; // Already saved in one of these lists
+      }
     }
 
-    links.add(link);
     await _updateSavedLinks(prefs, links);
-    await _updateListCount(link.listId);
+    // Update counts for all lists this link belongs to
+    for (final listId in link.listIds) {
+      await _updateListCount(listId);
+    }
   }
 
   static Future<void> deleteLink(String linkId) async {
@@ -43,7 +58,10 @@ class StorageService {
     
     links.removeWhere((l) => l.id == linkId);
     await _updateSavedLinks(prefs, links);
-    await _updateListCount(link.listId, decrement: true);
+    // Update counts for all lists this link belonged to
+    for (final listId in link.listIds) {
+      await _updateListCount(listId, decrement: true);
+    }
   }
 
   static Future<void> _updateSavedLinks(SharedPreferences prefs, List<SavedLink> links) async {
@@ -69,17 +87,17 @@ class StorageService {
 
     // Update item counts
     final allLinks = await getSavedLinks();
-    for (var list in customLists) {
-      final count = allLinks.where((link) => link.listId == list.id).length;
-      if (count != list.itemCount) {
-        list = list.copyWith(itemCount: count);
-      }
-    }
+    
+    // Update custom lists with correct item counts
+    final updatedCustomLists = customLists.map((list) {
+      final count = allLinks.where((link) => link.listIds.contains(list.id)).length;
+      return list.copyWith(itemCount: count);
+    }).toList();
 
-    final defaultCount = allLinks.where((link) => link.listId == _defaultListId).length;
+    final defaultCount = allLinks.where((link) => link.listIds.contains(_defaultListId)).length;
     final updatedDefault = defaultList.copyWith(itemCount: defaultCount);
 
-    return [updatedDefault, ...customLists];
+    return [updatedDefault, ...updatedCustomLists];
   }
 
   static Future<UserList> createUserList(String name, {String? description}) async {
@@ -119,7 +137,13 @@ class StorageService {
     // Move all links from deleted list to default list
     final allLinks = await getSavedLinks();
     for (var link in allLinks) {
-      if (link.listId == listId) {
+      if (link.listIds.contains(listId)) {
+        // Remove the deleted listId and add default if not already present
+        final updatedListIds = List<String>.from(link.listIds)..remove(listId);
+        if (!updatedListIds.contains(_defaultListId)) {
+          updatedListIds.add(_defaultListId);
+        }
+        
         final updatedLink = SavedLink(
           id: link.id,
           url: link.url,
@@ -127,7 +151,7 @@ class StorageService {
           thumbnailUrl: link.thumbnailUrl,
           description: link.description,
           type: link.type,
-          listId: _defaultListId,
+          listIds: updatedListIds,
           savedAt: link.savedAt,
         );
         await deleteLink(link.id);

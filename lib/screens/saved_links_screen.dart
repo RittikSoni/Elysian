@@ -3,6 +3,7 @@ import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
 
 class SavedLinksScreen extends StatefulWidget {
@@ -104,87 +105,256 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     final titleController = TextEditingController(text: link.title);
     final urlController = TextEditingController(text: link.url);
     final descriptionController = TextEditingController(text: link.description ?? '');
+    final newListNameController = TextEditingController();
+    final newListDescriptionController = TextEditingController();
+    final listPickerKey = GlobalKey();
+    List<String> selectedListIds = List<String>.from(link.listIds);
+    bool isCreatingList = false;
+    bool showCreateListForm = false;
 
-    final result = await showDialog<Map<String, String>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Edit Link',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  labelStyle: TextStyle(color: Colors.grey[400]),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: const UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: urlController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'URL',
-                  labelStyle: TextStyle(color: Colors.grey[400]),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: const UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Description (Optional)',
-                  labelStyle: TextStyle(color: Colors.grey[400]),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                  focusedBorder: const UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                ),
-                maxLines: 2,
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text(
+            'Edit Link',
+            style: TextStyle(color: Colors.white),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, {
-                'title': titleController.text.trim(),
-                'url': urlController.text.trim(),
-                'description': descriptionController.text.trim(),
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Title',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'URL',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Description (Optional)',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white),
+                    ),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 24),
+                // Lists Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Lists',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        setDialogState(() {
+                          showCreateListForm = !showCreateListForm;
+                        });
+                      },
+                      icon: Icon(
+                        showCreateListForm ? Icons.close : Icons.add,
+                        size: 18,
+                      ),
+                      label: Text(
+                        showCreateListForm ? 'Cancel' : 'New List',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Create New List Form
+                if (showCreateListForm) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: newListNameController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'List Name',
+                            labelStyle: TextStyle(color: Colors.grey[400]),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.grey[600]!),
+                            ),
+                            focusedBorder: const UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: newListDescriptionController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Description (Optional)',
+                            labelStyle: TextStyle(color: Colors.grey[400]),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.grey[600]!),
+                            ),
+                            focusedBorder: const UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white),
+                            ),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isCreatingList ? null : () async {
+                              final name = newListNameController.text.trim();
+                              if (name.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Please enter a list name')),
+                                );
+                                return;
+                              }
+
+                              setDialogState(() => isCreatingList = true);
+                              try {
+                                final description = newListDescriptionController.text.trim();
+                                final newList = await StorageService.createUserList(
+                                  name,
+                                  description: description.isEmpty ? null : description,
+                                );
+                                
+                                setDialogState(() {
+                                  selectedListIds.add(newList.id);
+                                  showCreateListForm = false;
+                                  isCreatingList = false;
+                                });
+                                
+                                newListNameController.clear();
+                                newListDescriptionController.clear();
+                                
+                                // Refresh the list picker
+                                final state = listPickerKey.currentState;
+                                if (state != null && state.mounted) {
+                                  (state as dynamic).refreshLists();
+                                }
+                                
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('List created successfully!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                setDialogState(() => isCreatingList = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                            ),
+                            child: isCreatingList
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Create List'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                // Multi-List Picker
+                MultiListPicker(
+                  key: listPickerKey,
+                  selectedListIds: selectedListIds,
+                  onSelectionChanged: (listIds) {
+                    setDialogState(() {
+                      selectedListIds = listIds;
+                    });
+                  },
+                ),
+              ],
             ),
-            child: const Text('Save'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, {
+                  'title': titleController.text.trim(),
+                  'url': urlController.text.trim(),
+                  'description': descriptionController.text.trim(),
+                  'listIds': selectedListIds,
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -227,6 +397,19 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           title = await LinkParser.fetchTitleFromUrl(newUrl, linkType);
         }
 
+        // Get selected list IDs from result
+        final selectedListIds = result['listIds'] as List<String>? ?? link.listIds;
+        
+        // Ensure at least one list is selected
+        if (selectedListIds.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please select at least one list.')),
+            );
+          }
+          return;
+        }
+
         // Delete old link and create updated one
         await StorageService.deleteLink(link.id);
         final updatedLink = SavedLink(
@@ -236,7 +419,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           thumbnailUrl: thumbnailUrl,
           description: result['description']!.isEmpty ? null : result['description'],
           type: linkType,
-          listId: link.listId,
+          listIds: selectedListIds,
           savedAt: link.savedAt,
         );
         await StorageService.saveLink(updatedLink);
@@ -300,7 +483,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         thumbnailUrl: thumbnailUrl,
         description: link.description,
         type: link.type,
-        listId: link.listId,
+        listIds: link.listIds, // Keep existing listIds
         savedAt: link.savedAt,
       );
       await StorageService.saveLink(updatedLink);
