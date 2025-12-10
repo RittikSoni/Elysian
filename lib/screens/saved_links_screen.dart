@@ -1,10 +1,11 @@
-import 'package:elysian/main.dart';
 import 'package:elysian/models/models.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class SavedLinksScreen extends StatefulWidget {
@@ -135,9 +136,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
 
     if (confirmed == true) {
       try {
-        await StorageService.deleteLinks(_selectedLinkIds.toList());
+        final linksProvider = context.read<LinksProvider>();
+        await linksProvider.deleteLinks(_selectedLinkIds.toList());
         await _loadLinks();
-        onLinkSavedCallback?.call();
         setState(() {
           _selectedLinkIds.clear();
           _isSelectionMode = false;
@@ -207,8 +208,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           _selectedLinkIds.toList(),
           result,
         );
+        final linksProvider = context.read<LinksProvider>();
+        await linksProvider.loadLinks(forceRefresh: true);
         await _loadLinks();
-        onLinkSavedCallback?.call();
         setState(() {
           _selectedLinkIds.clear();
           _isSelectionMode = false;
@@ -239,8 +241,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         _selectedLinkIds.toList(),
         isFavorite,
       );
+      final linksProvider = context.read<LinksProvider>();
+      await linksProvider.loadLinks(forceRefresh: true);
       await _loadLinks();
-      onLinkSavedCallback?.call();
       setState(() {
         _selectedLinkIds.clear();
         _isSelectionMode = false;
@@ -294,9 +297,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     if (confirmed == true) {
       try {
         await StorageService.deleteLink(link.id);
+        final linksProvider = context.read<LinksProvider>();
+        await linksProvider.loadLinks(forceRefresh: true);
         await _loadLinks();
-        // Refresh home screen
-        onLinkSavedCallback?.call();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -733,9 +736,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           viewCount: link.viewCount,
         );
         await StorageService.saveLink(updatedLink);
+        final linksProvider = context.read<LinksProvider>();
+        await linksProvider.loadLinks(forceRefresh: true);
         await _loadLinks();
-        // Refresh home screen
-        onLinkSavedCallback?.call();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -766,9 +769,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     });
 
     // Then do the async operation
-    await StorageService.toggleFavorite(link.id);
+    final linksProvider = context.read<LinksProvider>();
+    await linksProvider.toggleFavorite(link.id);
     await _loadLinks();
-    onLinkSavedCallback?.call();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -781,9 +784,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
             label: 'Undo',
             textColor: Colors.white,
             onPressed: () async {
-              await StorageService.toggleFavorite(link.id);
+              final linksProvider = context.read<LinksProvider>();
+              await linksProvider.toggleFavorite(link.id);
               await _loadLinks();
-              onLinkSavedCallback?.call();
             },
           ),
         ),
@@ -793,9 +796,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
 
   Future<void> _handleDelete(SavedLink link) async {
     try {
-      await StorageService.deleteLink(link.id);
+      final linksProvider = context.read<LinksProvider>();
+      await linksProvider.deleteLink(link.id);
       await _loadLinks();
-      onLinkSavedCallback?.call();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -869,9 +872,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         viewCount: link.viewCount,
       );
       await StorageService.saveLink(updatedLink);
+      final linksProvider = context.read<LinksProvider>();
+      await linksProvider.loadLinks(forceRefresh: true);
       await _loadLinks();
-      // Refresh home screen
-      onLinkSavedCallback?.call();
 
       if (mounted) {
         Navigator.pop(context); // Close loading

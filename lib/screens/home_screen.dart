@@ -1,7 +1,5 @@
 import 'package:elysian/data/data.dart';
-import 'package:elysian/main.dart';
-import 'package:elysian/models/models.dart';
-import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:elysian/widgets/saved_links_list.dart';
 import 'package:elysian/widgets/user_lists_widget.dart';
 import 'package:elysian/widgets/list_content_section.dart';
@@ -9,6 +7,7 @@ import 'package:elysian/widgets/favorites_section.dart';
 import 'package:elysian/widgets/recent_activity_section.dart';
 import 'package:elysian/widgets/suggestions_section.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,116 +21,51 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   late ScrollController _scrollController;
-  double _scollOffset = 0.0;
-  List<SavedLink> _savedLinks = [];
-  List<UserList> _userLists = [];
-  List<SavedLink> _favoriteLinks = [];
-  List<SavedLink> _recentLinks = [];
-  List<SavedLink> _suggestedLinks = [];
-  bool _isLoading = false;
+  double _scrollOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()
       ..addListener(() {
-        setState(() {
-          _scollOffset = _scrollController.offset;
-        });
-        // context.bloc<AppBarCubit>().setOffset(_scrollController.offset);
+        // Only update if offset changed significantly (performance optimization)
+        final newOffset = _scrollController.offset;
+        if ((newOffset - _scrollOffset).abs() > 1.0) {
+          setState(() {
+            _scrollOffset = newOffset;
+          });
+        }
       });
     
-    // Register refresh callback
-    onLinkSavedCallback = refreshLinks;
-    
-    // Load data after first frame
+    // Initialize providers if not already initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSavedLinks();
-    });
-  }
-
-  Future<void> _loadSavedLinks() async {
-    if (_isLoading) return; // Prevent concurrent loads
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // Load all data in parallel for better performance
-      // Use timeout to prevent hanging indefinitely
-      final results = await Future.wait([
-        StorageService.getSavedLinks(),
-        StorageService.getUserLists(),
-        StorageService.getFavoriteLinks(),
-        StorageService.getRecentlyViewedLinks(limit: 10),
-        StorageService.getSuggestedLinks(limit: 10),
-      ]).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          // Return empty lists if timeout
-          return [
-            <SavedLink>[],
-            <UserList>[],
-            <SavedLink>[],
-            <SavedLink>[],
-            <SavedLink>[],
-          ];
-        },
-      );
+      final linksProvider = context.read<LinksProvider>();
+      final listsProvider = context.read<ListsProvider>();
       
-      if (mounted) {
-        setState(() {
-          _savedLinks = results[0] as List<SavedLink>;
-          _userLists = results[1] as List<UserList>;
-          _favoriteLinks = results[2] as List<SavedLink>;
-          _recentLinks = results[3] as List<SavedLink>;
-          _suggestedLinks = results[4] as List<SavedLink>;
-          _isLoading = false;
-        });
+      if (!linksProvider.isInitialized) {
+        linksProvider.initialize();
       }
-    } catch (e) {
-      print('Error loading saved links: $e');
-      if (mounted) {
-        setState(() {
-          // Set empty lists on error to prevent UI from breaking
-          _savedLinks = [];
-          _userLists = [];
-          _favoriteLinks = [];
-          _recentLinks = [];
-          _suggestedLinks = [];
-          _isLoading = false;
-        });
+      if (!listsProvider.isInitialized) {
+        listsProvider.initialize();
       }
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Don't reload here - it causes issues during initialization
-  }
-
-  // Public method to refresh links (can be called from outside)
-  void refreshLinks() {
-    _loadSavedLinks();
+    });
   }
 
   @override
   void dispose() {
-    onLinkSavedCallback = null;
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Use Consumer widgets for selective rebuilds (performance optimization)
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: Size(MediaQuery.of(context).size.width, 50),
         child: CustomAppBar(
-          scrollOffset: _scollOffset,
+          scrollOffset: _scrollOffset,
           onNavigateToTab: widget.onNavigateToTab,
         ),
       ),
@@ -145,68 +79,103 @@ class HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.only(top: 0),
             sliver: SliverToBoxAdapter(
               child: Previews(
-                key: PageStorageKey(
-                  'previews',
-                ), //(maintain scroll postions) used to maintain the page current state if we change tab it will reamin same as we leave this page
+                key: const PageStorageKey('previews'),
                 title: 'previews',
                 contentList: previews,
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            key: PageStorageKey('userLists'),
-            child: UserListsWidget(
-              onRefresh: _loadSavedLinks,
-            ),
+          // User Lists - only rebuilds when lists change
+          Consumer<ListsProvider>(
+            builder: (context, listsProvider, child) {
+              return SliverToBoxAdapter(
+                key: const PageStorageKey('userLists'),
+                child: UserListsWidget(
+                  onRefresh: () => listsProvider.loadLists(forceRefresh: true),
+                ),
+              );
+            },
           ),
-          // Favorites Section
-          SliverToBoxAdapter(
-            key: PageStorageKey('favorites'),
-            child: FavoritesSection(
-              favoriteLinks: _favoriteLinks,
-              onRefresh: _loadSavedLinks,
-            ),
+          // Favorites Section - only rebuilds when favorites change
+          Consumer<LinksProvider>(
+            builder: (context, linksProvider, child) {
+              return SliverToBoxAdapter(
+                key: const PageStorageKey('favorites'),
+                child: FavoritesSection(
+                  favoriteLinks: linksProvider.favoriteLinks,
+                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                ),
+              );
+            },
           ),
-          // Recent Activity / Continue Watching
-          SliverToBoxAdapter(
-            key: PageStorageKey('recentActivity'),
-            child: RecentActivitySection(
-              recentLinks: _recentLinks,
-              onRefresh: _loadSavedLinks,
-            ),
+          // Recent Activity - only rebuilds when recent links change
+          Consumer<LinksProvider>(
+            builder: (context, linksProvider, child) {
+              return SliverToBoxAdapter(
+                key: const PageStorageKey('recentActivity'),
+                child: RecentActivitySection(
+                  recentLinks: linksProvider.recentLinks.take(10).toList(),
+                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                ),
+              );
+            },
           ),
-          // Smart Suggestions
-          SliverToBoxAdapter(
-            key: PageStorageKey('suggestions'),
-            child: SuggestionsSection(
-              suggestedLinks: _suggestedLinks,
-              onRefresh: _loadSavedLinks,
-            ),
+          // Smart Suggestions - only rebuilds when suggestions change
+          Consumer<LinksProvider>(
+            builder: (context, linksProvider, child) {
+              return SliverToBoxAdapter(
+                key: const PageStorageKey('suggestions'),
+                child: SuggestionsSection(
+                  suggestedLinks: linksProvider.suggestedLinks.take(10).toList(),
+                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                ),
+              );
+            },
           ),
-          // Separate sections for each list
-          ..._userLists.map((list) {
-            final listLinks = _savedLinks
-                .where((link) => link.listIds.contains(list.id))
-                .toList();
-            if (listLinks.isEmpty) {
-              return const SliverToBoxAdapter(child: SizedBox.shrink());
-            }
-            return SliverToBoxAdapter(
-              key: PageStorageKey('list_${list.id}'),
-              child: ListContentSection(
-                list: list,
-                links: listLinks,
-                onRefresh: _loadSavedLinks,
-              ),
-            );
-          }).toList(),
-          SliverToBoxAdapter(
-            key: PageStorageKey('savedLinks'),
-            child: SavedLinksList(
-              savedLinks: _savedLinks,
-              title: 'All Saved Links',
-              onRefresh: _loadSavedLinks,
-            ),
+          // Separate sections for each list - optimized with Consumer
+          Consumer2<LinksProvider, ListsProvider>(
+            builder: (context, linksProvider, listsProvider, child) {
+              final userLists = listsProvider.allLists;
+              final allLinks = linksProvider.allLinks;
+              
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final list = userLists[index];
+                    final listLinks = allLinks
+                        .where((link) => link.listIds.contains(list.id))
+                        .toList();
+                    if (listLinks.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return ListContentSection(
+                      key: PageStorageKey('list_${list.id}'),
+                      list: list,
+                      links: listLinks,
+                      onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                    );
+                  },
+                  childCount: userLists.length,
+                ),
+              );
+            },
+          ),
+          // All Saved Links - only rebuilds when links change
+          Consumer<LinksProvider>(
+            builder: (context, linksProvider, child) {
+              final savedLinks = linksProvider.allLinks;
+              if (savedLinks.isEmpty) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              return SliverToBoxAdapter(
+                key: const PageStorageKey('savedLinks'),
+                child: SavedLinksList(
+                  savedLinks: savedLinks,
+                  title: 'All Saved Links',
+                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                ),
+              );
+            },
           ),
           SliverToBoxAdapter(
             key: PageStorageKey('mylist'),

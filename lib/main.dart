@@ -2,12 +2,11 @@ import 'dart:async';
 import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart' as sharing;
 import 'screens/screens.dart';
-
-// Global callback for refreshing home screen
-VoidCallback? onLinkSavedCallback;
 
 void main() => runApp(Elysian());
 
@@ -98,13 +97,21 @@ class _ElysianState extends State<Elysian> {
     // Show list selection dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && navigatorKey.currentContext != null) {
+        final context = navigatorKey.currentContext!;
         showDialog(
-          context: navigatorKey.currentContext!,
+          context: context,
           barrierDismissible: false,
-          builder: (context) => ListSelectionDialog(
+          builder: (dialogContext) => ListSelectionDialog(
             sharedUrl: cleanedText,
             sharedTitle: _extractTitleFromUrl(cleanedText),
-            onLinkSaved: onLinkSavedCallback,
+            onLinkSaved: () {
+              // Refresh links provider when link is saved
+              final linksProvider = Provider.of<LinksProvider>(
+                context,
+                listen: false,
+              );
+              linksProvider.loadLinks(forceRefresh: true);
+            },
           ),
         );
       }
@@ -127,17 +134,24 @@ class _ElysianState extends State<Elysian> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.black,
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LinksProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => ListsProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => AppStateProvider()..initialize()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          scaffoldBackgroundColor: Colors.black,
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        title: 'Elysian',
+        navigatorKey: navigatorKey,
+        navigatorObservers: [routeObserver],
+        home: const BottomNav(),
       ),
-      title: 'Elysian',
-      navigatorKey: navigatorKey,
-      navigatorObservers: [routeObserver],
-      home: BottomNav(),
     );
   }
 }

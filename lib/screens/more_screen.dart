@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/screens/lists_management_screen.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/screens/statistics_screen.dart';
-import 'package:elysian/main.dart';
+import 'package:provider/provider.dart';
 
 class MoreScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -18,31 +19,27 @@ class MoreScreen extends StatefulWidget {
 class MoreScreenState extends State<MoreScreen> {
   late ScrollController _scrollController;
   double _scrollOffset = 0.0;
-  bool _useInbuiltPlayer = true;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()
       ..addListener(() {
-        setState(() {
-          _scrollOffset = _scrollController.offset;
-        });
+        // Only update if offset changed significantly (performance optimization)
+        final newOffset = _scrollController.offset;
+        if ((newOffset - _scrollOffset).abs() > 1.0) {
+          setState(() {
+            _scrollOffset = newOffset;
+          });
+        }
       });
-    _loadPlayerPreference();
-  }
-
-  Future<void> _loadPlayerPreference() async {
-    final useInbuilt = await StorageService.isInbuiltPlayer();
-    setState(() {
-      _useInbuiltPlayer = useInbuilt;
-    });
-  }
-
-  Future<void> _togglePlayerPreference(bool value) async {
-    await StorageService.setPlayerPreference(value);
-    setState(() {
-      _useInbuiltPlayer = value;
+    
+    // Initialize app state provider if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appStateProvider = context.read<AppStateProvider>();
+      if (!appStateProvider.isLoadingPlayerPreference) {
+        appStateProvider.initialize();
+      }
     });
   }
 
@@ -161,10 +158,19 @@ class MoreScreenState extends State<MoreScreen> {
                     icon: Icons.playlist_play,
                     title: 'My Lists',
                     onTap: () {
+                      // Use fade transition to prevent screen fluctuation
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const ListsManagementScreen(),
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              const ListsManagementScreen(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 200),
                         ),
                       );
                     },
@@ -263,13 +269,19 @@ class MoreScreenState extends State<MoreScreen> {
                       if (result == true && controller.text.isNotEmpty) {
                         try {
                           await StorageService.importData(controller.text);
+                          // Refresh providers
+                          final linksProvider = context.read<LinksProvider>();
+                          final listsProvider = context.read<ListsProvider>();
+                          await Future.wait([
+                            linksProvider.loadLinks(forceRefresh: true),
+                            listsProvider.loadLists(forceRefresh: true),
+                          ]);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Data imported successfully!'),
                               backgroundColor: Colors.green,
                             ),
                           );
-                          onLinkSavedCallback?.call();
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Error importing data: $e')),
@@ -327,12 +339,16 @@ class MoreScreenState extends State<MoreScreen> {
                     subtitle: 'On',
                     onTap: () {},
                   ),
-                  _PlayerPreferenceItem(
-                    icon: Icons.video_library,
-                    title: 'Video Player',
-                    subtitle: _useInbuiltPlayer ? 'Inbuilt' : 'External',
-                    value: _useInbuiltPlayer,
-                    onChanged: _togglePlayerPreference,
+                  Consumer<AppStateProvider>(
+                    builder: (context, appStateProvider, child) {
+                      return _PlayerPreferenceItem(
+                        icon: Icons.video_library,
+                        title: 'Video Player',
+                        subtitle: appStateProvider.isInbuiltPlayer ? 'Inbuilt' : 'External',
+                        value: appStateProvider.isInbuiltPlayer,
+                        onChanged: (value) => appStateProvider.setPlayerPreference(value),
+                      );
+                    },
                   ),
                 ],
               ),

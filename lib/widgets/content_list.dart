@@ -1,7 +1,8 @@
-import 'package:elysian/main.dart';
 import 'package:elysian/models/content_model.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class ContentList extends StatelessWidget {
   final String title;
@@ -24,8 +25,11 @@ class ContentList extends StatelessWidget {
     );
     
     if (result == true) {
-      // Refresh home screen
-      onLinkSavedCallback?.call();
+      // Refresh providers
+      final linksProvider = context.read<LinksProvider>();
+      final listsProvider = context.read<ListsProvider>();
+      linksProvider.loadLinks(forceRefresh: true);
+      listsProvider.loadLists(forceRefresh: true);
     }
   }
   @override

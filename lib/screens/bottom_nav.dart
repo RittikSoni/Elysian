@@ -3,7 +3,9 @@ import 'package:elysian/screens/search_screen.dart';
 import 'package:elysian/screens/coming_soon_screen.dart';
 import 'package:elysian/screens/downloads_screen.dart';
 import 'package:elysian/screens/more_screen.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
 
 class BottomNav extends StatefulWidget {
@@ -15,8 +17,7 @@ class BottomNav extends StatefulWidget {
 
 class BottomNavState extends State<BottomNav> {
   int _currentIndex = 0;
-  final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
-  
+
   void _changeTab(int index) {
     setState(() {
       _currentIndex = index;
@@ -24,16 +25,17 @@ class BottomNavState extends State<BottomNav> {
   }
 
   void refreshHomeScreen() {
-    _homeScreenKey.currentState?.refreshLinks();
+    // Refresh providers instead of calling removed method
+    final linksProvider = context.read<LinksProvider>();
+    final listsProvider = context.read<ListsProvider>();
+    linksProvider.loadLinks(forceRefresh: true);
+    listsProvider.loadLists(forceRefresh: true);
   }
 
   @override
   Widget build(BuildContext context) {
-      final List<Widget> screens = [
-      HomeScreen(
-        key: _homeScreenKey,
-        onNavigateToTab: _changeTab,
-      ),
+    final List<Widget> screens = [
+      HomeScreen(onNavigateToTab: _changeTab),
       SearchScreen(
         key: PageStorageKey('searchScreen'),
         onNavigateToTab: _changeTab,
@@ -51,7 +53,7 @@ class BottomNavState extends State<BottomNav> {
         onNavigateToTab: _changeTab,
       ),
     ];
-    
+
     final Map<String, IconData> icons = const {
       'Home': Icons.home,
       'Search': Icons.search,
@@ -59,7 +61,7 @@ class BottomNavState extends State<BottomNav> {
       'Downloads': Icons.download,
       'More': Icons.menu,
     };
-    
+
     return Scaffold(
       body: screens[_currentIndex],
       bottomNavigationBar: !Responsive.isDesktop(context)

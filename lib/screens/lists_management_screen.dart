@@ -1,9 +1,10 @@
-import 'package:elysian/main.dart';
 import 'package:elysian/models/models.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ListsManagementScreen extends StatefulWidget {
@@ -14,26 +15,21 @@ class ListsManagementScreen extends StatefulWidget {
 }
 
 class _ListsManagementScreenState extends State<ListsManagementScreen> {
-  List<UserList> _lists = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadLists();
-  }
-
-  Future<void> _loadLists() async {
-    setState(() => _isLoading = true);
-    try {
-      final lists = await StorageService.getUserLists();
-      setState(() {
-        _lists = lists;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+    // Initialize providers if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final listsProvider = context.read<ListsProvider>();
+      final linksProvider = context.read<LinksProvider>();
+      
+      if (!listsProvider.isInitialized) {
+        listsProvider.initialize();
+      }
+      if (!linksProvider.isInitialized) {
+        linksProvider.initialize();
+      }
+    });
   }
 
   Future<void> _showAddLinkDialog() async {
@@ -43,10 +39,13 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
     );
 
     if (result == true) {
-      // Refresh lists to update item counts
-      await _loadLists();
-      // Refresh home screen
-      onLinkSavedCallback?.call();
+      // Refresh providers
+      final listsProvider = context.read<ListsProvider>();
+      final linksProvider = context.read<LinksProvider>();
+      await Future.wait([
+        listsProvider.loadLists(forceRefresh: true),
+        linksProvider.loadLinks(forceRefresh: true),
+      ]);
     }
   }
 
@@ -125,13 +124,13 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
     if (result != null) {
       try {
-        await StorageService.createUserList(
+        final listsProvider = context.read<ListsProvider>();
+        await listsProvider.createList(
           result['name']!,
           description: result['description']!.isEmpty
               ? null
               : result['description'],
         );
-        await _loadLists();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -262,7 +261,12 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
           await StorageService.saveLink(updatedLink);
         }
 
-        await _loadLists();
+        final listsProvider = context.read<ListsProvider>();
+        final linksProvider = context.read<LinksProvider>();
+        await Future.wait([
+          listsProvider.loadLists(forceRefresh: true),
+          linksProvider.loadLinks(forceRefresh: true),
+        ]);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -352,8 +356,10 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
     if (confirmed == true) {
       try {
-        await StorageService.deleteUserList(list.id);
-        await _loadLists();
+        final listsProvider = context.read<ListsProvider>();
+        final linksProvider = context.read<LinksProvider>();
+        await listsProvider.deleteList(list.id);
+        await linksProvider.loadLinks(forceRefresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -394,17 +400,27 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
             onPressed: _createNewList,
             tooltip: 'Create New List',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadLists,
-            tooltip: 'Refresh',
+          Consumer<ListsProvider>(
+            builder: (context, listsProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: () => listsProvider.loadLists(forceRefresh: true),
+                tooltip: 'Refresh',
+              );
+            },
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _lists.isEmpty
-          ? Center(
+      body: Consumer<ListsProvider>(
+        builder: (context, listsProvider, child) {
+          if (listsProvider.isLoading && !listsProvider.isInitialized) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final lists = listsProvider.allLists;
+          
+          if (lists.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -441,12 +457,14 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
                   ),
                 ],
               ),
-            )
-          : ListView.builder(
+            );
+          }
+          
+          return ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _lists.length,
+              itemCount: lists.length,
               itemBuilder: (context, index) {
-                final list = _lists[index];
+                final list = lists[index];
                 final isDefault = list.id == StorageService.defaultListId;
 
                 return Card(
@@ -460,9 +478,12 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
                           builder: (context) => SavedLinksScreen(
                             listId: list.id,
                             listName: list.name,
-                          ),
                         ),
-                      ).then((_) => _loadLists());
+                      ),
+                    ).then((_) {
+                      // Refresh lists when returning
+                      context.read<ListsProvider>().loadLists(forceRefresh: true);
+                    });
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -592,7 +613,9 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
                   ),
                 );
               },
-            ),
+            );
+        },
+      ),
     );
   }
 }
