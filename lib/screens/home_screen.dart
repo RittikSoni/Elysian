@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Function(int)? onNavigateToTab;
+  
+  const HomeScreen({super.key, this.onNavigateToTab});
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -36,7 +38,10 @@ class HomeScreenState extends State<HomeScreen> {
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: Size(MediaQuery.of(context).size.width, 50),
-        child: CustomAppBar(scrollOffset: _scollOffset),
+        child: CustomAppBar(
+          scrollOffset: _scollOffset,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
       ),
       body: CustomScrollView(
         controller: _scrollController,
