@@ -104,10 +104,6 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   Offset _pipPosition = const Offset(20, 100);
   final GlobalKey _pipKey = GlobalKey();
 
-  // Store video position when entering PiP
-  Duration? _pipVideoPosition;
-  bool _pipWasPlaying = false;
-
   // call this to show one slider and auto‐hide it
   void _showSliderOverlay({required bool isVolume}) {
     if (_isDisposed || !mounted) return;
@@ -406,10 +402,6 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     // Reset orientation to portrait before entering PiP
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
-
-    // Store current video position and playing state
-    _pipVideoPosition = _controller.value.position;
-    _pipWasPlaying = _controller.value.isPlaying;
 
     // Hide controls and enter PiP
     setState(() {
@@ -737,18 +729,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 child: Container(color: const Color.fromARGB(87, 0, 0, 0)),
               ),
             if (_inAdBreak)
-              Positioned(
-                bottom: 20,
-                right: 20,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  color: Colors.black54,
-                  child: Text(
-                    'Ad ends in $_adSecondsRemaining s',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                ),
-              ),
+              _AdCountdownOverlayWidget(secondsRemaining: _adSecondsRemaining),
 
             if (!_inAdBreak) ...[
               GestureDetectorOverlay(),
@@ -856,58 +837,13 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     );
   }
 
+  // Optimized: Extract to separate widget to prevent rebuilds
   Widget _buildVolumeOverlay() {
-    return Container(
-      width: 60,
-      height: 700,
-      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.volume_up_outlined, color: Colors.white),
-          const SizedBox(height: 8),
-          Expanded(
-            child: RotatedBox(
-              quarterTurns: 3,
-              child: LinearProgressIndicator(
-                value: _volume,
-                backgroundColor: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-                minHeight: 10,
-                valueColor: const AlwaysStoppedAnimation(Colors.greenAccent),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return _VolumeOverlayWidget(volume: _volume);
   }
 
   Widget _buildBrightnessOverlay() {
-    return Container(
-      width: 60,
-      height: 700,
-      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.wb_sunny_outlined, color: Colors.white),
-          const SizedBox(height: 8),
-          Expanded(
-            child: RotatedBox(
-              quarterTurns: 3,
-              child: LinearProgressIndicator(
-                value: _brightness,
-                backgroundColor: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-                minHeight: 10,
-                valueColor: const AlwaysStoppedAnimation(Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return _BrightnessOverlayWidget(brightness: _brightness);
   }
 }
 
@@ -1599,6 +1535,101 @@ class CustomEpisodeCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Optimized widget classes to reduce rebuild scope
+
+/// Optimized ad countdown overlay - only rebuilds when seconds change
+class _AdCountdownOverlayWidget extends StatelessWidget {
+  final int secondsRemaining;
+
+  const _AdCountdownOverlayWidget({required this.secondsRemaining});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        color: Colors.black54,
+        child: Text(
+          'Ad ends in $secondsRemaining s',
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      ),
+    );
+  }
+}
+
+/// Optimized volume overlay - only rebuilds when volume changes
+class _VolumeOverlayWidget extends StatelessWidget {
+  final double volume;
+
+  const _VolumeOverlayWidget({required this.volume});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 60,
+      height: 700,
+      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.volume_up_outlined, color: Colors.white),
+          const SizedBox(height: 8),
+          Expanded(
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: LinearProgressIndicator(
+                value: volume,
+                backgroundColor: Colors.white24,
+                borderRadius: BorderRadius.circular(10),
+                minHeight: 10,
+                valueColor: const AlwaysStoppedAnimation(Colors.greenAccent),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Optimized brightness overlay - only rebuilds when brightness changes
+class _BrightnessOverlayWidget extends StatelessWidget {
+  final double brightness;
+
+  const _BrightnessOverlayWidget({required this.brightness});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 60,
+      height: 700,
+      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wb_sunny_outlined, color: Colors.white),
+          const SizedBox(height: 8),
+          Expanded(
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: LinearProgressIndicator(
+                value: brightness,
+                backgroundColor: Colors.white24,
+                borderRadius: BorderRadius.circular(10),
+                minHeight: 10,
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
