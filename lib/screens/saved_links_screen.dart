@@ -337,12 +337,16 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     bool isCreatingList = false;
     bool showCreateListForm = false;
     File? customThumbnailFile;
-    String? customThumbnailUrl = link.customThumbnailPath == null ? link.thumbnailUrl : null;
+    String? customThumbnailUrl = link.customThumbnailPath == null
+        ? link.thumbnailUrl
+        : null;
     final ImagePicker imagePicker = ImagePicker();
-    
+
     // Load existing custom thumbnail if it exists
     if (link.customThumbnailPath != null) {
-      final thumbnailFile = await ThumbnailService.getThumbnailFile(link.customThumbnailPath);
+      final thumbnailFile = await ThumbnailService.getThumbnailFile(
+        link.customThumbnailPath,
+      );
       if (thumbnailFile != null) {
         customThumbnailFile = thumbnailFile;
       }
@@ -409,7 +413,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                 Row(
                   children: [
                     const Text(
-                      'Custom Thumbnail (Optional)',
+                      'Thumbnail',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -417,7 +421,8 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                       ),
                     ),
                     const Spacer(),
-                    if (customThumbnailFile != null || customThumbnailUrl != null)
+                    if (customThumbnailFile != null ||
+                        customThumbnailUrl != null)
                       TextButton.icon(
                         onPressed: () {
                           setDialogState(() {
@@ -426,7 +431,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                           });
                         },
                         icon: const Icon(Icons.close, size: 18),
-                        label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Clear',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -448,19 +456,20 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: customThumbnailFile != null
-                          ? Image.file(
-                              customThumbnailFile!,
-                              fit: BoxFit.cover,
-                            )
+                          ? Image.file(customThumbnailFile!, fit: BoxFit.cover)
                           : Image.network(
                               customThumbnailUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.grey[800],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.grey),
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    color: Colors.grey[800],
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
                             ),
                     ),
                   ),
@@ -486,13 +495,18 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error picking image: $e')),
+                                SnackBar(
+                                  content: Text('Error picking image: $e'),
+                                ),
                               );
                             }
                           }
                         },
                         icon: const Icon(Icons.photo_library, size: 18),
-                        label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Gallery',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -520,13 +534,18 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error taking photo: $e')),
+                                SnackBar(
+                                  content: Text('Error taking photo: $e'),
+                                ),
                               );
                             }
                           }
                         },
                         icon: const Icon(Icons.camera_alt, size: 18),
-                        label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Camera',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -538,7 +557,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () async {
-                          final urlController = TextEditingController(text: customThumbnailUrl);
+                          final urlController = TextEditingController(
+                            text: customThumbnailUrl,
+                          );
                           final result = await showDialog<String>(
                             context: context,
                             builder: (context) => AlertDialog(
@@ -554,7 +575,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                   hintText: 'https://example.com/image.jpg',
                                   hintStyle: TextStyle(color: Colors.grey[600]),
                                   enabledBorder: UnderlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.grey[700]!),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey[700]!,
+                                    ),
                                   ),
                                   focusedBorder: const UnderlineInputBorder(
                                     borderSide: BorderSide(color: Colors.white),
@@ -567,7 +590,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                   child: const Text('Cancel'),
                                 ),
                                 ElevatedButton(
-                                  onPressed: () => Navigator.pop(context, urlController.text.trim()),
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    urlController.text.trim(),
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: Colors.black,
@@ -589,7 +615,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                           }
                         },
                         icon: const Icon(Icons.link, size: 18),
-                        label: const Text('URL', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'URL',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -892,15 +921,19 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         String? thumbnailUrl;
         final customThumbnailFile = result['customThumbnailFile'] as File?;
         final customThumbnailUrl = result['customThumbnailUrl'] as String?;
-        
+
         if (customThumbnailFile != null) {
           // Delete old thumbnail if exists
           if (link.customThumbnailPath != null) {
             await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
           }
           // Save new thumbnail
-          customThumbnailPath = await ThumbnailService.saveThumbnail(customThumbnailFile, link.id);
-        } else if (customThumbnailUrl != null && customThumbnailUrl.isNotEmpty) {
+          customThumbnailPath = await ThumbnailService.saveThumbnail(
+            customThumbnailFile,
+            link.id,
+          );
+        } else if (customThumbnailUrl != null &&
+            customThumbnailUrl.isNotEmpty) {
           // Use custom URL
           thumbnailUrl = customThumbnailUrl;
           // Delete old local thumbnail if exists
@@ -909,20 +942,25 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           }
         } else {
           // Generate thumbnail based on link type or fetch metadata
-          final metadata = await LinkParser.fetchMetadataFromUrl(newUrl, linkType);
+          final metadata = await LinkParser.fetchMetadataFromUrl(
+            newUrl,
+            linkType,
+          );
           thumbnailUrl = metadata['thumbnailUrl'];
-          if (metadata['description'] != null && result['description']!.isEmpty) {
+          if (metadata['description'] != null &&
+              result['description']!.isEmpty) {
             result['description'] = metadata['description'];
           }
-          
+
           // If no metadata thumbnail, try YouTube default
           if (thumbnailUrl == null && linkType == LinkType.youtube) {
             final videoId = LinkParser.extractYouTubeVideoId(newUrl);
             if (videoId != null) {
-              thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+              thumbnailUrl =
+                  'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
             }
           }
-          
+
           // Delete old local thumbnail if exists
           if (link.customThumbnailPath != null) {
             await ThumbnailService.deleteThumbnail(link.customThumbnailPath);

@@ -173,6 +173,7 @@ class HomeScreenState extends State<HomeScreen> {
                   savedLinks: savedLinks,
                   title: 'All Saved Links',
                   onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                  enableSwipeActions: false, // Disable swipe for horizontal scrolling
                 ),
               );
             },

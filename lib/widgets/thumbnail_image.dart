@@ -45,13 +45,27 @@ class ThumbnailImage extends StatelessWidget {
       );
     }
 
-    // Display network thumbnail
+    // Display network thumbnail with caching
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+      // Only cache if width/height are finite numbers (not infinity or NaN)
+      int? cacheW;
+      int? cacheH;
+      final w = width;
+      final h = height;
+      if (w != null && w.isFinite && !w.isNaN) {
+        cacheW = w.toInt();
+      }
+      if (h != null && h.isFinite && !h.isNaN) {
+        cacheH = h.toInt();
+      }
+
       return Image.network(
         thumbnailUrl,
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return placeholder ?? _defaultPlaceholder();
@@ -110,4 +124,3 @@ class ThumbnailImage extends StatelessWidget {
     }
   }
 }
-

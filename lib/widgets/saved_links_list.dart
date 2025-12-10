@@ -8,6 +8,7 @@ import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/thumbnail_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
+import 'package:elysian/widgets/thumbnail_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -17,12 +18,14 @@ class SavedLinksList extends StatefulWidget {
   final List<SavedLink> savedLinks;
   final String title;
   final VoidCallback? onRefresh;
+  final bool enableSwipeActions; // Disable swipe for horizontal lists
 
   const SavedLinksList({
     super.key,
     required this.savedLinks,
     required this.title,
     this.onRefresh,
+    this.enableSwipeActions = true, // Default to true for vertical lists
   });
 
   @override
@@ -173,12 +176,16 @@ class _SavedLinksListState extends State<SavedLinksList> {
     bool isCreatingList = false;
     bool showCreateListForm = false;
     File? customThumbnailFile;
-    String? customThumbnailUrl = link.customThumbnailPath == null ? link.thumbnailUrl : null;
+    String? customThumbnailUrl = link.customThumbnailPath == null
+        ? link.thumbnailUrl
+        : null;
     final ImagePicker imagePicker = ImagePicker();
-    
+
     // Load existing custom thumbnail if it exists
     if (link.customThumbnailPath != null) {
-      final thumbnailFile = await ThumbnailService.getThumbnailFile(link.customThumbnailPath);
+      final thumbnailFile = await ThumbnailService.getThumbnailFile(
+        link.customThumbnailPath,
+      );
       if (thumbnailFile != null) {
         customThumbnailFile = thumbnailFile;
       }
@@ -245,7 +252,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                 Row(
                   children: [
                     const Text(
-                      'Custom Thumbnail (Optional)',
+                      'Thumbnail',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -253,7 +260,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
                       ),
                     ),
                     const Spacer(),
-                    if (customThumbnailFile != null || customThumbnailUrl != null)
+                    if (customThumbnailFile != null ||
+                        customThumbnailUrl != null)
                       TextButton.icon(
                         onPressed: () {
                           setDialogState(() {
@@ -262,7 +270,10 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           });
                         },
                         icon: const Icon(Icons.close, size: 18),
-                        label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Clear',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -284,19 +295,20 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: customThumbnailFile != null
-                          ? Image.file(
-                              customThumbnailFile!,
-                              fit: BoxFit.cover,
-                            )
+                          ? Image.file(customThumbnailFile!, fit: BoxFit.cover)
                           : Image.network(
                               customThumbnailUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.grey[800],
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.grey),
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    color: Colors.grey[800],
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
                             ),
                     ),
                   ),
@@ -322,13 +334,18 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error picking image: $e')),
+                                SnackBar(
+                                  content: Text('Error picking image: $e'),
+                                ),
                               );
                             }
                           }
                         },
                         icon: const Icon(Icons.photo_library, size: 18),
-                        label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Gallery',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -356,13 +373,18 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error taking photo: $e')),
+                                SnackBar(
+                                  content: Text('Error taking photo: $e'),
+                                ),
                               );
                             }
                           }
                         },
                         icon: const Icon(Icons.camera_alt, size: 18),
-                        label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Camera',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -374,7 +396,9 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () async {
-                          final urlController = TextEditingController(text: customThumbnailUrl);
+                          final urlController = TextEditingController(
+                            text: customThumbnailUrl,
+                          );
                           final result = await showDialog<String>(
                             context: context,
                             builder: (context) => AlertDialog(
@@ -390,7 +414,9 @@ class _SavedLinksListState extends State<SavedLinksList> {
                                   hintText: 'https://example.com/image.jpg',
                                   hintStyle: TextStyle(color: Colors.grey[600]),
                                   enabledBorder: UnderlineInputBorder(
-                                    borderSide: BorderSide(color: Colors.grey[700]!),
+                                    borderSide: BorderSide(
+                                      color: Colors.grey[700]!,
+                                    ),
                                   ),
                                   focusedBorder: const UnderlineInputBorder(
                                     borderSide: BorderSide(color: Colors.white),
@@ -403,7 +429,10 @@ class _SavedLinksListState extends State<SavedLinksList> {
                                   child: const Text('Cancel'),
                                 ),
                                 ElevatedButton(
-                                  onPressed: () => Navigator.pop(context, urlController.text.trim()),
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    urlController.text.trim(),
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: Colors.black,
@@ -425,7 +454,10 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           }
                         },
                         icon: const Icon(Icons.link, size: 18),
-                        label: const Text('URL', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'URL',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.grey[700]!),
@@ -727,15 +759,19 @@ class _SavedLinksListState extends State<SavedLinksList> {
         String? thumbnailUrl;
         final customThumbnailFile = result['customThumbnailFile'] as File?;
         final customThumbnailUrl = result['customThumbnailUrl'] as String?;
-        
+
         if (customThumbnailFile != null) {
           // Delete old thumbnail if exists
           if (link.customThumbnailPath != null) {
             await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
           }
           // Save new thumbnail
-          customThumbnailPath = await ThumbnailService.saveThumbnail(customThumbnailFile, link.id);
-        } else if (customThumbnailUrl != null && customThumbnailUrl.isNotEmpty) {
+          customThumbnailPath = await ThumbnailService.saveThumbnail(
+            customThumbnailFile,
+            link.id,
+          );
+        } else if (customThumbnailUrl != null &&
+            customThumbnailUrl.isNotEmpty) {
           // Use custom URL
           thumbnailUrl = customThumbnailUrl;
           // Delete old local thumbnail if exists
@@ -744,20 +780,25 @@ class _SavedLinksListState extends State<SavedLinksList> {
           }
         } else {
           // Generate thumbnail based on link type or fetch metadata
-          final metadata = await LinkParser.fetchMetadataFromUrl(newUrl, linkType);
+          final metadata = await LinkParser.fetchMetadataFromUrl(
+            newUrl,
+            linkType,
+          );
           thumbnailUrl = metadata['thumbnailUrl'];
-          if (metadata['description'] != null && result['description']!.isEmpty) {
+          if (metadata['description'] != null &&
+              result['description']!.isEmpty) {
             result['description'] = metadata['description'];
           }
-          
+
           // If no metadata thumbnail, try YouTube default
           if (thumbnailUrl == null && linkType == LinkType.youtube) {
             final videoId = LinkParser.extractYouTubeVideoId(newUrl);
             if (videoId != null) {
-              thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+              thumbnailUrl =
+                  'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
             }
           }
-          
+
           // Delete old local thumbnail if exists
           if (link.customThumbnailPath != null) {
             await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
@@ -843,10 +884,11 @@ class _SavedLinksListState extends State<SavedLinksList> {
 
   String? _getThumbnailUrl(SavedLink link) {
     // First, try custom thumbnail (local file path takes priority)
-    if (link.customThumbnailPath != null && link.customThumbnailPath!.isNotEmpty) {
+    if (link.customThumbnailPath != null &&
+        link.customThumbnailPath!.isNotEmpty) {
       return link.customThumbnailPath!;
     }
-    
+
     // Then try saved thumbnail URL
     if (link.thumbnailUrl != null && link.thumbnailUrl!.isNotEmpty) {
       return link.thumbnailUrl!;
@@ -1003,7 +1045,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                       onPressed: _showAddLinkDialog,
                       tooltip: 'Add Link',
                     ),
-                  TextButton(
+                    TextButton(
                       onPressed: () async {
                         await Navigator.push(
                           context,
@@ -1012,14 +1054,14 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           ),
                         );
                         // Refresh will happen automatically via didChangeDependencies
-                    },
-                    child: const Text(
-                      'See All',
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                      },
+                      child: const Text(
+                        'See All',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ),
                   ],
-                  ),
+                ),
               ],
             ),
           ),
@@ -1050,12 +1092,24 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     vertical: 4.0,
                     horizontal: 16.0,
                   ),
-              scrollDirection: Axis.horizontal,
+                  scrollDirection: Axis.horizontal,
                   itemCount: availableLinks.length,
-              itemBuilder: (BuildContext context, int index) {
+                  itemBuilder: (BuildContext context, int index) {
                     final SavedLink link = availableLinks[index];
-                final thumbnailUrl = _getThumbnailUrl(link);
-                
+                    final thumbnailUrl = _getThumbnailUrl(link);
+
+                    // Build the card widget
+                    Widget card = _buildHorizontalLinkCard(
+                      context,
+                      link,
+                      thumbnailUrl,
+                    );
+
+                    // Wrap in Dismissible only if swipe actions are enabled
+                    if (!widget.enableSwipeActions) {
+                      return card;
+                    }
+
                     return Dismissible(
                       key: Key(link.id),
                       direction: DismissDirection.horizontal,
@@ -1141,315 +1195,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           Future.microtask(() => _handleFavoriteToggle(link));
                         }
                       },
-                      child: GestureDetector(
-                        onLongPress: () {
-                          // Show edit/delete menu on long press
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.grey[900],
-                            builder: (context) => SafeArea(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    leading: Icon(
-                                      link.isFavorite
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      color: link.isFavorite
-                                          ? Colors.amber
-                                          : Colors.white,
-                                    ),
-                                    title: Text(
-                                      link.isFavorite
-                                          ? 'Remove from Favorites'
-                                          : 'Add to Favorites',
-                                      style: TextStyle(
-                                        color: link.isFavorite
-                                            ? Colors.amber
-                                            : Colors.white,
-                                      ),
-                                    ),
-                                    onTap: () async {
-                                      Navigator.pop(context);
-                                      final linksProvider = context.read<LinksProvider>();
-                                      await linksProvider.toggleFavorite(link.id);
-                                      widget.onRefresh?.call();
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(
-                                      Icons.share,
-                                      color: Colors.white,
-                                    ),
-                                    title: const Text(
-                                      'Share',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _shareLink(link);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(
-                                      Icons.edit,
-                                      color: Colors.white,
-                                    ),
-                                    title: const Text(
-                                      'Edit',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _editLink(link);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    title: const Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _deleteLink(link);
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                    ),
-                                    title: const Text(
-                                      'Cancel',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    onTap: () => Navigator.pop(context),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                        onTap: () async {
-                          await _openLink(context, link);
-                        },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                    height: 200.0,
-                    width: 130.0,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(4.0),
-                            border: Border.all(
-                              color: Colors.grey[800]!,
-                              width: 1,
-                            ),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                              if (thumbnailUrl != null)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4.0),
-                            child: Image.network(
-                              thumbnailUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                      // Try fallback thumbnail for YouTube
-                                      if (link.type == LinkType.youtube) {
-                                        final videoId =
-                                            LinkParser.extractYouTubeVideoId(
-                                              link.url,
-                                            );
-                                        if (videoId != null) {
-                                          return Image.network(
-                                            'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return _buildPlaceholder(
-                                                    link.type,
-                                                  );
-                                                },
-                                          );
-                                        }
-                                      }
-                                return _buildPlaceholder(link.type);
-                              },
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                      return Container(
-                                        color: Colors.grey[900],
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                            value:
-                                                loadingProgress
-                                                        .expectedTotalBytes !=
-                                                    null
-                                                ? loadingProgress
-                                                          .cumulativeBytesLoaded /
-                                                      loadingProgress
-                                                          .expectedTotalBytes!
-                                                : null,
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      );
-                              },
-                            ),
-                          )
-                        else
-                          _buildPlaceholder(link.type),
-                              // Favorite button
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: GestureDetector(
-                                  onTap: () async {
-                                    final linksProvider = context.read<LinksProvider>();
-                                    await linksProvider.toggleFavorite(link.id);
-                                    widget.onRefresh?.call();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: link.isFavorite
-                                          ? Colors.amber.withOpacity(0.9)
-                                          : Colors.black.withOpacity(0.7),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: link.isFavorite
-                                            ? Colors.amber
-                                            : Colors.white.withOpacity(0.3),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      link.isFavorite
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      color: link.isFavorite
-                                          ? Colors.black
-                                          : Colors.white,
-                                      size: 22,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Notes indicator
-                              if (link.notes != null && link.notes!.isNotEmpty)
-                                Positioned(
-                                  top: 8,
-                                  left: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.6),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.note,
-                                      color: Colors.blue,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              // Duration badge (for videos)
-                              if (link.duration != null &&
-                                  link.duration!.isNotEmpty)
-                                Positioned(
-                                  bottom: 40,
-                                  right: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.access_time,
-                                          color: Colors.white,
-                                          size: 12,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          link.duration!,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8.0),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.8),
-                                ],
-                              ),
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(4.0),
-                                bottomRight: Radius.circular(4.0),
-                              ),
-                            ),
-                            child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      _getIconForType(link.type),
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        link.title,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                      ),
+                      child: card,
                     );
                   },
                 );
@@ -1461,18 +1207,238 @@ class _SavedLinksListState extends State<SavedLinksList> {
     );
   }
 
-  Widget _buildPlaceholder(LinkType type) {
-    return Container(
-      color: Colors.grey[900],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildHorizontalLinkCard(
+    BuildContext context,
+    SavedLink link,
+    String? thumbnailUrl,
+  ) {
+    return GestureDetector(
+      onLongPress: () {
+        // Show edit/delete menu on long press
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.grey[900],
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(
+                    link.isFavorite ? Icons.star : Icons.star_border,
+                    color: link.isFavorite ? Colors.amber : Colors.white,
+                  ),
+                  title: Text(
+                    link.isFavorite
+                        ? 'Remove from Favorites'
+                        : 'Add to Favorites',
+                    style: TextStyle(
+                      color: link.isFavorite ? Colors.amber : Colors.white,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final linksProvider = context.read<LinksProvider>();
+                    await linksProvider.toggleFavorite(link.id);
+                    widget.onRefresh?.call();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.share, color: Colors.white),
+                  title: const Text(
+                    'Share',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _shareLink(link);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.edit, color: Colors.white),
+                  title: const Text(
+                    'Edit',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editLink(link);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteLink(link);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.close, color: Colors.white),
+                  title: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      onTap: () async {
+        await _openLink(context, link);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0),
+        height: 200.0,
+        width: 130.0,
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(4.0),
+          border: Border.all(color: Colors.grey[800]!, width: 1),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Icon(_getIconForType(type), color: Colors.grey[600], size: 40),
-            const SizedBox(height: 8),
-            Text(
-              _getTypeLabel(type),
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            // Use ThumbnailImage widget for consistent thumbnail handling
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4.0),
+              child: ThumbnailImage(
+                link: link,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            ),
+            // Favorite button
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () async {
+                  final linksProvider = context.read<LinksProvider>();
+                  await linksProvider.toggleFavorite(link.id);
+                  widget.onRefresh?.call();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: link.isFavorite
+                        ? Colors.amber.withOpacity(0.9)
+                        : Colors.black.withOpacity(0.7),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: link.isFavorite
+                          ? Colors.amber
+                          : Colors.white.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    link.isFavorite ? Icons.star : Icons.star_border,
+                    color: link.isFavorite ? Colors.black : Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+            // Notes indicator
+            if (link.notes != null && link.notes!.isNotEmpty)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.note, color: Colors.blue, size: 16),
+                ),
+              ),
+            // Duration badge (for videos)
+            if (link.duration != null && link.duration!.isNotEmpty)
+              Positioned(
+                bottom: 40,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        color: Colors.white,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        link.duration!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(4.0),
+                    bottomRight: Radius.circular(4.0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _getIconForType(link.type),
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            link.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

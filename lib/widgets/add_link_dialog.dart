@@ -23,7 +23,8 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _newListNameController = TextEditingController();
-  final TextEditingController _newListDescriptionController = TextEditingController();
+  final TextEditingController _newListDescriptionController =
+      TextEditingController();
   final GlobalKey _listPickerKey = GlobalKey();
   List<String> _selectedListIds = [];
   bool _isLoading = false;
@@ -39,8 +40,8 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedListIds = widget.initialListId != null 
-        ? [widget.initialListId!] 
+    _selectedListIds = widget.initialListId != null
+        ? [widget.initialListId!]
         : [StorageService.defaultListId];
     if (widget.initialTitle != null) {
       _titleController.text = widget.initialTitle!;
@@ -91,19 +92,23 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
       if (mounted) {
         _titleController.text = title;
       }
-      
+
       // Also fetch metadata (thumbnail, description) if not already set
-      if (mounted && _customThumbnailFile == null && _customThumbnailUrl == null) {
+      if (mounted &&
+          _customThumbnailFile == null &&
+          _customThumbnailUrl == null) {
         final metadata = await LinkParser.fetchMetadataFromUrl(
           _urlController.text.trim(),
           _detectedLinkType!,
         );
         if (mounted) {
           setState(() {
-            if (metadata['thumbnailUrl'] != null && _customThumbnailUrl == null) {
+            if (metadata['thumbnailUrl'] != null &&
+                _customThumbnailUrl == null) {
               _customThumbnailUrl = metadata['thumbnailUrl'];
             }
-            if (metadata['description'] != null && _descriptionController.text.isEmpty) {
+            if (metadata['description'] != null &&
+                _descriptionController.text.isEmpty) {
               _descriptionController.text = metadata['description']!;
             }
           });
@@ -134,9 +139,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
@@ -157,9 +162,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error taking photo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error taking photo: $e')));
       }
     }
   }
@@ -204,7 +209,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         ],
       ),
     );
-    
+
     if (result != null && mounted) {
       setState(() {
         if (result.isEmpty) {
@@ -220,9 +225,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   Future<void> _createNewList() async {
     final name = _newListNameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a list name')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a list name')));
       return;
     }
 
@@ -233,22 +238,22 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         name,
         description: description.isEmpty ? null : description,
       );
-      
+
       // Add the newly created list to selected lists
       setState(() {
         _selectedListIds.add(newList.id);
         _showCreateListForm = false;
       });
-      
+
       _newListNameController.clear();
       _newListDescriptionController.clear();
-      
+
       // Refresh the list picker to show the new list
       final state = _listPickerKey.currentState;
       if (state != null && state.mounted) {
         (state as dynamic).refreshLists();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -260,9 +265,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-          ),
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
         );
       }
     } finally {
@@ -300,9 +303,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     }
 
     if (_selectedListIds.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select at least one list')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one list')),
+      );
       return;
     }
 
@@ -347,15 +350,19 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
 
     try {
       final linkId = DateTime.now().millisecondsSinceEpoch.toString();
-      
+
       // Handle custom thumbnail
       String? customThumbnailPath;
       String? thumbnailUrl;
-      
+
       if (_customThumbnailFile != null) {
         // Save local thumbnail
-        customThumbnailPath = await ThumbnailService.saveThumbnail(_customThumbnailFile!, linkId);
-      } else if (_customThumbnailUrl != null && _customThumbnailUrl!.isNotEmpty) {
+        customThumbnailPath = await ThumbnailService.saveThumbnail(
+          _customThumbnailFile!,
+          linkId,
+        );
+      } else if (_customThumbnailUrl != null &&
+          _customThumbnailUrl!.isNotEmpty) {
         // Use custom URL
         thumbnailUrl = _customThumbnailUrl;
       } else {
@@ -376,9 +383,13 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
           case LinkType.unknown:
             // Try to fetch metadata for these types
             try {
-              final metadata = await LinkParser.fetchMetadataFromUrl(url, _detectedLinkType!);
+              final metadata = await LinkParser.fetchMetadataFromUrl(
+                url,
+                _detectedLinkType!,
+              );
               thumbnailUrl = metadata['thumbnailUrl'];
-              if (metadata['description'] != null && _descriptionController.text.isEmpty) {
+              if (metadata['description'] != null &&
+                  _descriptionController.text.isEmpty) {
                 _descriptionController.text = metadata['description']!;
               }
             } catch (e) {
@@ -504,7 +515,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
               Row(
                 children: [
                   const Text(
-                    'Custom Thumbnail (Optional)',
+                    'Thumbnail',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -512,7 +523,8 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                     ),
                   ),
                   const Spacer(),
-                  if (_customThumbnailFile != null || _customThumbnailUrl != null)
+                  if (_customThumbnailFile != null ||
+                      _customThumbnailUrl != null)
                     TextButton.icon(
                       onPressed: () {
                         setState(() {
@@ -521,7 +533,10 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                         });
                       },
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Clear',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.red,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -551,12 +566,16 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                             _customThumbnailUrl!,
                             fit: BoxFit.cover,
                             width: double.infinity,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.grey[800],
-                              child: const Center(
-                                child: Icon(Icons.broken_image, color: Colors.grey),
-                              ),
-                            ),
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: Colors.grey[800],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
                           ),
                   ),
                 ),
@@ -567,7 +586,10 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _pickImageFromGallery,
                       icon: const Icon(Icons.photo_library, size: 18),
-                      label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Gallery',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: BorderSide(color: Colors.grey[700]!),
@@ -580,7 +602,10 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                     child: OutlinedButton.icon(
                       onPressed: _pickImageFromCamera,
                       icon: const Icon(Icons.camera_alt, size: 18),
-                      label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Camera',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: BorderSide(color: Colors.grey[700]!),
@@ -767,7 +792,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('Create List'),
                         ),

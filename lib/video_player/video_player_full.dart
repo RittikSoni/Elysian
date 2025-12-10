@@ -7,15 +7,58 @@ import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:elysian/utils/kroute.dart';
+
+enum VideoFitMode {
+  fit, // Contain - shows entire video (letterboxing)
+  fill, // Cover - fills screen (may crop)
+  stretch, // Stretch - distorts to fill
+  original, // Original aspect ratio
+  zoom, // Zoom - crop to fill (aggressive)
+}
+
+extension VideoFitModeExtension on VideoFitMode {
+  String get label {
+    switch (this) {
+      case VideoFitMode.fit:
+        return 'Fit';
+      case VideoFitMode.fill:
+        return 'Fill';
+      case VideoFitMode.stretch:
+        return 'Stretch';
+      case VideoFitMode.original:
+        return 'Original';
+      case VideoFitMode.zoom:
+        return 'Zoom';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case VideoFitMode.fit:
+        return 'Show entire video';
+      case VideoFitMode.fill:
+        return 'Fill screen (may crop)';
+      case VideoFitMode.stretch:
+        return 'Stretch to fill';
+      case VideoFitMode.original:
+        return 'Original aspect ratio';
+      case VideoFitMode.zoom:
+        return 'Zoom to fill';
+    }
+  }
+}
 
 class RSNewVideoPlayerScreen extends StatefulWidget {
   final String? mediaUrl;
   final VoidCallback? onError;
+  final Duration? initialPosition; // Optional initial position to seek to
 
   const RSNewVideoPlayerScreen({
     super.key,
     this.mediaUrl,
     this.onError,
+    this.initialPosition,
   });
 
   @override
@@ -51,6 +94,19 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   Timer? _adCountdownTimer;
 
   bool _isLocked = false;
+
+  // Video fit mode
+  VideoFitMode _videoFitMode = VideoFitMode.fit;
+
+  // PiP state
+  bool _isInPiP = false;
+  OverlayEntry? _pipOverlayEntry;
+  Offset _pipPosition = const Offset(20, 100);
+  final GlobalKey _pipKey = GlobalKey();
+
+  // Store video position when entering PiP
+  Duration? _pipVideoPosition;
+  bool _pipWasPlaying = false;
 
   // call this to show one slider and auto‐hide it
   void _showSliderOverlay({required bool isVolume}) {
@@ -90,50 +146,65 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   }
 
   void initializeVid() async {
-    await Future.delayed(Duration(seconds: 2));
     if (_isDisposed || !mounted) return;
-    
+
     _controller
-      ..initialize().then((_) {
-        if (_isDisposed || !mounted) return;
-        // Calculate ad positions 10%, 25, 50%, 80%
-        final totalDuration = _controller.value.duration;
-        
-        if (totalDuration.inMilliseconds > 0) {
-          if (mounted) {
-            setState(() {
-              _adPositions.addAll([
-                Duration(
-                  milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
-                ),
-                Duration(
-                  milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
-                ),
-                Duration(
-                  milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
-                ),
-                Duration(
-                  milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
-                ),
-              ]);
-              _controller.play();
-            });
-          }
-        }
-      }).catchError((error) {
-        // Handle initialization errors
-        if (!_isDisposed && mounted) {
-          _handleVideoError(error);
-        }
-      });
-    
+      ..initialize()
+          .then((_) {
+            if (_isDisposed || !mounted) return;
+            // Calculate ad positions 10%, 25, 50%, 80%
+            final totalDuration = _controller.value.duration;
+
+            if (totalDuration.inMilliseconds > 0) {
+              if (mounted) {
+                setState(() {
+                  _adPositions.addAll([
+                    Duration(
+                      milliseconds: (totalDuration.inMilliseconds * 0.1)
+                          .toInt(),
+                    ),
+                    Duration(
+                      milliseconds: (totalDuration.inMilliseconds * 0.25)
+                          .toInt(),
+                    ),
+                    Duration(
+                      milliseconds: (totalDuration.inMilliseconds * 0.5)
+                          .toInt(),
+                    ),
+                    Duration(
+                      milliseconds: (totalDuration.inMilliseconds * 0.8)
+                          .toInt(),
+                    ),
+                  ]);
+
+                  // If initial position is provided, seek to it
+                  if (widget.initialPosition != null) {
+                    final seekPosition = Duration(
+                      milliseconds: widget.initialPosition!.inMilliseconds
+                          .clamp(0, totalDuration.inMilliseconds),
+                    );
+                    _controller.seekTo(seekPosition);
+                  }
+
+                  _controller.play();
+                });
+              }
+            }
+          })
+          .catchError((error) {
+            // Handle initialization errors
+            if (!_isDisposed && mounted) {
+              _handleVideoError(error);
+            }
+          });
+
     // Listen for video player errors - optimized to avoid unnecessary setState
     _controller.addListener(_videoPlayerListener);
   }
 
   void _videoPlayerListener() {
     if (_isDisposed || !mounted) return;
-    
+
     if (_controller.value.hasError) {
       _handleVideoError(_controller.value.errorDescription);
     } else {
@@ -171,7 +242,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
               onPressed: () async {
                 Navigator.pop(context); // Close dialog
                 Navigator.pop(context); // Close video player
-                
+
                 // Open in external player
                 if (widget.onError != null) {
                   widget.onError!();
@@ -181,7 +252,10 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                   if (url != null) {
                     final uri = Uri.parse(url);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     }
                   }
                 }
@@ -209,7 +283,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   void _startAdBreak() {
     if (_isDisposed || !mounted) return;
-    
+
     setState(() {
       _inAdBreak = true;
       _showControls = false;
@@ -219,32 +293,41 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
     final adUrl = _adUrls[_nextAdIndex];
     _adController = VideoPlayerController.networkUrl(Uri.parse(adUrl))
-      ..initialize().then((_) {
-        if (_isDisposed || !mounted) return;
-        
-        if (mounted) {
-          setState(() {
-            _adController!.play();
-            _adSecondsRemaining = 30; // Set ad duration to 30 seconds
-            // _adSecondsRemaining = _adController!.value.duration.inSeconds;
-          });
-        }
+      ..initialize()
+          .then((_) {
+            if (_isDisposed || !mounted) return;
 
-        _adCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          if (_isDisposed || !mounted) {
-            timer.cancel();
-            return;
-          }
-          if (mounted) {
-            setState(() {
-              _adSecondsRemaining--;
+            if (mounted) {
+              setState(() {
+                _adController!.play();
+                _adSecondsRemaining = 30; // Set ad duration to 30 seconds
+                // _adSecondsRemaining = _adController!.value.duration.inSeconds;
+              });
+            }
+
+            _adCountdownTimer = Timer.periodic(const Duration(seconds: 1), (
+              timer,
+            ) {
+              if (_isDisposed || !mounted) {
+                timer.cancel();
+                return;
+              }
+              if (mounted) {
+                setState(() {
+                  _adSecondsRemaining--;
+                });
+              }
+              if (_adSecondsRemaining <= 0) {
+                _endAdBreak();
+              }
             });
-          }
-          if (_adSecondsRemaining <= 0) {
-            _endAdBreak();
-          }
-        });
-      });
+          })
+          .catchError((error) {
+            // If ad fails to load, end ad break immediately and resume video
+            if (!_isDisposed && mounted) {
+              _endAdBreak();
+            }
+          });
 
     _nextAdIndex++;
   }
@@ -270,8 +353,19 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _sliderHideTimer?.cancel();
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
-    _controller.removeListener(_videoPlayerListener);
-    _controller.dispose();
+
+    // Only remove PiP overlay if not in PiP mode (to prevent closing PiP when route is popped)
+    if (!_isInPiP) {
+      _pipOverlayEntry?.remove();
+      _pipOverlayEntry = null;
+      _controller.removeListener(_videoPlayerListener);
+      _controller.dispose();
+    } else {
+      // In PiP mode, keep the controller alive but remove listener
+      // The overlay will handle cleanup when PiP is exited
+      _controller.removeListener(_videoPlayerListener);
+    }
+
     _adController?.dispose();
     super.dispose();
   }
@@ -283,13 +377,345 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     return '$hours:$minutes:$seconds';
   }
 
+  void _enterPiPMode() {
+    if (_isInPiP || !mounted) return;
+
+    // Use global navigatorKey to get the overlay - this persists after route pop
+    final navigatorState = navigatorKey.currentState;
+    if (navigatorState == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PiP mode not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final overlay = navigatorState.overlay;
+    if (overlay == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PiP mode not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Reset orientation to portrait before entering PiP
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+
+    // Store current video position and playing state
+    _pipVideoPosition = _controller.value.position;
+    _pipWasPlaying = _controller.value.isPlaying;
+
+    // Hide controls and enter PiP
+    setState(() {
+      _isInPiP = true;
+      _showControls = false;
+    });
+
+    // Create overlay entry for PiP - pass controller reference
+    final controllerRef = _controller;
+    _pipOverlayEntry = OverlayEntry(
+      builder: (context) => _buildPiPOverlay(controllerRef),
+    );
+
+    // Insert overlay in root navigator's overlay
+    overlay.insert(_pipOverlayEntry!);
+
+    // Use post-frame callback to ensure overlay is inserted before popping
+    // Add a small delay to ensure overlay is fully rendered
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        // Navigate back to previous screen
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  void _exitPiPMode() {
+    if (!_isInPiP) return;
+
+    // Remove overlay
+    _pipOverlayEntry?.remove();
+    _pipOverlayEntry = null;
+
+    // Clean up controller if widget was disposed
+    if (_isDisposed) {
+      _controller.removeListener(_videoPlayerListener);
+      _controller.dispose();
+    } else if (mounted) {
+      setState(() {
+        _isInPiP = false;
+        _showControls = true;
+      });
+    }
+  }
+
+  Widget _buildPiPOverlay(VideoPlayerController controller) {
+    // Use Builder to get a valid context from the overlay
+    return Builder(
+      builder: (overlayContext) {
+        // Use StatefulBuilder to manage local state for position
+        return StatefulBuilder(
+          builder: (context, setOverlayState) {
+            return Positioned(
+              left: _pipPosition.dx,
+              top: _pipPosition.dy,
+              child: GestureDetector(
+                key: _pipKey,
+                onPanUpdate: (details) {
+                  setOverlayState(() {
+                    _pipPosition += details.delta;
+                    // Keep within screen bounds
+                    final screenSize = MediaQuery.of(overlayContext).size;
+                    _pipPosition = Offset(
+                      _pipPosition.dx.clamp(0.0, screenSize.width - 200),
+                      _pipPosition.dy.clamp(0.0, screenSize.height - 150),
+                    );
+                  });
+                  _pipOverlayEntry?.markNeedsBuild();
+                },
+                onTap: () {
+                  // Single tap - toggle play/pause instead of exiting
+                  if (controller.value.isPlaying) {
+                    controller.pause();
+                  } else {
+                    controller.play();
+                  }
+                },
+                onLongPress: () {
+                  // Long press to exit PiP
+                  _exitPiPMode();
+                },
+                child: Container(
+                  width: 200,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      children: [
+                        // Video player in PiP - use ValueListenableBuilder to react to state changes
+                        ValueListenableBuilder<VideoPlayerValue>(
+                          valueListenable: controller,
+                          builder: (context, value, child) {
+                            if (!value.isInitialized) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            return AspectRatio(
+                              aspectRatio: value.aspectRatio,
+                              child: VideoPlayer(controller),
+                            );
+                          },
+                        ),
+                        // Control buttons row
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          right: 4,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Full screen button
+                              GestureDetector(
+                                onTap: () {
+                                  // Store current position before exiting
+                                  final currentPosition =
+                                      controller.value.position;
+
+                                  // Exit PiP first
+                                  _exitPiPMode();
+
+                                  // Re-open video player in full screen with preserved position
+                                  // Use a small delay to ensure PiP is fully exited
+                                  Future.delayed(
+                                    const Duration(milliseconds: 100),
+                                    () {
+                                      navigatorKey.currentState?.push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              RSNewVideoPlayerScreen(
+                                                mediaUrl: widget.mediaUrl,
+                                                onError: widget.onError,
+                                                initialPosition:
+                                                    currentPosition,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.fullscreen,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                              // Close button
+                              GestureDetector(
+                                onTap: () {
+                                  controller.pause();
+                                  _exitPiPMode();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Play/Pause button overlay - use ValueListenableBuilder to show/hide based on playing state
+                        ValueListenableBuilder<VideoPlayerValue>(
+                          valueListenable: controller,
+                          builder: (context, value, child) {
+                            if (!value.isInitialized) {
+                              return const SizedBox.shrink();
+                            }
+                            // Show play button when paused
+                            if (!value.isPlaying) {
+                              return Center(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    controller.play();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.7),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            // When playing, show a small pause indicator on tap (optional)
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildVideoPlayer(VideoPlayerController controller) {
+    if (!controller.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final aspectRatio = controller.value.aspectRatio;
+    Widget videoWidget = VideoPlayer(controller);
+
+    switch (_videoFitMode) {
+      case VideoFitMode.fit:
+        // Contain - show entire video with letterboxing
+        return Center(
+          child: AspectRatio(aspectRatio: aspectRatio, child: videoWidget),
+        );
+      case VideoFitMode.fill:
+        // Cover - fill screen, may crop
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: videoWidget,
+            ),
+          ),
+        );
+      case VideoFitMode.stretch:
+        // Stretch - distort to fill
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.fill,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: videoWidget,
+            ),
+          ),
+        );
+      case VideoFitMode.original:
+        // Original aspect ratio - center it
+        return Center(
+          child: AspectRatio(aspectRatio: aspectRatio, child: videoWidget),
+        );
+      case VideoFitMode.zoom:
+        // Zoom - aggressive crop to fill
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: videoWidget,
+            ),
+          ),
+        );
+    }
+  }
+
+  void _showAspectRatioMenu(BuildContext context) {
+    // This method is no longer used - aspect ratio is now handled by PopupMenuButton
+    // Keeping for backward compatibility but can be removed
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
         if (didPop == true) {
-          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-          SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+          if (!_isInPiP) {
+            SystemChrome.setPreferredOrientations([
+              DeviceOrientation.portraitUp,
+            ]);
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+          }
         }
       },
       child: Scaffold(
@@ -299,9 +725,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
             if (_inAdBreak &&
                 _adController != null &&
                 _adController!.value.isInitialized)
-              VideoPlayer(_adController!)
+              _buildVideoPlayer(_adController!)
             else if (!_inAdBreak && _controller.value.isInitialized)
-              VideoPlayer(_controller)
+              _buildVideoPlayer(_controller)
             else
               const Center(child: CircularProgressIndicator()),
 
@@ -510,13 +936,16 @@ class ControlBarState extends State<ControlBar> {
         // Only show times if video is initialized and has valid duration
         final position = value.position;
         final duration = value.duration;
-        final isInitialized = value.isInitialized && duration.inMilliseconds > 0;
+        final isInitialized =
+            value.isInitialized && duration.inMilliseconds > 0;
 
         // compute slider values
         final maxMillis = duration.inMilliseconds.toDouble();
         final currentMillis = _isDragging
             ? _dragValue
-            : position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+            : position.inMilliseconds
+                  .clamp(0, duration.inMilliseconds)
+                  .toDouble();
 
         return SizedBox(
           width: MediaQuery.of(context).size.width,
@@ -570,7 +999,9 @@ class ControlBarState extends State<ControlBar> {
                             });
                           },
                           onChangeEnd: (v) {
-                            controller.seekTo(Duration(milliseconds: v.toInt()));
+                            controller.seekTo(
+                              Duration(milliseconds: v.toInt()),
+                            );
                             setState(() {
                               _isDragging = false;
                             });
@@ -668,20 +1099,120 @@ class ControlBarState extends State<ControlBar> {
                           ),
                           onPressed: () {
                             if (state.mounted) {
-                              state.setState(() => state._showEpisodeList = true);
+                              state.setState(
+                                () => state._showEpisodeList = true,
+                              );
                             }
                           },
                         ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: Icon(Icons.settings, color: Colors.white),
-                        ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: Icon(
-                            Icons.picture_in_picture_alt_rounded,
+                        // Aspect Ratio - compact popup menu
+                        PopupMenuButton<VideoFitMode>(
+                          color: Colors.black,
+                          icon: const Icon(
+                            Icons.aspect_ratio,
                             color: Colors.white,
                           ),
+                          tooltip:
+                              'Aspect Ratio (${state._videoFitMode.label})',
+                          onSelected: (mode) {
+                            if (!state._isDisposed && state.mounted) {
+                              state.setState(() {
+                                state._videoFitMode = mode;
+                              });
+                            }
+                          },
+                          itemBuilder: (context) =>
+                              VideoFitMode.values.map((mode) {
+                                final isSelected = state._videoFitMode == mode;
+                                return PopupMenuItem<VideoFitMode>(
+                                  value: mode,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isSelected ? Icons.check : null,
+                                        color: Colors.amber,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              mode.label,
+                                              style: TextStyle(
+                                                color: isSelected
+                                                    ? Colors.amber
+                                                    : Colors.white,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            Text(
+                                              mode.description,
+                                              style: TextStyle(
+                                                color: Colors.grey[400],
+                                                fontSize: 10,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                        PopupMenuButton<String>(
+                          color: Colors.black,
+                          icon: const Icon(Icons.settings, color: Colors.white),
+                          onSelected: (value) {
+                            if (value == 'aspect_ratio') {
+                              // Show aspect ratio menu via the aspect ratio button
+                              // This is handled by the PopupMenuButton above
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'aspect_ratio',
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.aspect_ratio,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Aspect Ratio (${state._videoFitMode.label})',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            if (state._isInPiP) {
+                              state._exitPiPMode();
+                            } else {
+                              state._enterPiPMode();
+                            }
+                          },
+                          icon: Icon(
+                            state._isInPiP
+                                ? Icons.picture_in_picture_outlined
+                                : Icons.picture_in_picture_alt_rounded,
+                            color: state._isInPiP ? Colors.amber : Colors.white,
+                          ),
+                          tooltip: state._isInPiP ? 'Exit PiP' : 'Enter PiP',
                         ),
                         IconButton(
                           icon: const Icon(
@@ -864,7 +1395,8 @@ class PlayPauseControlBar extends StatelessWidget {
                   onPressed: () {
                     if (!state._isDisposed && state.mounted) {
                       state._controller.seekTo(
-                        state._controller.value.position + Duration(seconds: 10),
+                        state._controller.value.position +
+                            Duration(seconds: 10),
                       );
                     }
                   },

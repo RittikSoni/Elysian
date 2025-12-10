@@ -1,5 +1,6 @@
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_handler.dart';
+import 'package:elysian/widgets/thumbnail_image.dart';
 import 'package:flutter/material.dart';
 
 class SuggestionsSection extends StatelessWidget {
@@ -81,6 +82,7 @@ class SuggestionsSection extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Thumbnail
             Stack(
@@ -90,33 +92,11 @@ class SuggestionsSection extends StatelessWidget {
                     topLeft: Radius.circular(12),
                     topRight: Radius.circular(12),
                   ),
-                  child: link.thumbnailUrl != null
-                      ? Image.network(
-                          link.thumbnailUrl!,
-                          width: double.infinity,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: double.infinity,
-                            height: 120,
-                            color: Colors.grey[800],
-                            child: Icon(
-                              _getIconForType(link.type),
-                              color: Colors.grey[600],
-                              size: 40,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          width: double.infinity,
-                          height: 120,
-                          color: Colors.grey[800],
-                          child: Icon(
-                            _getIconForType(link.type),
-                            color: Colors.grey[600],
-                            size: 40,
-                          ),
-                        ),
+                  child: ThumbnailImage(
+                    link: link,
+                    width: double.infinity,
+                    height: 120,
+                  ),
                 ),
                 if (link.viewCount > 0)
                   Positioned(
@@ -148,40 +128,48 @@ class SuggestionsSection extends StatelessWidget {
               ],
             ),
             // Content
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    link.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        _getIconForType(link.type),
-                        size: 12,
-                        color: Colors.grey[500],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getTypeLabel(link.type),
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 11,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        link.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          _getIconForType(link.type),
+                          size: 12,
+                          color: Colors.grey[500],
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            _getTypeLabel(link.type),
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 11,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
