@@ -10,7 +10,7 @@ class LinkParser {
     final host = uri.host.toLowerCase();
     final path = uri.path.toLowerCase();
     final scheme = uri.scheme.toLowerCase();
-
+    
     // YouTube
     if (host.contains('youtube.com') || host.contains('youtu.be')) {
       return LinkType.youtube;
@@ -40,7 +40,7 @@ class LinkParser {
     if (scheme == 'http' || scheme == 'https') {
       return LinkType.web;
     }
-
+    
     return null;
   }
 
@@ -374,6 +374,70 @@ class LinkParser {
       return 'https://drive.google.com/file/d/$fileId/preview';
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Fetches YouTube video duration
+  static Future<String?> fetchYouTubeDuration(String url) async {
+    try {
+      final videoId = extractYouTubeVideoId(url);
+      if (videoId == null) return null;
+
+      // Fetch the page and extract duration from HTML
+      final pageResponse = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+
+      if (pageResponse.statusCode == 200) {
+        final html = pageResponse.body;
+        
+        // Try to extract duration from meta tag
+        final durationMatch = RegExp(
+          r'"lengthSeconds":"(\d+)"',
+          caseSensitive: false,
+        ).firstMatch(html);
+        
+        if (durationMatch != null) {
+          final seconds = int.tryParse(durationMatch.group(1)!);
+          if (seconds != null) {
+            return _formatDuration(seconds);
+          }
+        }
+        
+        // Alternative: try to find in videoDetails
+        final videoDetailsMatch = RegExp(
+          r'"videoDetails":\{[^}]*"lengthSeconds":"(\d+)"',
+          caseSensitive: false,
+        ).firstMatch(html);
+        
+        if (videoDetailsMatch != null) {
+          final seconds = int.tryParse(videoDetailsMatch.group(1)!);
+          if (seconds != null) {
+            return _formatDuration(seconds);
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail
+    }
+    return null;
+  }
+
+  /// Formats seconds into readable duration (e.g., "10:30", "1h 5m")
+  static String _formatDuration(int seconds) {
+    if (seconds < 60) {
+      return '${seconds}s';
+    } else if (seconds < 3600) {
+      final minutes = seconds ~/ 60;
+      final secs = seconds % 60;
+      return secs > 0 ? '$minutes:${secs.toString().padLeft(2, '0')}' : '${minutes}m';
+    } else {
+      final hours = seconds ~/ 3600;
+      final minutes = (seconds % 3600) ~/ 60;
+      if (minutes > 0) {
+        return '${hours}h ${minutes}m';
+      }
+      return '${hours}h';
     }
   }
 

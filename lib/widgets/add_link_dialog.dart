@@ -223,14 +223,21 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     setState(() => _isLoading = true);
 
     try {
-      // Generate thumbnail URL based on link type
+      // Generate thumbnail URL and fetch duration based on link type
       String? thumbnailUrl;
+      String? duration;
       switch (_detectedLinkType!) {
         case LinkType.youtube:
           final videoId = LinkParser.extractYouTubeVideoId(url);
           if (videoId != null) {
             thumbnailUrl =
                 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            // Fetch duration for YouTube videos
+            try {
+              duration = await LinkParser.fetchYouTubeDuration(url);
+            } catch (e) {
+              // Silently fail, duration is optional
+            }
           }
           break;
         case LinkType.vimeo:
@@ -258,6 +265,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        duration: duration,
       );
 
       await StorageService.saveLink(savedLink);

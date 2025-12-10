@@ -4,6 +4,7 @@ import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ListsManagementScreen extends StatefulWidget {
   const ListsManagementScreen({super.key});
@@ -280,6 +281,41 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
     }
   }
 
+  Future<void> _shareList(UserList list) async {
+    try {
+      final links = await StorageService.getSavedLinksByList(list.id);
+      
+      if (links.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This list is empty')),
+        );
+        return;
+      }
+
+      final shareText = StringBuffer();
+      shareText.writeln('${list.name}');
+      if (list.description != null && list.description!.isNotEmpty) {
+        shareText.writeln(list.description);
+      }
+      shareText.writeln('\nLinks (${links.length}):\n');
+      
+      for (var link in links) {
+        shareText.writeln('${link.title}');
+        shareText.writeln(link.url);
+        if (link.description != null && link.description!.isNotEmpty) {
+          shareText.writeln(link.description);
+        }
+        shareText.writeln('');
+      }
+
+      await Share.share(shareText.toString());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sharing list: $e')),
+      );
+    }
+  }
+
   Future<void> _deleteList(UserList list) async {
     if (list.id == StorageService.defaultListId) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -508,6 +544,9 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
                               color: Colors.grey[900],
                               onSelected: (value) {
                                 switch (value) {
+                                  case 'share':
+                                    _shareList(list);
+                                    break;
                                   case 'edit':
                                     _editList(list);
                                     break;
@@ -517,6 +556,20 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
                                 }
                               },
                               itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'share',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.share, color: Colors.white, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Share',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuDivider(),
                                 const PopupMenuItem(
                                   value: 'edit',
                                   child: Text(

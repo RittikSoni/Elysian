@@ -7,14 +7,27 @@ class StorageService {
   static const String _userListsKey = 'user_lists';
   static const String _defaultListId = 'my_list';
   static const String _playerPreferenceKey = 'player_preference'; // 'inbuilt' or 'external'
+  static const String _recentSearchesKey = 'recent_searches';
+  static const int _maxRecentSearches = 10;
 
   // Saved Links
   static Future<List<SavedLink>> getSavedLinks() async {
     final prefs = await SharedPreferences.getInstance();
     final linksJson = prefs.getStringList(_savedLinksKey) ?? [];
-    return linksJson
-        .map((json) => SavedLink.fromJson(jsonDecode(json) as Map<String, dynamic>))
-        .toList();
+    final List<SavedLink> links = [];
+    
+    // Parse links with error handling to skip corrupted entries
+    for (final json in linksJson) {
+      try {
+        final link = SavedLink.fromJson(jsonDecode(json) as Map<String, dynamic>);
+        links.add(link);
+      } catch (e) {
+        // Skip corrupted entries - log error but continue
+        print('Error parsing saved link: $e');
+      }
+    }
+    
+    return links;
   }
 
   static Future<List<SavedLink>> getSavedLinksByList(String listId) async {
@@ -23,31 +36,48 @@ class StorageService {
   }
 
   static Future<void> saveLink(SavedLink link) async {
-    final prefs = await SharedPreferences.getInstance();
-    final links = await getSavedLinks();
-    
-    // Check if link already exists (by ID)
-    final existingIndex = links.indexWhere((l) => l.id == link.id);
-    if (existingIndex != -1) {
-      // Update existing link
-      links[existingIndex] = link;
-    } else {
-      // Check if same URL exists in any of the same lists
-      final duplicateExists = links.any((l) => 
-        l.url == link.url && 
-        l.listIds.any((id) => link.listIds.contains(id))
-      );
-      if (!duplicateExists) {
-        links.add(link);
-      } else {
-        return; // Already saved in one of these lists
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final links = await getSavedLinks();
+      
+      // Validate listIds exist (except default list)
+      final allLists = await getUserLists();
+      final validListIds = allLists.map((l) => l.id).toSet();
+      final validatedListIds = link.listIds.where((id) => validListIds.contains(id)).toList();
+      
+      // If no valid list IDs, add to default list
+      if (validatedListIds.isEmpty) {
+        validatedListIds.add(_defaultListId);
       }
-    }
+      
+      final linkWithValidLists = link.copyWith(listIds: validatedListIds);
+      
+      // Check if link already exists (by ID)
+      final existingIndex = links.indexWhere((l) => l.id == linkWithValidLists.id);
+      if (existingIndex != -1) {
+        // Update existing link
+        links[existingIndex] = linkWithValidLists;
+      } else {
+        // Check if same URL exists in any of the same lists
+        final duplicateExists = links.any((l) => 
+          l.url == linkWithValidLists.url && 
+          l.listIds.any((id) => linkWithValidLists.listIds.contains(id))
+        );
+        if (!duplicateExists) {
+          links.add(linkWithValidLists);
+        } else {
+          return; // Already saved in one of these lists
+        }
+      }
 
-    await _updateSavedLinks(prefs, links);
-    // Update counts for all lists this link belongs to
-    for (final listId in link.listIds) {
-      await _updateListCount(listId);
+      await _updateSavedLinks(prefs, links);
+      // Update counts for all lists this link belongs to
+      for (final listId in linkWithValidLists.listIds) {
+        await _updateListCount(listId);
+      }
+    } catch (e) {
+      print('Error saving link: $e');
+      rethrow; // Re-throw to let caller handle it
     }
   }
 
@@ -81,9 +111,17 @@ class StorageService {
       createdAt: DateTime.now(),
     );
     
-    final customLists = listsJson
-        .map((json) => UserList.fromJson(jsonDecode(json) as Map<String, dynamic>))
-        .toList();
+    // Parse lists with error handling to skip corrupted entries
+    final List<UserList> customLists = [];
+    for (final json in listsJson) {
+      try {
+        final list = UserList.fromJson(jsonDecode(json) as Map<String, dynamic>);
+        customLists.add(list);
+      } catch (e) {
+        // Skip corrupted entries - log error but continue
+        print('Error parsing user list: $e');
+      }
+    }
 
     // Update item counts
     final allLinks = await getSavedLinks();
@@ -365,6 +403,73 @@ class StorageService {
       'recentlyViewed': recentlyViewed.take(5).map((l) => l.toJson()).toList(),
       'totalViews': allLinks.fold(0, (sum, link) => sum + link.viewCount),
     };
+  }
+
+  // Recent Searches
+  static Future<List<String>> getRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_recentSearchesKey) ?? [];
+  }
+
+  static Future<void> addRecentSearch(String query) async {
+    if (query.trim().isEmpty) return;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final searches = await getRecentSearches();
+    
+    // Remove if already exists
+    searches.remove(query.trim());
+    
+    // Add to beginning
+    searches.insert(0, query.trim());
+    
+    // Keep only max recent searches
+    if (searches.length > _maxRecentSearches) {
+      searches.removeRange(_maxRecentSearches, searches.length);
+    }
+    
+    await prefs.setStringList(_recentSearchesKey, searches);
+  }
+
+  static Future<void> clearRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_recentSearchesKey);
+  }
+
+  // Smart Suggestions
+  static Future<List<SavedLink>> getSuggestedLinks({int limit = 5}) async {
+    final allLinks = await getSavedLinks();
+    
+    // Get most viewed links that user hasn't viewed recently
+    final viewedLinks = allLinks
+        .where((link) => link.viewCount > 0)
+        .toList()
+      ..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    
+    // Get links similar to recently viewed (by type)
+    final recentLinks = await getRecentlyViewedLinks(limit: 5);
+    if (recentLinks.isEmpty) {
+      return viewedLinks.take(limit).toList();
+    }
+    
+    // Find links of same types as recently viewed
+    final recentTypes = recentLinks.map((l) => l.type).toSet();
+    final suggested = allLinks
+        .where((link) => 
+            recentTypes.contains(link.type) && 
+            !recentLinks.any((r) => r.id == link.id))
+        .toList();
+    
+    // Combine with most viewed
+    final combined = [...suggested, ...viewedLinks];
+    final unique = <String, SavedLink>{};
+    for (final link in combined) {
+      if (!unique.containsKey(link.id)) {
+        unique[link.id] = link;
+      }
+    }
+    
+    return unique.values.take(limit).toList();
   }
 }
 

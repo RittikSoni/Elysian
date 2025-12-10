@@ -10,3 +10,4 @@ export 'user_lists_widget.dart';
 export 'list_content_section.dart';
 export 'favorites_section.dart';
 export 'recent_activity_section.dart';
+export 'suggestions_section.dart';

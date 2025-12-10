@@ -5,16 +5,13 @@ import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SavedLinksScreen extends StatefulWidget {
   final String? listId;
   final String? listName;
 
-  const SavedLinksScreen({
-    super.key,
-    this.listId,
-    this.listName,
-  });
+  const SavedLinksScreen({super.key, this.listId, this.listName});
 
   @override
   State<SavedLinksScreen> createState() => _SavedLinksScreenState();
@@ -67,7 +64,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     // Apply sorting
     switch (_sortBy) {
       case 'title':
-        filtered.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        filtered.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
         break;
       case 'type':
         filtered.sort((a, b) => a.type.toString().compareTo(b.type.toString()));
@@ -109,7 +108,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Delete Links', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Delete Links',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           'Are you sure you want to delete ${_selectedLinkIds.length} link(s)?',
           style: const TextStyle(color: Colors.white70),
@@ -143,16 +145,18 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${_selectedLinkIds.length} link(s) deleted successfully'),
+              content: Text(
+                '${_selectedLinkIds.length} link(s) deleted successfully',
+              ),
               backgroundColor: Colors.green,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting links: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting links: $e')));
         }
       }
     }
@@ -167,7 +171,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Move to Lists', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Move to Lists',
+          style: TextStyle(color: Colors.white),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: MultiListPicker(
@@ -196,7 +203,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
 
     if (result != null && result.isNotEmpty) {
       try {
-        await StorageService.moveLinksToLists(_selectedLinkIds.toList(), result);
+        await StorageService.moveLinksToLists(
+          _selectedLinkIds.toList(),
+          result,
+        );
         await _loadLinks();
         onLinkSavedCallback?.call();
         setState(() {
@@ -213,9 +223,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error moving links: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error moving links: $e')));
         }
       }
     }
@@ -225,7 +235,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     if (_selectedLinkIds.isEmpty) return;
 
     try {
-      await StorageService.toggleFavoritesForLinks(_selectedLinkIds.toList(), isFavorite);
+      await StorageService.toggleFavoritesForLinks(
+        _selectedLinkIds.toList(),
+        isFavorite,
+      );
       await _loadLinks();
       onLinkSavedCallback?.call();
       setState(() {
@@ -235,16 +248,18 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+            content: Text(
+              isFavorite ? 'Added to favorites' : 'Removed from favorites',
+            ),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating favorites: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating favorites: $e')));
       }
     }
   }
@@ -254,10 +269,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Delete Link',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Delete Link', style: TextStyle(color: Colors.white)),
         content: Text(
           'Are you sure you want to delete "${link.title}"?',
           style: const TextStyle(color: Colors.white70),
@@ -295,9 +307,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting link: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting link: $e')));
         }
       }
     }
@@ -306,7 +318,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
   Future<void> _editLink(SavedLink link) async {
     final titleController = TextEditingController(text: link.title);
     final urlController = TextEditingController(text: link.url);
-    final descriptionController = TextEditingController(text: link.description ?? '');
+    final descriptionController = TextEditingController(
+      text: link.description ?? '',
+    );
     final notesController = TextEditingController(text: link.notes ?? '');
     final newListNameController = TextEditingController();
     final newListDescriptionController = TextEditingController();
@@ -321,10 +335,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: const Text(
-            'Edit Link',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: const Text('Edit Link', style: TextStyle(color: Colors.white)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -505,57 +516,84 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: isCreatingList ? null : () async {
-                              final name = newListNameController.text.trim();
-                              if (name.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter a list name')),
-                                );
-                                return;
-                              }
+                            onPressed: isCreatingList
+                                ? null
+                                : () async {
+                                    final name = newListNameController.text
+                                        .trim();
+                                    if (name.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Please enter a list name',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                              setDialogState(() => isCreatingList = true);
-                              try {
-                                final description = newListDescriptionController.text.trim();
-                                final newList = await StorageService.createUserList(
-                                  name,
-                                  description: description.isEmpty ? null : description,
-                                );
-                                
-                                setDialogState(() {
-                                  selectedListIds.add(newList.id);
-                                  showCreateListForm = false;
-                                  isCreatingList = false;
-                                });
-                                
-                                newListNameController.clear();
-                                newListDescriptionController.clear();
-                                
-                                // Refresh the list picker
-                                final state = listPickerKey.currentState;
-                                if (state != null && state.mounted) {
-                                  (state as dynamic).refreshLists();
-                                }
-                                
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('List created successfully!'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                setDialogState(() => isCreatingList = false);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(e.toString().replaceAll('Exception: ', '')),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
+                                    setDialogState(() => isCreatingList = true);
+                                    try {
+                                      final description =
+                                          newListDescriptionController.text
+                                              .trim();
+                                      final newList =
+                                          await StorageService.createUserList(
+                                            name,
+                                            description: description.isEmpty
+                                                ? null
+                                                : description,
+                                          );
+
+                                      setDialogState(() {
+                                        selectedListIds.add(newList.id);
+                                        showCreateListForm = false;
+                                        isCreatingList = false;
+                                      });
+
+                                      newListNameController.clear();
+                                      newListDescriptionController.clear();
+
+                                      // Refresh the list picker
+                                      final state = listPickerKey.currentState;
+                                      if (state != null && state.mounted) {
+                                        (state as dynamic).refreshLists();
+                                      }
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'List created successfully!',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      setDialogState(
+                                        () => isCreatingList = false,
+                                      );
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              e.toString().replaceAll(
+                                                'Exception: ',
+                                                '',
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
@@ -564,7 +602,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Text('Create List'),
                           ),
@@ -622,7 +662,11 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         if (linkType == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Invalid URL. Must be YouTube or Instagram link.')),
+              const SnackBar(
+                content: Text(
+                  'Invalid URL. Must be YouTube or Instagram link.',
+                ),
+              ),
             );
           }
           return;
@@ -634,7 +678,8 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           case LinkType.youtube:
             final videoId = LinkParser.extractYouTubeVideoId(newUrl);
             if (videoId != null) {
-              thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+              thumbnailUrl =
+                  'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
             }
             break;
           case LinkType.vimeo:
@@ -654,8 +699,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         }
 
         // Get selected list IDs from result
-        final selectedListIds = result['listIds'] as List<String>? ?? link.listIds;
-        
+        final selectedListIds =
+            result['listIds'] as List<String>? ?? link.listIds;
+
         // Ensure at least one list is selected
         if (selectedListIds.isEmpty) {
           if (mounted) {
@@ -673,7 +719,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           url: newUrl,
           title: title,
           thumbnailUrl: thumbnailUrl,
-          description: result['description']!.isEmpty ? null : result['description'],
+          description: result['description']!.isEmpty
+              ? null
+              : result['description'],
           type: linkType,
           listIds: selectedListIds,
           savedAt: link.savedAt,
@@ -699,11 +747,78 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating link: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error updating link: $e')));
         }
       }
+    }
+  }
+
+  Future<void> _handleFavoriteToggle(SavedLink link) async {
+    final wasFavorite = link.isFavorite;
+    // Update state immediately to prevent Dismissible error
+    setState(() {
+      final index = _filteredLinks.indexWhere((l) => l.id == link.id);
+      if (index != -1) {
+        _filteredLinks[index] = link.copyWith(isFavorite: !link.isFavorite);
+      }
+    });
+
+    // Then do the async operation
+    await StorageService.toggleFavorite(link.id);
+    await _loadLinks();
+    onLinkSavedCallback?.call();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wasFavorite ? 'Removed from favorites' : 'Added to favorites',
+          ),
+          backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: 'Undo',
+            textColor: Colors.white,
+            onPressed: () async {
+              await StorageService.toggleFavorite(link.id);
+              await _loadLinks();
+              onLinkSavedCallback?.call();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleDelete(SavedLink link) async {
+    try {
+      await StorageService.deleteLink(link.id);
+      await _loadLinks();
+      onLinkSavedCallback?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting link: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareLink(SavedLink link) async {
+    final shareText = '${link.title}\n${link.url}';
+    if (link.description != null && link.description!.isNotEmpty) {
+      await Share.share('$shareText\n\n${link.description}');
+    } else {
+      await Share.share(shareText);
     }
   }
 
@@ -716,14 +831,15 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       );
 
       final title = await LinkParser.fetchTitleFromUrl(link.url, link.type);
-      
+
       // Generate thumbnail if YouTube
       String? thumbnailUrl = link.thumbnailUrl;
       switch (link.type) {
         case LinkType.youtube:
           final videoId = LinkParser.extractYouTubeVideoId(link.url);
           if (videoId != null) {
-            thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            thumbnailUrl =
+                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
           }
           break;
         case LinkType.vimeo:
@@ -769,9 +885,9 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error refreshing title: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error refreshing title: $e')));
       }
     }
   }
@@ -869,7 +985,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('Date', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'Date',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -883,7 +1002,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('Title', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'Title',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -897,7 +1019,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('Type', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'Type',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -923,7 +1048,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('All', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'All',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -937,7 +1065,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('Favorites', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'Favorites',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -951,7 +1082,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text('By Type', style: TextStyle(color: Colors.white)),
+                          const Text(
+                            'By Type',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -968,191 +1102,327 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _filteredLinks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.link_off,
-                        size: 64,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No saved links',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.link_off, size: 64, color: Colors.grey[600]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No saved links',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 18),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _filteredLinks.length,
-                  itemBuilder: (context, index) {
-                    final link = _filteredLinks[index];
-                    final isSelected = _selectedLinkIds.contains(link.id);
-                    final thumbnailUrl = link.thumbnailUrl;
-                    final videoId = link.type == LinkType.youtube
-                        ? LinkParser.extractYouTubeVideoId(link.url)
-                        : null;
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _filteredLinks.length,
+              itemBuilder: (context, index) {
+                final link = _filteredLinks[index];
+                final isSelected = _selectedLinkIds.contains(link.id);
+                final thumbnailUrl = link.thumbnailUrl;
+                final videoId = link.type == LinkType.youtube
+                    ? LinkParser.extractYouTubeVideoId(link.url)
+                    : null;
 
-                    return Card(
-                      color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.grey[900],
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: _isSelectionMode
-                            ? () => _toggleLinkSelection(link.id)
-                            : () => LinkHandler.openLink(
-                                  context,
-                                  link.url,
-                                  linkType: link.type,
-                                  title: link.title,
-                                  description: link.description,
-                                  linkId: link.id,
-                                ),
-                        onLongPress: () {
-                          if (!_isSelectionMode) {
-                            _toggleSelectionMode();
-                            _toggleLinkSelection(link.id);
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Selection checkbox
-                              if (_isSelectionMode)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: Checkbox(
-                                    value: isSelected,
-                                    onChanged: (value) => _toggleLinkSelection(link.id),
-                                    activeColor: Colors.blue,
-                                  ),
-                                ),
-                              // Thumbnail
-                              Container(
-                                width: 120,
-                                height: 90,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[800],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: thumbnailUrl != null || videoId != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: Image.network(
-                                          thumbnailUrl ??
-                                              'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Icon(
-                                              _getIconForType(link.type),
-                                              color: Colors.grey[600],
-                                              size: 40,
-                                            );
-                                          },
-                                        ),
-                                      )
-                                    : Icon(
-                                        _getIconForType(link.type),
-                                        color: Colors.grey[600],
-                                        size: 40,
-                                      ),
+                return Dismissible(
+                  key: Key(link.id),
+                  direction: DismissDirection.horizontal,
+                  background: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: link.isFavorite ? Colors.orange : Colors.green,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    child: Icon(
+                      link.isFavorite ? Icons.star_border : Icons.star,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  secondaryBackground: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.endToStart) {
+                      // For delete, show confirmation
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Colors.grey[900],
+                          title: const Text(
+                            'Delete Link',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          content: Text(
+                            'Are you sure you want to delete "${link.title}"?',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
                               ),
-                              const SizedBox(width: 12),
-                              // Content
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        // Handle delete immediately
+                        _handleDelete(link);
+                      }
+                      return confirmed ?? false;
+                    } else if (direction == DismissDirection.startToEnd) {
+                      // For favorite toggle, allow dismissal and handle in onDismissed
+                      return true;
+                    }
+                    return false;
+                  },
+                  onDismissed: (direction) {
+                    if (direction == DismissDirection.startToEnd) {
+                      // Swipe right - Toggle favorite
+                      // Remove from list immediately to prevent Dismissible error
+                      setState(() {
+                        _filteredLinks.removeWhere((l) => l.id == link.id);
+                      });
+                      // Schedule async operation after current frame to ensure widget is removed
+                      Future.microtask(() => _handleFavoriteToggle(link));
+                    }
+                  },
+                  child: Card(
+                    color: isSelected
+                        ? Colors.blue.withOpacity(0.2)
+                        : Colors.grey[900],
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: _isSelectionMode
+                          ? () => _toggleLinkSelection(link.id)
+                          : () => LinkHandler.openLink(
+                              context,
+                              link.url,
+                              linkType: link.type,
+                              title: link.title,
+                              description: link.description,
+                              linkId: link.id,
+                            ),
+                      onLongPress: () {
+                        if (!_isSelectionMode) {
+                          _toggleSelectionMode();
+                          _toggleLinkSelection(link.id);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Selection checkbox
+                            if (_isSelectionMode)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: Checkbox(
+                                  value: isSelected,
+                                  onChanged: (value) =>
+                                      _toggleLinkSelection(link.id),
+                                  activeColor: Colors.blue,
+                                ),
+                              ),
+                            // Thumbnail
+                            Container(
+                              width: 120,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: thumbnailUrl != null || videoId != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: Image.network(
+                                        thumbnailUrl ??
+                                            'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                              return Icon(
+                                                _getIconForType(link.type),
+                                                color: Colors.grey[600],
+                                                size: 40,
+                                              );
+                                            },
+                                      ),
+                                    )
+                                  : Icon(
+                                      _getIconForType(link.type),
+                                      color: Colors.grey[600],
+                                      size: 40,
+                                    ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Content
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    link.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (link.description != null &&
+                                      link.description!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
                                     Text(
-                                      link.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                      link.description!,
+                                      style: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 12,
                                       ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    if (link.description != null &&
-                                        link.description!.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
+                                  ],
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _getIconForType(link.type),
+                                        color: Colors.grey[500],
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        link.description!,
+                                        _getTypeLabel(link.type),
                                         style: TextStyle(
-                                          color: Colors.grey[400],
+                                          color: Colors.grey[500],
                                           fontSize: 12,
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          _getIconForType(link.type),
-                                          color: Colors.grey[500],
-                                          size: 14,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _getTypeLabel(link.type),
-                                          style: TextStyle(
-                                            color: Colors.grey[500],
-                                            fontSize: 12,
-                                          ),
+                                      if (link.duration != null &&
+                                          link.duration!.isNotEmpty) ...[
+                                        const SizedBox(width: 12),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.access_time,
+                                              color: Colors.grey[500],
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              link.duration!,
+                                              style: TextStyle(
+                                                color: Colors.grey[500],
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Actions
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, color: Colors.white),
-                                color: Colors.grey[900],
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _editLink(link);
-                                      break;
-                                    case 'refresh':
-                                      _refreshTitle(link);
-                                      break;
-                                    case 'delete':
-                                      _deleteLink(link);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit', style: TextStyle(color: Colors.white)),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'refresh',
-                                    child: Text('Refresh Title', style: TextStyle(color: Colors.white)),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete', style: TextStyle(color: Colors.red)),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                            // Actions
+                            PopupMenuButton<String>(
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white,
+                              ),
+                              color: Colors.grey[900],
+                              onSelected: (value) {
+                                switch (value) {
+                                  case 'share':
+                                    _shareLink(link);
+                                    break;
+                                  case 'edit':
+                                    _editLink(link);
+                                    break;
+                                  case 'refresh':
+                                    _refreshTitle(link);
+                                    break;
+                                  case 'delete':
+                                    _deleteLink(link);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'share',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.share,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Share',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuDivider(),
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text(
+                                    'Edit',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'refresh',
+                                  child: Text(
+                                    'Refresh Title',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 
@@ -1180,13 +1450,19 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Filter by Type', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Filter by Type',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: LinkType.values.map((type) {
             return ListTile(
               leading: Icon(_getIconForType(type), color: Colors.white),
-              title: Text(_getTypeLabel(type), style: const TextStyle(color: Colors.white)),
+              title: Text(
+                _getTypeLabel(type),
+                style: const TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(context, type),
             );
           }).toList(),
@@ -1221,4 +1497,3 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     }
   }
 }
-

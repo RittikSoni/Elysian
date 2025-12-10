@@ -7,6 +7,7 @@ import 'package:elysian/widgets/user_lists_widget.dart';
 import 'package:elysian/widgets/list_content_section.dart';
 import 'package:elysian/widgets/favorites_section.dart';
 import 'package:elysian/widgets/recent_activity_section.dart';
+import 'package:elysian/widgets/suggestions_section.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -26,9 +27,12 @@ class HomeScreenState extends State<HomeScreen> {
   List<UserList> _userLists = [];
   List<SavedLink> _favoriteLinks = [];
   List<SavedLink> _recentLinks = [];
+  List<SavedLink> _suggestedLinks = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
+    super.initState();
     _scrollController = ScrollController()
       ..addListener(() {
         setState(() {
@@ -36,36 +40,76 @@ class HomeScreenState extends State<HomeScreen> {
         });
         // context.bloc<AppBarCubit>().setOffset(_scrollController.offset);
       });
-    _loadSavedLinks();
-    super.initState();
-
+    
     // Register refresh callback
     onLinkSavedCallback = refreshLinks;
+    
+    // Load data after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedLinks();
+    });
   }
 
   Future<void> _loadSavedLinks() async {
+    if (_isLoading) return; // Prevent concurrent loads
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
-      final links = await StorageService.getSavedLinks();
-      final lists = await StorageService.getUserLists();
-      final favorites = await StorageService.getFavoriteLinks();
-      final recent = await StorageService.getRecentlyViewedLinks(limit: 10);
+      // Load all data in parallel for better performance
+      // Use timeout to prevent hanging indefinitely
+      final results = await Future.wait([
+        StorageService.getSavedLinks(),
+        StorageService.getUserLists(),
+        StorageService.getFavoriteLinks(),
+        StorageService.getRecentlyViewedLinks(limit: 10),
+        StorageService.getSuggestedLinks(limit: 10),
+      ]).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          // Return empty lists if timeout
+          return [
+            <SavedLink>[],
+            <UserList>[],
+            <SavedLink>[],
+            <SavedLink>[],
+            <SavedLink>[],
+          ];
+        },
+      );
       
-      setState(() {
-        _savedLinks = links;
-        _userLists = lists;
-        _favoriteLinks = favorites;
-        _recentLinks = recent;
-      });
+      if (mounted) {
+        setState(() {
+          _savedLinks = results[0] as List<SavedLink>;
+          _userLists = results[1] as List<UserList>;
+          _favoriteLinks = results[2] as List<SavedLink>;
+          _recentLinks = results[3] as List<SavedLink>;
+          _suggestedLinks = results[4] as List<SavedLink>;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      // Handle error silently
+      print('Error loading saved links: $e');
+      if (mounted) {
+        setState(() {
+          // Set empty lists on error to prevent UI from breaking
+          _savedLinks = [];
+          _userLists = [];
+          _favoriteLinks = [];
+          _recentLinks = [];
+          _suggestedLinks = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload links when screen becomes visible again
-    _loadSavedLinks();
+    // Don't reload here - it causes issues during initialization
   }
 
   // Public method to refresh links (can be called from outside)
@@ -128,6 +172,14 @@ class HomeScreenState extends State<HomeScreen> {
             key: PageStorageKey('recentActivity'),
             child: RecentActivitySection(
               recentLinks: _recentLinks,
+              onRefresh: _loadSavedLinks,
+            ),
+          ),
+          // Smart Suggestions
+          SliverToBoxAdapter(
+            key: PageStorageKey('suggestions'),
+            child: SuggestionsSection(
+              suggestedLinks: _suggestedLinks,
               onRefresh: _loadSavedLinks,
             ),
           ),

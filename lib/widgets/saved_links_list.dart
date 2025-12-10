@@ -7,6 +7,7 @@ import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SavedLinksList extends StatefulWidget {
   final List<SavedLink> savedLinks;
@@ -25,6 +26,17 @@ class SavedLinksList extends StatefulWidget {
 }
 
 class _SavedLinksListState extends State<SavedLinksList> {
+  final Set<String> _dismissedLinkIds = {};
+
+  @override
+  void didUpdateWidget(SavedLinksList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Clear dismissed set when widget updates (e.g., after refresh)
+    if (oldWidget.savedLinks != widget.savedLinks) {
+      _dismissedLinkIds.clear();
+    }
+  }
+
   Future<void> _openLink(BuildContext context, SavedLink link) async {
     await LinkHandler.openLink(
       context,
@@ -34,6 +46,64 @@ class _SavedLinksListState extends State<SavedLinksList> {
       description: link.description,
       linkId: link.id, // Pass linkId to track views
     );
+  }
+
+  Future<void> _handleFavoriteToggle(SavedLink link) async {
+    final wasFavorite = link.isFavorite;
+    await StorageService.toggleFavorite(link.id);
+    widget.onRefresh?.call();
+    onLinkSavedCallback?.call();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(wasFavorite 
+              ? 'Removed from favorites' 
+              : 'Added to favorites'),
+          backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: 'Undo',
+            textColor: Colors.white,
+            onPressed: () async {
+              await StorageService.toggleFavorite(link.id);
+              widget.onRefresh?.call();
+              onLinkSavedCallback?.call();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleDelete(SavedLink link) async {
+    try {
+      await StorageService.deleteLink(link.id);
+      // Refresh home screen
+      onLinkSavedCallback?.call();
+      widget.onRefresh?.call();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting link: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareLink(SavedLink link) async {
+    final shareText = '${link.title}\n${link.url}';
+    if (link.description != null && link.description!.isNotEmpty) {
+      await Share.share('$shareText\n\n${link.description}');
+    } else {
+      await Share.share(shareText);
+    }
   }
 
   Future<void> _deleteLink(SavedLink link) async {
@@ -682,88 +752,189 @@ class _SavedLinksListState extends State<SavedLinksList> {
                 horizontal: 16.0,
               ),
               scrollDirection: Axis.horizontal,
-              itemCount: widget.savedLinks.length > 10
-                  ? 10
-                  : widget.savedLinks.length,
               itemBuilder: (BuildContext context, int index) {
-                final SavedLink link = widget.savedLinks[index];
+                final availableLinks = widget.savedLinks
+                    .where((l) => !_dismissedLinkIds.contains(l.id))
+                    .take(10)
+                    .toList();
+                
+                if (index >= availableLinks.length) {
+                  return const SizedBox.shrink();
+                }
+                
+                final SavedLink link = availableLinks[index];
                 final thumbnailUrl = _getThumbnailUrl(link);
                 
-                return GestureDetector(
-                  onLongPress: () {
-                    // Show edit/delete menu on long press
-                    showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.grey[900],
-                      builder: (context) => SafeArea(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ListTile(
-                              leading: Icon(
-                                link.isFavorite ? Icons.star : Icons.star_border,
-                                color: link.isFavorite ? Colors.amber : Colors.white,
-                              ),
-                              title: Text(
-                                link.isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
-                                style: TextStyle(
-                                  color: link.isFavorite ? Colors.amber : Colors.white,
-                                ),
-                              ),
-                              onTap: () async {
-                                Navigator.pop(context);
-                                await StorageService.toggleFavorite(link.id);
-                                widget.onRefresh?.call();
-                                onLinkSavedCallback?.call();
-                              },
+                return Dismissible(
+                  key: Key(link.id),
+                  direction: DismissDirection.horizontal,
+                  background: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                    decoration: BoxDecoration(
+                      color: link.isFavorite ? Colors.orange : Colors.green,
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    child: Icon(
+                      link.isFavorite ? Icons.star_border : Icons.star,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  secondaryBackground: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.endToStart) {
+                      // For delete, show confirmation
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Colors.grey[900],
+                          title: const Text('Delete Link', style: TextStyle(color: Colors.white)),
+                          content: Text(
+                            'Are you sure you want to delete "${link.title}"?',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
                             ),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.edit,
-                                color: Colors.white,
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
                               ),
-                              title: const Text(
-                                'Edit',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _editLink(link);
-                              },
-                            ),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
-                              ),
-                              title: const Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _deleteLink(link);
-                              },
-                            ),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                              ),
-                              title: const Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              onTap: () => Navigator.pop(context),
+                              child: const Text('Delete'),
                             ),
                           ],
                         ),
-                      ),
-                    );
+                      );
+                      if (confirmed == true) {
+                        // Handle delete immediately
+                        _handleDelete(link);
+                      }
+                      return confirmed ?? false;
+                    } else if (direction == DismissDirection.startToEnd) {
+                      // For favorite toggle, allow dismissal and handle in onDismissed
+                      return true;
+                    }
+                    return false;
                   },
-                  onTap: () async {
-                    await _openLink(context, link);
+                  onDismissed: (direction) {
+                    if (direction == DismissDirection.startToEnd) {
+                      // Swipe right - Toggle favorite
+                      // Mark as dismissed immediately to prevent Dismissible error
+                      setState(() {
+                        _dismissedLinkIds.add(link.id);
+                      });
+                      // Schedule async operation after current frame to ensure widget is removed
+                      Future.microtask(() => _handleFavoriteToggle(link));
+                    }
                   },
+                  child: GestureDetector(
+                    onLongPress: () {
+                      // Show edit/delete menu on long press
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.grey[900],
+                        builder: (context) => SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: Icon(
+                                  link.isFavorite ? Icons.star : Icons.star_border,
+                                  color: link.isFavorite ? Colors.amber : Colors.white,
+                                ),
+                                title: Text(
+                                  link.isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
+                                  style: TextStyle(
+                                    color: link.isFavorite ? Colors.amber : Colors.white,
+                                  ),
+                                ),
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await StorageService.toggleFavorite(link.id);
+                                  widget.onRefresh?.call();
+                                  onLinkSavedCallback?.call();
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.share,
+                                  color: Colors.white,
+                                ),
+                                title: const Text(
+                                  'Share',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _shareLink(link);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                ),
+                                title: const Text(
+                                  'Edit',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _editLink(link);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                title: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _deleteLink(link);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                ),
+                                title: const Text(
+                                  'Cancel',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                onTap: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    onTap: () async {
+                      await _openLink(context, link);
+                    },
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8.0),
                     height: 200.0,
@@ -875,6 +1046,38 @@ class _SavedLinksListState extends State<SavedLinksList> {
                               ),
                             ),
                           ),
+                        // Duration badge (for videos)
+                        if (link.duration != null && link.duration!.isNotEmpty)
+                          Positioned(
+                            bottom: 40,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.access_time,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    link.duration!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         Positioned(
                           bottom: 0,
                           left: 0,
@@ -926,6 +1129,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           ),
                         ),
                       ],
+                    ),
                     ),
                   ),
                 );

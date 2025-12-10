@@ -19,6 +19,7 @@ class SearchScreenState extends State<SearchScreen> {
   List<Content> _contentResults = [];
   List<SavedLink> _linkResults = [];
   bool _isSearching = false;
+  List<String> _recentSearches = [];
   late ScrollController _scrollController;
   double _scrollOffset = 0.0;
 
@@ -32,6 +33,14 @@ class SearchScreenState extends State<SearchScreen> {
         });
       });
     _searchController.addListener(_onSearchChanged);
+    _loadRecentSearches();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final searches = await StorageService.getRecentSearches();
+    setState(() {
+      _recentSearches = searches;
+    });
   }
 
   @override
@@ -58,6 +67,10 @@ class SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _performSearch(String query) async {
+    // Save to recent searches
+    await StorageService.addRecentSearch(query);
+    await _loadRecentSearches();
+
     // Search content
     final allContent = [
       ...previews,
@@ -71,12 +84,13 @@ class SearchScreenState extends State<SearchScreen> {
             content.description.toLowerCase().contains(query))
         .toList();
 
-    // Search saved links
+    // Search saved links (including notes)
     final allLinks = await StorageService.getSavedLinks();
     final linkResults = allLinks
         .where((link) =>
             link.title.toLowerCase().contains(query) ||
             (link.description?.toLowerCase().contains(query) ?? false) ||
+            (link.notes?.toLowerCase().contains(query) ?? false) ||
             link.url.toLowerCase().contains(query))
         .toList();
 
@@ -182,6 +196,77 @@ class SearchScreenState extends State<SearchScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Recent Searches
+                        if (_recentSearches.isNotEmpty) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Recent Searches',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  await StorageService.clearRecentSearches();
+                                  await _loadRecentSearches();
+                                },
+                                child: const Text(
+                                  'Clear',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12.0),
+                          Wrap(
+                            spacing: 10.0,
+                            runSpacing: 10.0,
+                            children: [
+                              ..._recentSearches.map(
+                                (search) => GestureDetector(
+                                  onTap: () {
+                                    _searchController.text = search;
+                                    _performSearch(search);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0,
+                                      vertical: 8.0,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(4.0),
+                                      border: Border.all(color: Colors.grey[700]!),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.history,
+                                          color: Colors.grey,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          search,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14.0,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 30.0),
+                        ],
                         const Text(
                           'Popular Searches',
                           style: TextStyle(

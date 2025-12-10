@@ -13,6 +13,7 @@ class SavedLink {
   final String? notes; // Personal notes/annotations
   final DateTime? lastViewedAt; // Last time link was viewed
   final int viewCount; // Number of times viewed
+  final String? duration; // Video duration (e.g., "10:30", "1h 5m")
 
   SavedLink({
     required this.id,
@@ -27,6 +28,7 @@ class SavedLink {
     this.notes,
     this.lastViewedAt,
     this.viewCount = 0,
+    this.duration,
   });
 
   // Helper getter for backward compatibility (returns first listId)
@@ -46,6 +48,7 @@ class SavedLink {
         'notes': notes,
         'lastViewedAt': lastViewedAt?.toIso8601String(),
         'viewCount': viewCount,
+        'duration': duration,
       };
 
   factory SavedLink.fromJson(Map<String, dynamic> json) {
@@ -77,6 +80,7 @@ class SavedLink {
           ? DateTime.parse(json['lastViewedAt'] as String)
           : null,
       viewCount: json['viewCount'] as int? ?? 0,
+      duration: json['duration'] as String?,
     );
   }
 
@@ -94,6 +98,7 @@ class SavedLink {
     String? notes,
     DateTime? lastViewedAt,
     int? viewCount,
+    String? duration,
   }) {
     return SavedLink(
       id: id ?? this.id,
@@ -108,6 +113,7 @@ class SavedLink {
       notes: notes ?? this.notes,
       lastViewedAt: lastViewedAt ?? this.lastViewedAt,
       viewCount: viewCount ?? this.viewCount,
+      duration: duration ?? this.duration,
     );
   }
 }

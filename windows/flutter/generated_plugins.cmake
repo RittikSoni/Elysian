@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_inappwebview_windows
   flutter_volume_controller
   screen_brightness_windows
+  share_plus
   url_launcher_windows
 )
 

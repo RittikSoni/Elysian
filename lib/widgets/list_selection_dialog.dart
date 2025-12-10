@@ -76,27 +76,61 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
   }
 
   Future<void> _saveToList(String listId) async {
+    // Verify the list exists before saving
+    try {
+      final allLists = await StorageService.getUserLists();
+      if (!allLists.any((l) => l.id == listId)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('List not found. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error verifying list: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final linkType = LinkParser.parseLinkType(widget.sharedUrl);
       if (linkType == null) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Invalid link type')));
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Invalid link type')));
+        }
         return;
       }
 
       // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
 
       // Fetch actual title from URL
-      final title =
-          widget.sharedTitle ??
-          await LinkParser.fetchTitleFromUrl(widget.sharedUrl, linkType);
+      String title = widget.sharedTitle ?? 'Shared Link';
+      try {
+        title = await LinkParser.fetchTitleFromUrl(widget.sharedUrl, linkType);
+      } catch (e) {
+        // Use fallback title if fetch fails
+        print('Error fetching title: $e');
+      }
 
       // Generate thumbnail URL based on link type
       String? thumbnailUrl;
@@ -134,21 +168,34 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
       );
 
       await StorageService.saveLink(savedLink);
-      Navigator.of(context).pop();
+      
+      if (mounted) {
+        Navigator.of(context).pop();
 
-      // Trigger refresh callback
-      widget.onLinkSaved?.call();
+        // Trigger refresh callback
+        widget.onLinkSaved?.call();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Link saved successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error saving link: $e')));
+      // Close loading dialog if still open
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        Navigator.of(context).pop(); // Close list selection dialog
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving link: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
