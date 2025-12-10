@@ -6,11 +6,13 @@ import 'package:elysian/services/link_parser.dart';
 class ListSelectionDialog extends StatefulWidget {
   final String sharedUrl;
   final String? sharedTitle;
+  final VoidCallback? onLinkSaved;
 
   const ListSelectionDialog({
     super.key,
     required this.sharedUrl,
     this.sharedTitle,
+    this.onLinkSaved,
   });
 
   @override
@@ -22,7 +24,8 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
   bool _isLoading = true;
   bool _isCreatingList = false;
   final TextEditingController _newListNameController = TextEditingController();
-  final TextEditingController _newListDescriptionController = TextEditingController();
+  final TextEditingController _newListDescriptionController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -46,9 +49,9 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
   Future<void> _createNewList() async {
     final name = _newListNameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a list name')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a list name')));
       return;
     }
 
@@ -77,16 +80,45 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
       final linkType = LinkParser.parseLinkType(widget.sharedUrl);
       if (linkType == null) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid link type')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invalid link type')));
         return;
+      }
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Fetch actual title from URL
+      final title =
+          widget.sharedTitle ??
+          await LinkParser.fetchTitleFromUrl(widget.sharedUrl, linkType);
+
+      // Generate thumbnail URL based on link type
+      String? thumbnailUrl;
+      if (linkType == LinkType.youtube) {
+        final videoId = LinkParser.extractYouTubeVideoId(widget.sharedUrl);
+        if (videoId != null) {
+          thumbnailUrl =
+              'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+        }
+      }
+      // Instagram thumbnails require API access, so we'll leave it null
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
       }
 
       final savedLink = SavedLink(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         url: widget.sharedUrl,
-        title: widget.sharedTitle ?? LinkParser.generateTitleFromUrl(widget.sharedUrl, linkType),
+        title: title,
+        thumbnailUrl: thumbnailUrl,
         type: linkType,
         listId: listId,
         savedAt: DateTime.now(),
@@ -94,6 +126,10 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
 
       await StorageService.saveLink(savedLink);
       Navigator.of(context).pop();
+
+      // Trigger refresh callback
+      widget.onLinkSaved?.call();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Link saved successfully!'),
@@ -101,9 +137,9 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving link: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving link: $e')));
     }
   }
 
@@ -210,10 +246,7 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
             const SizedBox(height: 8),
             Text(
               widget.sharedTitle ?? 'Shared Link',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -233,7 +266,10 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
                   itemBuilder: (context, index) {
                     if (index == _lists.length) {
                       return ListTile(
-                        leading: const Icon(Icons.add_circle_outline, color: Colors.white),
+                        leading: const Icon(
+                          Icons.add_circle_outline,
+                          color: Colors.white,
+                        ),
                         title: const Text(
                           'Create New List',
                           style: TextStyle(color: Colors.white),
@@ -244,7 +280,10 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
 
                     final list = _lists[index];
                     return ListTile(
-                      leading: const Icon(Icons.playlist_add, color: Colors.white),
+                      leading: const Icon(
+                        Icons.playlist_add,
+                        color: Colors.white,
+                      ),
                       title: Text(
                         list.name,
                         style: const TextStyle(color: Colors.white),
@@ -254,7 +293,11 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
                         style: TextStyle(color: Colors.grey[400]),
                       ),
                       trailing: list.id == StorageService.defaultListId
-                          ? const Icon(Icons.star, color: Colors.amber, size: 20)
+                          ? const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 20,
+                            )
                           : null,
                       onTap: () => _saveToList(list.id),
                     );
@@ -272,4 +315,3 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
     );
   }
 }
-

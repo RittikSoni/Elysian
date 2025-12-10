@@ -7,7 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 class LinkHandler {
   /// Handles opening a link based on user's player preference
-  static Future<void> openLink(BuildContext context, String url, {LinkType? linkType}) async {
+  static Future<void> openLink(
+    BuildContext context,
+    String url, {
+    LinkType? linkType,
+    String? title,
+    String? description,
+  }) async {
     // Determine link type if not provided
     final type = linkType ?? LinkParser.parseLinkType(url);
     
@@ -21,14 +27,20 @@ class LinkHandler {
     final useInbuilt = await StorageService.isInbuiltPlayer();
 
     if (useInbuilt) {
-      await _openInbuilt(context, url, type);
+      await _openInbuilt(context, url, type, title: title, description: description);
     } else {
       await _openExternally(url);
     }
   }
 
   /// Opens link in inbuilt player
-  static Future<void> _openInbuilt(BuildContext context, String url, LinkType type) async {
+  static Future<void> _openInbuilt(
+    BuildContext context,
+    String url,
+    LinkType type, {
+    String? title,
+    String? description,
+  }) async {
     switch (type) {
       case LinkType.youtube:
         final videoId = LinkParser.extractYouTubeVideoId(url);
@@ -36,7 +48,11 @@ class LinkHandler {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => YTFull(videoId: videoId),
+              builder: (context) => YTFull(
+                videoId: videoId,
+                title: title,
+                description: description,
+              ),
             ),
           );
         } else {

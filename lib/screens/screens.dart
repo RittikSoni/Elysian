@@ -4,3 +4,5 @@ export 'search_screen.dart';
 export 'coming_soon_screen.dart';
 export 'downloads_screen.dart';
 export 'more_screen.dart';
+export 'saved_links_screen.dart';
+export 'lists_management_screen.dart';

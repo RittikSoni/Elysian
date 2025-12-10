@@ -13,8 +13,16 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 class YTFull extends StatefulWidget {
   final String? mediaUrl;
   final String? videoId;
+  final String? title;
+  final String? description;
 
-  const YTFull({super.key, this.mediaUrl, this.videoId});
+  const YTFull({
+    super.key,
+    this.mediaUrl,
+    this.videoId,
+    this.title,
+    this.description,
+  });
 
   @override
   State<YTFull> createState() => _YTFullState();
@@ -351,12 +359,16 @@ class _YTFullState extends State<YTFull> {
                 ),
               if (_showControls && !_isLocked)
                 Text(
-                  'Iron Sky: The Coming Race',
+                  (_controller.metadata.title.isNotEmpty
+                      ? _controller.metadata.title
+                      : widget.title ?? 'Shared Video'),
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
             ],
           ),

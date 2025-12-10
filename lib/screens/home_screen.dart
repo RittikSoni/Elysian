@@ -1,4 +1,5 @@
 import 'package:elysian/data/data.dart';
+import 'package:elysian/main.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/saved_links_list.dart';
@@ -7,7 +8,7 @@ import 'package:elysian/widgets/widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
-  
+
   const HomeScreen({super.key, this.onNavigateToTab});
 
   @override
@@ -30,6 +31,9 @@ class HomeScreenState extends State<HomeScreen> {
       });
     _loadSavedLinks();
     super.initState();
+
+    // Register refresh callback
+    onLinkSavedCallback = refreshLinks;
   }
 
   Future<void> _loadSavedLinks() async {
@@ -50,8 +54,14 @@ class HomeScreenState extends State<HomeScreen> {
     _loadSavedLinks();
   }
 
+  // Public method to refresh links (can be called from outside)
+  void refreshLinks() {
+    _loadSavedLinks();
+  }
+
   @override
   void dispose() {
+    onLinkSavedCallback = null;
     _scrollController.dispose();
     super.dispose();
   }
@@ -85,14 +95,14 @@ class HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          if (_savedLinks.isNotEmpty)
-            SliverToBoxAdapter(
-              key: PageStorageKey('savedLinks'),
-              child: SavedLinksList(
-                savedLinks: _savedLinks,
-                title: 'Saved Links',
-              ),
+          SliverToBoxAdapter(
+            key: PageStorageKey('savedLinks'),
+            child: SavedLinksList(
+              savedLinks: _savedLinks,
+              title: 'Saved Links',
+              onRefresh: _loadSavedLinks,
             ),
+          ),
           SliverToBoxAdapter(
             key: PageStorageKey('mylist'),
             child: ContentList(

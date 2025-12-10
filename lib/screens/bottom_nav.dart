@@ -15,6 +15,7 @@ class BottomNav extends StatefulWidget {
 
 class BottomNavState extends State<BottomNav> {
   int _currentIndex = 0;
+  final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
   
   void _changeTab(int index) {
     setState(() {
@@ -22,11 +23,15 @@ class BottomNavState extends State<BottomNav> {
     });
   }
 
+  void refreshHomeScreen() {
+    _homeScreenKey.currentState?.refreshLinks();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
+      final List<Widget> screens = [
       HomeScreen(
-        key: PageStorageKey('homeScreen'),
+        key: _homeScreenKey,
         onNavigateToTab: _changeTab,
       ),
       SearchScreen(

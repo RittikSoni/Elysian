@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart' as sharing;
 import 'screens/screens.dart';
 
+// Global callback for refreshing home screen
+VoidCallback? onLinkSavedCallback;
+
 void main() => runApp(Elysian());
 
 class Elysian extends StatefulWidget {
@@ -101,6 +104,7 @@ class _ElysianState extends State<Elysian> {
           builder: (context) => ListSelectionDialog(
             sharedUrl: cleanedText,
             sharedTitle: _extractTitleFromUrl(cleanedText),
+            onLinkSaved: onLinkSavedCallback,
           ),
         );
       }

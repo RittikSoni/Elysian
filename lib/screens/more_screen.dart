@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/screens/lists_management_screen.dart';
+import 'package:elysian/screens/saved_links_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -152,6 +154,30 @@ class MoreScreenState extends State<MoreScreen> {
                     icon: Icons.info_outline,
                     title: 'About',
                     onTap: () {},
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.playlist_play,
+                    title: 'My Lists',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ListsManagementScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.link,
+                    title: 'Saved Links',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SavedLinksScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
