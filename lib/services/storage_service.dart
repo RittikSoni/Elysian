@@ -6,6 +6,7 @@ class StorageService {
   static const String _savedLinksKey = 'saved_links';
   static const String _userListsKey = 'user_lists';
   static const String _defaultListId = 'my_list';
+  static const String _playerPreferenceKey = 'player_preference'; // 'inbuilt' or 'external'
 
   // Saved Links
   static Future<List<SavedLink>> getSavedLinks() async {
@@ -141,6 +142,18 @@ class StorageService {
   static Future<void> _updateListCount(String listId, {bool decrement = false}) async {
     // List count is calculated dynamically, so we don't need to update it here
     // This method is kept for future use if needed
+  }
+
+  // Player Preference
+  static Future<bool> isInbuiltPlayer() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Default to inbuilt player (true)
+    return prefs.getBool(_playerPreferenceKey) ?? true;
+  }
+
+  static Future<void> setPlayerPreference(bool useInbuilt) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_playerPreferenceKey, useInbuilt);
   }
 
   static String get defaultListId => _defaultListId;

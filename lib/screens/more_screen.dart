@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
+import 'package:elysian/services/storage_service.dart';
 
 class MoreScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -13,6 +14,7 @@ class MoreScreen extends StatefulWidget {
 class MoreScreenState extends State<MoreScreen> {
   late ScrollController _scrollController;
   double _scrollOffset = 0.0;
+  bool _useInbuiltPlayer = true;
 
   @override
   void initState() {
@@ -23,6 +25,21 @@ class MoreScreenState extends State<MoreScreen> {
           _scrollOffset = _scrollController.offset;
         });
       });
+    _loadPlayerPreference();
+  }
+
+  Future<void> _loadPlayerPreference() async {
+    final useInbuilt = await StorageService.isInbuiltPlayer();
+    setState(() {
+      _useInbuiltPlayer = useInbuilt;
+    });
+  }
+
+  Future<void> _togglePlayerPreference(bool value) async {
+    await StorageService.setPlayerPreference(value);
+    setState(() {
+      _useInbuiltPlayer = value;
+    });
   }
 
   @override
@@ -173,6 +190,13 @@ class MoreScreenState extends State<MoreScreen> {
                     subtitle: 'On',
                     onTap: () {},
                   ),
+                  _PlayerPreferenceItem(
+                    icon: Icons.video_library,
+                    title: 'Video Player',
+                    subtitle: _useInbuiltPlayer ? 'Inbuilt' : 'External',
+                    value: _useInbuiltPlayer,
+                    onChanged: _togglePlayerPreference,
+                  ),
                 ],
               ),
             ),
@@ -259,6 +283,71 @@ class _MoreMenuItem extends StatelessWidget {
             Icon(
               Icons.chevron_right,
               color: Colors.grey[600],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerPreferenceItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _PlayerPreferenceItem({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 28.0,
+            ),
+            const SizedBox(width: 16.0),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.0,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4.0),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14.0,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: Colors.red,
             ),
           ],
         ),

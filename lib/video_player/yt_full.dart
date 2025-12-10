@@ -12,8 +12,9 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class YTFull extends StatefulWidget {
   final String? mediaUrl;
+  final String? videoId;
 
-  const YTFull({super.key, this.mediaUrl});
+  const YTFull({super.key, this.mediaUrl, this.videoId});
 
   @override
   State<YTFull> createState() => _YTFullState();
@@ -92,8 +93,10 @@ class _YTFullState extends State<YTFull> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
     _initVolumeAndBrightness();
+    // Use provided videoId or fallback to first ID in list
+    final initialVideoId = widget.videoId ?? _ids.first;
     _controller = YoutubePlayerController(
-      initialVideoId: _ids.first,
+      initialVideoId: initialVideoId,
       flags: const YoutubePlayerFlags(
         mute: false,
         autoPlay: true,

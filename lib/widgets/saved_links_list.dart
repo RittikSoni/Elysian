@@ -1,7 +1,7 @@
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/services/link_handler.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SavedLinksList extends StatelessWidget {
   final List<SavedLink> savedLinks;
@@ -13,11 +13,8 @@ class SavedLinksList extends StatelessWidget {
     required this.title,
   });
 
-  Future<void> _openLink(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  Future<void> _openLink(BuildContext context, String url, LinkType type) async {
+    await LinkHandler.openLink(context, url, linkType: type);
   }
 
   String _getThumbnailUrl(SavedLink link) {
@@ -101,7 +98,7 @@ class SavedLinksList extends StatelessWidget {
                 final thumbnailUrl = _getThumbnailUrl(link);
                 
                 return GestureDetector(
-                  onTap: () => _openLink(link.url),
+                  onTap: () => _openLink(context, link.url, link.type),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8.0),
                     height: 200.0,
