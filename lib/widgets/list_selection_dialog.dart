@@ -100,14 +100,23 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
 
       // Generate thumbnail URL based on link type
       String? thumbnailUrl;
-      if (linkType == LinkType.youtube) {
-        final videoId = LinkParser.extractYouTubeVideoId(widget.sharedUrl);
-        if (videoId != null) {
-          thumbnailUrl =
-              'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-        }
+      switch (linkType) {
+        case LinkType.youtube:
+          final videoId = LinkParser.extractYouTubeVideoId(widget.sharedUrl);
+          if (videoId != null) {
+            thumbnailUrl =
+                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+          }
+          break;
+        case LinkType.vimeo:
+        case LinkType.googledrive:
+        case LinkType.instagram:
+        case LinkType.directVideo:
+        case LinkType.web:
+        case LinkType.unknown:
+          // These don't have easy thumbnail access
+          break;
       }
-      // Instagram thumbnails require API access, so we'll leave it null
 
       // Close loading dialog
       if (mounted) {

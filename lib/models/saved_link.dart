@@ -45,6 +45,10 @@ class SavedLink {
 enum LinkType {
   youtube,
   instagram,
+  vimeo,
+  googledrive,
+  directVideo, // Direct video URLs (mp4, webm, m3u8, etc.)
+  web, // Generic web video links
   unknown;
 
   static LinkType fromString(String value) {
@@ -53,8 +57,33 @@ enum LinkType {
         return LinkType.youtube;
       case 'LinkType.instagram':
         return LinkType.instagram;
+      case 'LinkType.vimeo':
+        return LinkType.vimeo;
+      case 'LinkType.googledrive':
+        return LinkType.googledrive;
+      case 'LinkType.directVideo':
+        return LinkType.directVideo;
+      case 'LinkType.web':
+        return LinkType.web;
       default:
         return LinkType.unknown;
+    }
+  }
+
+  /// Returns true if this link type can be played in inbuilt player
+  bool get canPlayInbuilt {
+    switch (this) {
+      case LinkType.youtube:
+      case LinkType.directVideo:
+        return true;
+      case LinkType.vimeo:
+      case LinkType.googledrive:
+        // Can attempt, but may need URL extraction
+        return true;
+      case LinkType.instagram:
+      case LinkType.web:
+      case LinkType.unknown:
+        return false;
     }
   }
 }

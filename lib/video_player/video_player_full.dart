@@ -6,11 +6,17 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RSNewVideoPlayerScreen extends StatefulWidget {
   final String? mediaUrl;
+  final VoidCallback? onError;
 
-  const RSNewVideoPlayerScreen({super.key, this.mediaUrl});
+  const RSNewVideoPlayerScreen({
+    super.key,
+    this.mediaUrl,
+    this.onError,
+  });
 
   @override
   State<RSNewVideoPlayerScreen> createState() => _RSNewVideoPlayerScreenState();
@@ -103,13 +109,73 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
           ]);
           _controller.play();
         });
-      })
-      ..addListener(() {
+      }).catchError((error) {
+        // Handle initialization errors
+        _handleVideoError(error);
+      });
+    
+    // Listen for video player errors
+    _controller.addListener(() {
+      if (_controller.value.hasError) {
+        _handleVideoError(_controller.value.errorDescription);
+      } else {
         /// trigger ad break
         _onMainVideoUpdate();
         // Trigger UI rebuild for timeline
         if (!_inAdBreak) setState(() {});
-      });
+      }
+    });
+  }
+
+  void _handleVideoError(dynamic error) {
+    // Show error dialog and allow fallback to external player
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text(
+            'Playback Error',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            'Unable to play video in built-in player. Would you like to open it in an external player?',
+            style: TextStyle(color: Colors.grey[300]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Close video player
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Close video player
+                
+                // Open in external player
+                if (widget.onError != null) {
+                  widget.onError!();
+                } else {
+                  // Fallback: try to open URL externally
+                  final url = widget.mediaUrl;
+                  if (url != null) {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  }
+                }
+              },
+              child: const Text('Open Externally'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   void _onMainVideoUpdate() {

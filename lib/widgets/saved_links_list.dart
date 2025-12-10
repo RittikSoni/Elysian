@@ -268,11 +268,21 @@ class _SavedLinksListState extends State<SavedLinksList> {
           return 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
         }
         break;
-      case LinkType.instagram:
-        // Instagram thumbnails require API, use placeholder
-        return null;
-      case LinkType.unknown:
+      case LinkType.vimeo:
+        final videoId = LinkParser.extractVimeoVideoId(link.url);
+        if (videoId != null) {
+          // Vimeo thumbnail API (requires API key for better quality)
+          // For now, return null to use placeholder
+          return null;
+        }
         break;
+      case LinkType.instagram:
+      case LinkType.googledrive:
+      case LinkType.directVideo:
+      case LinkType.web:
+      case LinkType.unknown:
+        // These don't have easy thumbnail access
+        return null;
     }
     return null;
   }
@@ -283,8 +293,35 @@ class _SavedLinksListState extends State<SavedLinksList> {
         return Icons.play_circle_outline;
       case LinkType.instagram:
         return Icons.photo_outlined;
+      case LinkType.vimeo:
+        return Icons.play_circle_filled;
+      case LinkType.googledrive:
+        return Icons.cloud;
+      case LinkType.directVideo:
+        return Icons.video_library;
+      case LinkType.web:
+        return Icons.language;
       case LinkType.unknown:
         return Icons.link;
+    }
+  }
+
+  String _getTypeLabel(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return 'YouTube';
+      case LinkType.instagram:
+        return 'Instagram';
+      case LinkType.vimeo:
+        return 'Vimeo';
+      case LinkType.googledrive:
+        return 'Google Drive';
+      case LinkType.directVideo:
+        return 'Video';
+      case LinkType.web:
+        return 'Web';
+      case LinkType.unknown:
+        return 'Link';
     }
   }
 
@@ -600,7 +637,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
             Icon(_getIconForType(type), color: Colors.grey[600], size: 40),
             const SizedBox(height: 8),
             Text(
-              type == LinkType.youtube ? 'YouTube' : 'Instagram',
+              _getTypeLabel(type),
               style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ],

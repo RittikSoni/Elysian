@@ -8,14 +8,78 @@ class LinkParser {
     if (uri == null) return null;
 
     final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    final scheme = uri.scheme.toLowerCase();
 
+    // YouTube
     if (host.contains('youtube.com') || host.contains('youtu.be')) {
       return LinkType.youtube;
-    } else if (host.contains('instagram.com')) {
+    }
+
+    // Instagram
+    if (host.contains('instagram.com')) {
       return LinkType.instagram;
     }
 
+    // Vimeo
+    if (host.contains('vimeo.com')) {
+      return LinkType.vimeo;
+    }
+
+    // Google Drive
+    if (host.contains('drive.google.com') || host.contains('docs.google.com')) {
+      return LinkType.googledrive;
+    }
+
+    // Direct video URLs - check file extension or content type
+    if (_isDirectVideoUrl(url, path)) {
+      return LinkType.directVideo;
+    }
+
+    // Generic web links (http/https)
+    if (scheme == 'http' || scheme == 'https') {
+      return LinkType.web;
+    }
+
     return null;
+  }
+
+  /// Checks if URL is a direct video file
+  static bool _isDirectVideoUrl(String url, String path) {
+    final videoExtensions = [
+      '.mp4',
+      '.webm',
+      '.ogg',
+      '.ogv',
+      '.m3u8',
+      '.m3u',
+      '.mov',
+      '.avi',
+      '.wmv',
+      '.flv',
+      '.mkv',
+      '.3gp',
+    ];
+
+    final lowerUrl = url.toLowerCase();
+    final lowerPath = path.toLowerCase();
+
+    // Check file extension
+    for (final ext in videoExtensions) {
+      if (lowerPath.endsWith(ext) || lowerUrl.contains(ext)) {
+        return true;
+      }
+    }
+
+    // Check for common video URL patterns
+    if (lowerUrl.contains('/video/') ||
+        lowerUrl.contains('/stream/') ||
+        lowerUrl.contains('.m3u8') ||
+        lowerUrl.contains('.m3u')) {
+      return true;
+    }
+
+    return false;
   }
 
   static String? extractYouTubeVideoId(String url) {
@@ -59,7 +123,54 @@ class LinkParser {
 
   static bool isValidLink(String url) {
     final type = parseLinkType(url);
-    return type != null;
+    return type != null && type != LinkType.unknown;
+  }
+
+  /// Extracts Vimeo video ID from URL
+  static String? extractVimeoVideoId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+
+    if (uri.host.contains('vimeo.com')) {
+      // Vimeo URLs are typically: https://vimeo.com/VIDEO_ID
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        return pathSegments.first;
+      }
+    }
+
+    return null;
+  }
+
+  /// Extracts Google Drive file ID from URL
+  static String? extractGoogleDriveFileId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+
+    if (uri.host.contains('drive.google.com')) {
+      // Google Drive URLs: https://drive.google.com/file/d/FILE_ID/view
+      final pathSegments = uri.pathSegments;
+      final fileIndex = pathSegments.indexOf('d');
+      if (fileIndex != -1 && fileIndex + 1 < pathSegments.length) {
+        return pathSegments[fileIndex + 1];
+      }
+
+      // Alternative format: ?id=FILE_ID
+      return uri.queryParameters['id'];
+    }
+
+    if (uri.host.contains('docs.google.com')) {
+      // Google Docs viewer format
+      return uri.queryParameters['id'];
+    }
+
+    return null;
+  }
+
+  /// Checks if URL is a direct playable video URL
+  static bool isDirectPlayableVideo(String url) {
+    final type = parseLinkType(url);
+    return type == LinkType.directVideo;
   }
 
   /// Generates a default title from URL (synchronous, for fallback)
@@ -70,6 +181,14 @@ class LinkParser {
         return videoId != null ? 'YouTube Video' : 'YouTube Link';
       case LinkType.instagram:
         return 'Instagram Post';
+      case LinkType.vimeo:
+        return 'Vimeo Video';
+      case LinkType.googledrive:
+        return 'Google Drive Video';
+      case LinkType.directVideo:
+        return 'Video';
+      case LinkType.web:
+        return 'Web Link';
       case LinkType.unknown:
         return 'Shared Link';
     }
@@ -83,12 +202,178 @@ class LinkParser {
           return await _fetchYouTubeTitle(url);
         case LinkType.instagram:
           return await _fetchInstagramTitle(url);
+        case LinkType.vimeo:
+          return await _fetchVimeoTitle(url);
+        case LinkType.googledrive:
+          return await _fetchGoogleDriveTitle(url);
+        case LinkType.directVideo:
+        case LinkType.web:
+          return await _fetchWebTitle(url);
         case LinkType.unknown:
           return 'Shared Link';
       }
     } catch (e) {
       // Fallback to default title on error
       return generateTitleFromUrl(url, type);
+    }
+  }
+
+  /// Fetches Vimeo video title
+  static Future<String> _fetchVimeoTitle(String url) async {
+    try {
+      final videoId = extractVimeoVideoId(url);
+      if (videoId == null) {
+        return 'Vimeo Video';
+      }
+
+      final oEmbedUrl = Uri.parse('https://vimeo.com/api/oembed.json?url=$url');
+
+      final response = await http
+          .get(oEmbedUrl)
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final title = data['title'] as String?;
+        if (title != null && title.isNotEmpty) {
+          return title;
+        }
+      }
+
+      return 'Vimeo Video';
+    } catch (e) {
+      return 'Vimeo Video';
+    }
+  }
+
+  /// Fetches Google Drive file title
+  static Future<String> _fetchGoogleDriveTitle(String url) async {
+    try {
+      // Google Drive doesn't have a public API for fetching titles without auth
+      // We'll try to extract from the page HTML as fallback
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final html = response.body;
+
+        // Try to extract title from og:title or <title>
+        final ogTitleMatch = RegExp(
+          r'<meta\s+property="og:title"\s+content="([^"]+)"',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        if (ogTitleMatch != null) {
+          final title = ogTitleMatch.group(1)!;
+          if (title.isNotEmpty) {
+            return title.trim();
+          }
+        }
+
+        final titleMatch = RegExp(
+          r'<title[^>]*>([^<]+)</title>',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        if (titleMatch != null) {
+          String title = titleMatch.group(1)!;
+          title = title.replaceAll(
+            RegExp(r'\s*-\s*Google\s+Drive\s*$', caseSensitive: false),
+            '',
+          );
+          if (title.isNotEmpty) {
+            return title.trim();
+          }
+        }
+      }
+
+      return 'Google Drive Video';
+    } catch (e) {
+      return 'Google Drive Video';
+    }
+  }
+
+  /// Fetches web page title
+  static Future<String> _fetchWebTitle(String url) async {
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final html = response.body;
+
+        // Try og:title first
+        final ogTitleMatch = RegExp(
+          r'<meta\s+property="og:title"\s+content="([^"]+)"',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        if (ogTitleMatch != null) {
+          final title = ogTitleMatch.group(1)!;
+          if (title.isNotEmpty) {
+            return title.trim();
+          }
+        }
+
+        // Fallback to <title>
+        final titleMatch = RegExp(
+          r'<title[^>]*>([^<]+)</title>',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        if (titleMatch != null) {
+          String title = titleMatch.group(1)!;
+          if (title.isNotEmpty) {
+            return title.trim();
+          }
+        }
+      }
+
+      return 'Web Link';
+    } catch (e) {
+      return 'Web Link';
+    }
+  }
+
+  /// Extracts direct video URL from Vimeo link
+  static Future<String?> extractVimeoVideoUrl(String url) async {
+    try {
+      final videoId = extractVimeoVideoId(url);
+      if (videoId == null) return null;
+
+      // Try Vimeo oEmbed API to get video info
+      final oEmbedUrl = Uri.parse('https://vimeo.com/api/oembed.json?url=$url');
+
+      final response = await http
+          .get(oEmbedUrl)
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        // Vimeo oEmbed doesn't provide direct video URL, but we can construct it
+        // For now, return the original URL with video_player
+        // The video_player package can handle vimeo.com URLs in some cases
+        return url;
+      }
+    } catch (e) {
+      // Fallback to original URL
+    }
+    return url;
+  }
+
+  /// Extracts direct video URL from Google Drive link
+  static String? extractGoogleDriveVideoUrl(String url) {
+    try {
+      final fileId = extractGoogleDriveFileId(url);
+      if (fileId == null) return null;
+
+      // Construct direct video URL for Google Drive
+      // Format: https://drive.google.com/uc?export=download&id=FILE_ID
+      // For video playback: https://drive.google.com/file/d/FILE_ID/preview
+      return 'https://drive.google.com/file/d/$fileId/preview';
+    } catch (e) {
+      return null;
     }
   }
 

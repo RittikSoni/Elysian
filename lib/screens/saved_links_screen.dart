@@ -202,13 +202,23 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           return;
         }
 
-        // Generate thumbnail if YouTube
+        // Generate thumbnail based on link type
         String? thumbnailUrl;
-        if (linkType == LinkType.youtube) {
-          final videoId = LinkParser.extractYouTubeVideoId(newUrl);
-          if (videoId != null) {
-            thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-          }
+        switch (linkType) {
+          case LinkType.youtube:
+            final videoId = LinkParser.extractYouTubeVideoId(newUrl);
+            if (videoId != null) {
+              thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            }
+            break;
+          case LinkType.vimeo:
+          case LinkType.googledrive:
+          case LinkType.instagram:
+          case LinkType.directVideo:
+          case LinkType.web:
+          case LinkType.unknown:
+            // These don't have easy thumbnail access
+            break;
         }
 
         // Fetch title if not provided
@@ -264,11 +274,21 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       
       // Generate thumbnail if YouTube
       String? thumbnailUrl = link.thumbnailUrl;
-      if (link.type == LinkType.youtube) {
-        final videoId = LinkParser.extractYouTubeVideoId(link.url);
-        if (videoId != null) {
-          thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-        }
+      switch (link.type) {
+        case LinkType.youtube:
+          final videoId = LinkParser.extractYouTubeVideoId(link.url);
+          if (videoId != null) {
+            thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+          }
+          break;
+        case LinkType.vimeo:
+        case LinkType.googledrive:
+        case LinkType.instagram:
+        case LinkType.directVideo:
+        case LinkType.web:
+        case LinkType.unknown:
+          // These don't have easy thumbnail access
+          break;
       }
 
       // Delete old and create updated link
@@ -396,9 +416,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                           fit: BoxFit.cover,
                                           errorBuilder: (context, error, stackTrace) {
                                             return Icon(
-                                              link.type == LinkType.youtube
-                                                  ? Icons.play_circle_outline
-                                                  : Icons.photo_outlined,
+                                              _getIconForType(link.type),
                                               color: Colors.grey[600],
                                               size: 40,
                                             );
@@ -406,9 +424,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                         ),
                                       )
                                     : Icon(
-                                        link.type == LinkType.youtube
-                                            ? Icons.play_circle_outline
-                                            : Icons.photo_outlined,
+                                        _getIconForType(link.type),
                                         color: Colors.grey[600],
                                         size: 40,
                                       ),
@@ -446,17 +462,13 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                                     Row(
                                       children: [
                                         Icon(
-                                          link.type == LinkType.youtube
-                                              ? Icons.play_circle_outline
-                                              : Icons.photo_outlined,
+                                          _getIconForType(link.type),
                                           color: Colors.grey[500],
                                           size: 14,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          link.type == LinkType.youtube
-                                              ? 'YouTube'
-                                              : 'Instagram',
+                                          _getTypeLabel(link.type),
                                           style: TextStyle(
                                             color: Colors.grey[500],
                                             fontSize: 12,
@@ -507,6 +519,44 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                   },
                 ),
     );
+  }
+
+  IconData _getIconForType(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return Icons.play_circle_outline;
+      case LinkType.instagram:
+        return Icons.photo_outlined;
+      case LinkType.vimeo:
+        return Icons.play_circle_filled;
+      case LinkType.googledrive:
+        return Icons.cloud;
+      case LinkType.directVideo:
+        return Icons.video_library;
+      case LinkType.web:
+        return Icons.language;
+      case LinkType.unknown:
+        return Icons.link;
+    }
+  }
+
+  String _getTypeLabel(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return 'YouTube';
+      case LinkType.instagram:
+        return 'Instagram';
+      case LinkType.vimeo:
+        return 'Vimeo';
+      case LinkType.googledrive:
+        return 'Google Drive';
+      case LinkType.directVideo:
+        return 'Video';
+      case LinkType.web:
+        return 'Web';
+      case LinkType.unknown:
+        return 'Link';
+    }
   }
 }
 

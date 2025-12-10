@@ -136,12 +136,22 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     try {
       // Generate thumbnail URL based on link type
       String? thumbnailUrl;
-      if (_detectedLinkType == LinkType.youtube) {
-        final videoId = LinkParser.extractYouTubeVideoId(url);
-        if (videoId != null) {
-          thumbnailUrl =
-              'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-        }
+      switch (_detectedLinkType!) {
+        case LinkType.youtube:
+          final videoId = LinkParser.extractYouTubeVideoId(url);
+          if (videoId != null) {
+            thumbnailUrl =
+                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+          }
+          break;
+        case LinkType.vimeo:
+        case LinkType.googledrive:
+        case LinkType.instagram:
+        case LinkType.directVideo:
+        case LinkType.web:
+        case LinkType.unknown:
+          // These don't have easy thumbnail access
+          break;
       }
 
       final savedLink = SavedLink(
@@ -226,9 +236,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                         )
                       : _detectedLinkType != null
                       ? Icon(
-                          _detectedLinkType == LinkType.youtube
-                              ? Icons.play_circle_outline
-                              : Icons.photo_outlined,
+                          _getIconForType(_detectedLinkType!),
                           color: Colors.green,
                         )
                       : null,
@@ -239,17 +247,13 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                 Row(
                   children: [
                     Icon(
-                      _detectedLinkType == LinkType.youtube
-                          ? Icons.play_circle_outline
-                          : Icons.photo_outlined,
+                      _getIconForType(_detectedLinkType!),
                       color: Colors.green,
                       size: 16,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      _detectedLinkType == LinkType.youtube
-                          ? 'YouTube link detected'
-                          : 'Instagram link detected',
+                      '${_getTypeLabel(_detectedLinkType!)} link detected',
                       style: const TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ],
@@ -378,5 +382,43 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         ),
       ),
     );
+  }
+
+  IconData _getIconForType(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return Icons.play_circle_outline;
+      case LinkType.instagram:
+        return Icons.photo_outlined;
+      case LinkType.vimeo:
+        return Icons.play_circle_filled;
+      case LinkType.googledrive:
+        return Icons.cloud;
+      case LinkType.directVideo:
+        return Icons.video_library;
+      case LinkType.web:
+        return Icons.language;
+      case LinkType.unknown:
+        return Icons.link;
+    }
+  }
+
+  String _getTypeLabel(LinkType type) {
+    switch (type) {
+      case LinkType.youtube:
+        return 'YouTube';
+      case LinkType.instagram:
+        return 'Instagram';
+      case LinkType.vimeo:
+        return 'Vimeo';
+      case LinkType.googledrive:
+        return 'Google Drive';
+      case LinkType.directVideo:
+        return 'Video';
+      case LinkType.web:
+        return 'Web';
+      case LinkType.unknown:
+        return 'Link';
+    }
   }
 }
