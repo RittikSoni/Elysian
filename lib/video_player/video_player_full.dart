@@ -34,6 +34,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   bool _showBrightnessSlider = false;
   Timer? _sliderHideTimer;
   Timer? _hideTimer;
+  bool _isDisposed = false;
 
   // Ad state
   final List<Duration> _adPositions = [];
@@ -53,16 +54,19 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   // call this to show one slider and auto‐hide it
   void _showSliderOverlay({required bool isVolume}) {
+    if (_isDisposed || !mounted) return;
     _sliderHideTimer?.cancel();
     setState(() {
       _showVolumeSlider = isVolume;
       _showBrightnessSlider = !isVolume;
     });
     _sliderHideTimer = Timer(Duration(seconds: 1, milliseconds: 500), () {
-      setState(() {
-        _showVolumeSlider = false;
-        _showBrightnessSlider = false;
-      });
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _showVolumeSlider = false;
+          _showBrightnessSlider = false;
+        });
+      }
     });
   }
 
@@ -87,44 +91,56 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   void initializeVid() async {
     await Future.delayed(Duration(seconds: 2));
+    if (_isDisposed || !mounted) return;
+    
     _controller
       ..initialize().then((_) {
+        if (_isDisposed || !mounted) return;
         // Calculate ad positions 10%, 25, 50%, 80%
         final totalDuration = _controller.value.duration;
-
-        setState(() {
-          _adPositions.addAll([
-            Duration(
-              milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
-            ),
-            Duration(
-              milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
-            ),
-            Duration(
-              milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
-            ),
-            Duration(
-              milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
-            ),
-          ]);
-          _controller.play();
-        });
+        
+        if (totalDuration.inMilliseconds > 0) {
+          if (mounted) {
+            setState(() {
+              _adPositions.addAll([
+                Duration(
+                  milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
+                ),
+                Duration(
+                  milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
+                ),
+                Duration(
+                  milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
+                ),
+                Duration(
+                  milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
+                ),
+              ]);
+              _controller.play();
+            });
+          }
+        }
       }).catchError((error) {
         // Handle initialization errors
-        _handleVideoError(error);
+        if (!_isDisposed && mounted) {
+          _handleVideoError(error);
+        }
       });
     
-    // Listen for video player errors
-    _controller.addListener(() {
-      if (_controller.value.hasError) {
-        _handleVideoError(_controller.value.errorDescription);
-      } else {
-        /// trigger ad break
-        _onMainVideoUpdate();
-        // Trigger UI rebuild for timeline
-        if (!_inAdBreak) setState(() {});
-      }
-    });
+    // Listen for video player errors - optimized to avoid unnecessary setState
+    _controller.addListener(_videoPlayerListener);
+  }
+
+  void _videoPlayerListener() {
+    if (_isDisposed || !mounted) return;
+    
+    if (_controller.value.hasError) {
+      _handleVideoError(_controller.value.errorDescription);
+    } else {
+      /// trigger ad break
+      _onMainVideoUpdate();
+      // Note: Removed setState here - UI updates via ValueListenableBuilder
+    }
   }
 
   void _handleVideoError(dynamic error) {
@@ -192,6 +208,8 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   }
 
   void _startAdBreak() {
+    if (_isDisposed || !mounted) return;
+    
     setState(() {
       _inAdBreak = true;
       _showControls = false;
@@ -202,16 +220,26 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     final adUrl = _adUrls[_nextAdIndex];
     _adController = VideoPlayerController.networkUrl(Uri.parse(adUrl))
       ..initialize().then((_) {
-        setState(() {
-          _adController!.play();
-          _adSecondsRemaining = 30; // Set ad duration to 30 seconds
-          // _adSecondsRemaining = _adController!.value.duration.inSeconds;
-        });
+        if (_isDisposed || !mounted) return;
+        
+        if (mounted) {
+          setState(() {
+            _adController!.play();
+            _adSecondsRemaining = 30; // Set ad duration to 30 seconds
+            // _adSecondsRemaining = _adController!.value.duration.inSeconds;
+          });
+        }
 
         _adCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          setState(() {
-            _adSecondsRemaining--;
-          });
+          if (_isDisposed || !mounted) {
+            timer.cancel();
+            return;
+          }
+          if (mounted) {
+            setState(() {
+              _adSecondsRemaining--;
+            });
+          }
           if (_adSecondsRemaining <= 0) {
             _endAdBreak();
           }
@@ -227,19 +255,22 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _adController?.dispose();
     _adController = null;
 
-    setState(() {
-      _inAdBreak = false;
-      _showControls = true;
-    });
-
-    _controller.play();
+    if (!_isDisposed && mounted) {
+      setState(() {
+        _inAdBreak = false;
+        _showControls = true;
+      });
+      _controller.play();
+    }
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _sliderHideTimer?.cancel();
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
+    _controller.removeListener(_videoPlayerListener);
     _controller.dispose();
     _adController?.dispose();
     super.dispose();
@@ -370,9 +401,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                   : EdgeInsets.only(right: 10),
               child: InkWell(
                 onTap: () {
-                  setState(() {
-                    _isLocked = !_isLocked;
-                  });
+                  if (!_isDisposed && mounted) {
+                    setState(() {
+                      _isLocked = !_isLocked;
+                    });
+                  }
                 },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -470,199 +503,210 @@ class ControlBarState extends State<ControlBar> {
     final state = context
         .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
     final controller = state._controller;
-    final position = controller.value.position;
-    final duration = controller.value.duration;
 
-    // compute slider values
-    final maxMillis = duration.inMilliseconds.toDouble();
-    final currentMillis = _isDragging
-        ? _dragValue
-        : position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+    return ValueListenableBuilder<VideoPlayerValue>(
+      valueListenable: controller,
+      builder: (context, value, child) {
+        // Only show times if video is initialized and has valid duration
+        final position = value.position;
+        final duration = value.duration;
+        final isInitialized = value.isInitialized && duration.inMilliseconds > 0;
 
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      child: Column(
-        children: [
-          // Progress + times
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                // current time
-                Text(
-                  widget.formatTime(position),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(width: 5),
+        // compute slider values
+        final maxMillis = duration.inMilliseconds.toDouble();
+        final currentMillis = _isDragging
+            ? _dragValue
+            : position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
 
-                // slider progress bar with thumb
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 15,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 12,
-                      ),
-                      thumbColor: Colors.amber,
-                      activeTrackColor: Colors.amber,
-                      inactiveTrackColor: Colors.grey,
-                      overlayColor: Colors.amber.withValues(alpha: 0.2),
-                    ),
-                    child: Slider(
-                      min: 0,
-                      max: maxMillis > 0 ? maxMillis : 1,
-                      value: currentMillis,
-                      onChangeStart: (v) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragValue = v;
-                        });
-                      },
-                      onChanged: (v) {
-                        setState(() {
-                          _dragValue = v;
-                        });
-                      },
-                      onChangeEnd: (v) {
-                        controller.seekTo(Duration(milliseconds: v.toInt()));
-                        setState(() {
-                          _isDragging = false;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 5),
-                // total time
-                Text(
-                  widget.formatTime(duration),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
-          Padding(
-            padding: const EdgeInsets.only(left: 18.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // speed menu...
-                PopupMenuButton<double>(
-                  color: Colors.black,
-                  initialValue: controller.value.playbackSpeed,
-                  onSelected: (s) => controller.setPlaybackSpeed(s),
-                  itemBuilder: (_) {
-                    const textStyle = TextStyle(
-                      fontSize: 15,
-                      color: Colors.white,
-                    );
-                    return const [
-                      PopupMenuItem(
-                        value: 0.5,
-                        child: Text("0.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.0,
-                        child: Text("1.0x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.5,
-                        child: Text("1.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 2.0,
-                        child: Text("2.0x", style: textStyle),
-                      ),
-                    ];
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.speed, color: Colors.white),
-                      const SizedBox(width: 5),
-                      const Text(
-                        "Speed ",
-                        style: TextStyle(color: Colors.white, fontSize: 15),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        "(${controller.value.playbackSpeed}x)",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // episode, settings, PiP, fullscreen...
-                Row(
+        return SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: Column(
+            children: [
+              // Progress + times
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
                   children: [
-                    TextButton.icon(
-                      icon: Icon(
-                        Icons.list,
-                        color: state._showEpisodeList
-                            ? Colors.amber
-                            : Colors.white,
+                    // current time
+                    Text(
+                      isInitialized ? widget.formatTime(position) : '00:00:00',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      label: Text(
-                        "Episode",
-                        style: TextStyle(
-                          color: state._showEpisodeList
-                              ? Colors.amber
-                              : Colors.white,
+                    ),
+                    const SizedBox(width: 5),
+
+                    // slider progress bar with thumb
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 15,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 12,
+                          ),
+                          thumbColor: Colors.amber,
+                          activeTrackColor: Colors.amber,
+                          inactiveTrackColor: Colors.grey,
+                          overlayColor: Colors.amber.withValues(alpha: 0.2),
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: maxMillis > 0 ? maxMillis : 1,
+                          value: currentMillis,
+                          onChangeStart: (v) {
+                            setState(() {
+                              _isDragging = true;
+                              _dragValue = v;
+                            });
+                          },
+                          onChanged: (v) {
+                            setState(() {
+                              _dragValue = v;
+                            });
+                          },
+                          onChangeEnd: (v) {
+                            controller.seekTo(Duration(milliseconds: v.toInt()));
+                            setState(() {
+                              _isDragging = false;
+                            });
+                          },
                         ),
                       ),
-                      onPressed: () =>
-                          state.setState(() => state._showEpisodeList = true),
                     ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(Icons.settings, color: Colors.white),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.picture_in_picture_alt_rounded,
+
+                    const SizedBox(width: 5),
+                    // total time
+                    Text(
+                      isInitialized ? widget.formatTime(duration) : '00:00:00',
+                      style: const TextStyle(
                         color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.fullscreen_exit,
-                        color: Colors.white,
-                      ),
-                      onPressed: () {
-                        SystemChrome.setPreferredOrientations([
-                          DeviceOrientation.portraitUp,
-                        ]);
-                        SystemChrome.setEnabledSystemUIMode(
-                          SystemUiMode.leanBack,
-                        );
-                        Navigator.pop(context);
-                      },
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
+              Padding(
+                padding: const EdgeInsets.only(left: 18.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // speed menu...
+                    PopupMenuButton<double>(
+                      color: Colors.black,
+                      initialValue: value.playbackSpeed,
+                      onSelected: (s) => controller.setPlaybackSpeed(s),
+                      itemBuilder: (_) {
+                        const textStyle = TextStyle(
+                          fontSize: 15,
+                          color: Colors.white,
+                        );
+                        return const [
+                          PopupMenuItem(
+                            value: 0.5,
+                            child: Text("0.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.0,
+                            child: Text("1.0x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.5,
+                            child: Text("1.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 2.0,
+                            child: Text("2.0x", style: textStyle),
+                          ),
+                        ];
+                      },
+                      child: Row(
+                        children: [
+                          Icon(Icons.speed, color: Colors.white),
+                          const SizedBox(width: 5),
+                          const Text(
+                            "Speed ",
+                            style: TextStyle(color: Colors.white, fontSize: 15),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "(${value.playbackSpeed}x)",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // episode, settings, PiP, fullscreen...
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(
+                            Icons.list,
+                            color: state._showEpisodeList
+                                ? Colors.amber
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            "Episode",
+                            style: TextStyle(
+                              color: state._showEpisodeList
+                                  ? Colors.amber
+                                  : Colors.white,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (state.mounted) {
+                              state.setState(() => state._showEpisodeList = true);
+                            }
+                          },
+                        ),
+                        IconButton(
+                          onPressed: () {},
+                          icon: Icon(Icons.settings, color: Colors.white),
+                        ),
+                        IconButton(
+                          onPressed: () {},
+                          icon: Icon(
+                            Icons.picture_in_picture_alt_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.fullscreen_exit,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            SystemChrome.setPreferredOrientations([
+                              DeviceOrientation.portraitUp,
+                            ]);
+                            SystemChrome.setEnabledSystemUIMode(
+                              SystemUiMode.leanBack,
+                            );
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -678,16 +722,20 @@ class GestureDetectorOverlay extends StatelessWidget {
         .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
 
     void startHideTimer() {
+      if (state._isDisposed || !state.mounted) return;
       state._hideTimer?.cancel(); // Cancel any existing timer
 
       state._hideTimer = Timer(Duration(seconds: 3), () {
-        state.setState(() {
-          state._showControls = false;
-        });
+        if (!state._isDisposed && state.mounted) {
+          state.setState(() {
+            state._showControls = false;
+          });
+        }
       });
     }
 
     void toggleControls() {
+      if (state._isDisposed || !state.mounted) return;
       state.setState(() {
         state._showControls = !state._showControls;
       });
@@ -703,32 +751,29 @@ class GestureDetectorOverlay extends StatelessWidget {
     return GestureDetector(
       onTap: toggleControls,
       onDoubleTapDown: (d) {
-        state.setState(() {
-          final width = MediaQuery.of(context).size.width;
-          final isRight = d.localPosition.dx > width / 2;
+        if (state._isDisposed || !state.mounted) return;
+        final width = MediaQuery.of(context).size.width;
+        final isRight = d.localPosition.dx > width / 2;
 
-          if (isRight) {
-            // Skip forward 10 seconds
-            state._controller.seekTo(
-              state._controller.value.position + Duration(seconds: 10),
-            );
-            state.setState(() {});
-          } else {
-            // Skip backward 10 seconds
-            state._controller.seekTo(
-              state._controller.value.position - Duration(seconds: 10),
-            );
-            state.setState(() {});
-          }
-        });
+        if (isRight) {
+          // Skip forward 10 seconds
+          state._controller.seekTo(
+            state._controller.value.position + Duration(seconds: 10),
+          );
+        } else {
+          // Skip backward 10 seconds
+          state._controller.seekTo(
+            state._controller.value.position - Duration(seconds: 10),
+          );
+        }
       },
       onHorizontalDragUpdate: (d) {
+        if (state._isDisposed || !state.mounted) return;
         final delta = d.primaryDelta!;
         state._controller.seekTo(
           state._controller.value.position +
               Duration(milliseconds: (delta * 1000).toInt()),
         );
-        state.setState(() {});
       },
       onVerticalDragUpdate: (d) {
         final width = MediaQuery.of(context).size.width;
@@ -780,11 +825,13 @@ class PlayPauseControlBar extends StatelessWidget {
                 height: iconSize,
                 child: IconButton(
                   icon: Icon(Icons.replay_10_rounded, color: Colors.white),
-                  onPressed: () => state.setState(() {
-                    controller.seekTo(
-                      controller.value.position - const Duration(seconds: 10),
-                    );
-                  }),
+                  onPressed: () {
+                    if (!state._isDisposed && state.mounted) {
+                      controller.seekTo(
+                        controller.value.position - const Duration(seconds: 10),
+                      );
+                    }
+                  },
                 ),
               ),
 
@@ -814,11 +861,13 @@ class PlayPauseControlBar extends StatelessWidget {
                 height: iconSize,
                 child: IconButton(
                   icon: Icon(Icons.forward_10_rounded, color: Colors.white),
-                  onPressed: () => state.setState(() {
-                    state._controller.seekTo(
-                      state._controller.value.position + Duration(seconds: 10),
-                    );
-                  }),
+                  onPressed: () {
+                    if (!state._isDisposed && state.mounted) {
+                      state._controller.seekTo(
+                        state._controller.value.position + Duration(seconds: 10),
+                      );
+                    }
+                  },
                 ),
               ),
             ],
@@ -853,8 +902,11 @@ class _EpisodeListOverlayState extends State<EpisodeListOverlay>
             SizedBox(height: 290, child: EpisodeViewMovieScreen()),
             TextButton(
               child: Text("Close", style: TextStyle(color: Colors.white)),
-              onPressed: () =>
-                  state.setState(() => state._showEpisodeList = false),
+              onPressed: () {
+                if (!state._isDisposed && state.mounted) {
+                  state.setState(() => state._showEpisodeList = false);
+                }
+              },
             ),
           ],
         ),
