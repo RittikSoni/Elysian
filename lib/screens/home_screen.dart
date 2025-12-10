@@ -1,4 +1,7 @@
 import 'package:elysian/data/data.dart';
+import 'package:elysian/models/models.dart';
+import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/widgets/saved_links_list.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -14,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   late ScrollController _scrollController;
   double _scollOffset = 0.0;
+  List<SavedLink> _savedLinks = [];
+
   @override
   void initState() {
     _scrollController = ScrollController()
@@ -23,7 +28,26 @@ class HomeScreenState extends State<HomeScreen> {
         });
         // context.bloc<AppBarCubit>().setOffset(_scrollController.offset);
       });
+    _loadSavedLinks();
     super.initState();
+  }
+
+  Future<void> _loadSavedLinks() async {
+    try {
+      final links = await StorageService.getSavedLinks();
+      setState(() {
+        _savedLinks = links;
+      });
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload links when screen becomes visible again
+    _loadSavedLinks();
   }
 
   @override
@@ -61,6 +85,14 @@ class HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (_savedLinks.isNotEmpty)
+            SliverToBoxAdapter(
+              key: PageStorageKey('savedLinks'),
+              child: SavedLinksList(
+                savedLinks: _savedLinks,
+                title: 'Saved Links',
+              ),
+            ),
           SliverToBoxAdapter(
             key: PageStorageKey('mylist'),
             child: ContentList(
