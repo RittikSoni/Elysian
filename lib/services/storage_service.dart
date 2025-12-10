@@ -181,5 +181,190 @@ class StorageService {
   }
 
   static String get defaultListId => _defaultListId;
+
+  // Favorites
+  static Future<List<SavedLink>> getFavoriteLinks() async {
+    final allLinks = await getSavedLinks();
+    return allLinks.where((link) => link.isFavorite).toList();
+  }
+
+  static Future<void> toggleFavorite(String linkId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    final index = links.indexWhere((l) => l.id == linkId);
+    if (index != -1) {
+      links[index] = links[index].copyWith(isFavorite: !links[index].isFavorite);
+      await _updateSavedLinks(prefs, links);
+    }
+  }
+
+  // Watch History / Recent Activity
+  static Future<List<SavedLink>> getRecentlyViewedLinks({int limit = 10}) async {
+    final allLinks = await getSavedLinks();
+    final viewedLinks = allLinks
+        .where((link) => link.lastViewedAt != null)
+        .toList()
+      ..sort((a, b) => (b.lastViewedAt ?? DateTime(1970))
+          .compareTo(a.lastViewedAt ?? DateTime(1970)));
+    return viewedLinks.take(limit).toList();
+  }
+
+  static Future<void> recordLinkView(String linkId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    final index = links.indexWhere((l) => l.id == linkId);
+    if (index != -1) {
+      final link = links[index];
+      links[index] = link.copyWith(
+        lastViewedAt: DateTime.now(),
+        viewCount: link.viewCount + 1,
+      );
+      await _updateSavedLinks(prefs, links);
+    }
+  }
+
+  // Notes
+  static Future<void> updateLinkNotes(String linkId, String? notes) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    final index = links.indexWhere((l) => l.id == linkId);
+    if (index != -1) {
+      links[index] = links[index].copyWith(notes: notes);
+      await _updateSavedLinks(prefs, links);
+    }
+  }
+
+  // Bulk Operations
+  static Future<void> deleteLinks(List<String> linkIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    final linksToDelete = links.where((l) => linkIds.contains(l.id)).toList();
+    
+    // Update list counts
+    for (final link in linksToDelete) {
+      for (final listId in link.listIds) {
+        await _updateListCount(listId, decrement: true);
+      }
+    }
+    
+    links.removeWhere((l) => linkIds.contains(l.id));
+    await _updateSavedLinks(prefs, links);
+  }
+
+  static Future<void> moveLinksToLists(List<String> linkIds, List<String> targetListIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    
+    for (final linkId in linkIds) {
+      final index = links.indexWhere((l) => l.id == linkId);
+      if (index != -1) {
+        links[index] = links[index].copyWith(listIds: targetListIds);
+      }
+    }
+    
+    await _updateSavedLinks(prefs, links);
+    // Update counts for all affected lists
+    for (final listId in targetListIds) {
+      await _updateListCount(listId);
+    }
+  }
+
+  static Future<void> toggleFavoritesForLinks(List<String> linkIds, bool isFavorite) async {
+    final prefs = await SharedPreferences.getInstance();
+    final links = await getSavedLinks();
+    
+    for (final linkId in linkIds) {
+      final index = links.indexWhere((l) => l.id == linkId);
+      if (index != -1) {
+        links[index] = links[index].copyWith(isFavorite: isFavorite);
+      }
+    }
+    
+    await _updateSavedLinks(prefs, links);
+  }
+
+  // Duplicate Detection
+  static Future<List<SavedLink>> findDuplicates(String url) async {
+    final allLinks = await getSavedLinks();
+    return allLinks.where((link) => link.url == url).toList();
+  }
+
+  // Export/Import
+  static Future<String> exportData() async {
+    final links = await getSavedLinks();
+    final lists = await getUserLists();
+    final data = {
+      'links': links.map((l) => l.toJson()).toList(),
+      'lists': lists.map((l) => l.toJson()).toList(),
+      'exportDate': DateTime.now().toIso8601String(),
+    };
+    return jsonEncode(data);
+  }
+
+  static Future<void> importData(String jsonData) async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = jsonDecode(jsonData) as Map<String, dynamic>;
+    
+    // Import lists
+    if (data['lists'] != null) {
+      final importedLists = (data['lists'] as List)
+          .map((json) => UserList.fromJson(json as Map<String, dynamic>))
+          .toList();
+      
+      // Filter out default list and merge with existing
+      final customLists = importedLists.where((l) => l.id != _defaultListId).toList();
+      final listsJson = customLists.map((list) => jsonEncode(list.toJson())).toList();
+      await prefs.setStringList(_userListsKey, listsJson);
+    }
+    
+    // Import links
+    if (data['links'] != null) {
+      final importedLinks = (data['links'] as List)
+          .map((json) => SavedLink.fromJson(json as Map<String, dynamic>))
+          .toList();
+      
+      // Merge with existing links (avoid duplicates by URL)
+      final existingLinks = await getSavedLinks();
+      final existingUrls = existingLinks.map((l) => l.url).toSet();
+      
+      final newLinks = importedLinks.where((l) => !existingUrls.contains(l.url)).toList();
+      final allLinks = [...existingLinks, ...newLinks];
+      
+      await _updateSavedLinks(prefs, allLinks);
+    }
+  }
+
+  // Statistics
+  static Future<Map<String, dynamic>> getStatistics() async {
+    final allLinks = await getSavedLinks();
+    final lists = await getUserLists();
+    
+    // Count by type
+    final typeCounts = <LinkType, int>{};
+    for (final link in allLinks) {
+      typeCounts[link.type] = (typeCounts[link.type] ?? 0) + 1;
+    }
+    
+    // Most viewed
+    final mostViewed = allLinks.toList()
+      ..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    
+    // Recent activity
+    final recentlyViewed = allLinks
+        .where((l) => l.lastViewedAt != null)
+        .toList()
+      ..sort((a, b) => (b.lastViewedAt ?? DateTime(1970))
+          .compareTo(a.lastViewedAt ?? DateTime(1970)));
+    
+    return {
+      'totalLinks': allLinks.length,
+      'totalLists': lists.length,
+      'favoriteLinks': allLinks.where((l) => l.isFavorite).length,
+      'typeCounts': typeCounts.map((k, v) => MapEntry(k.toString(), v)),
+      'mostViewed': mostViewed.take(5).map((l) => l.toJson()).toList(),
+      'recentlyViewed': recentlyViewed.take(5).map((l) => l.toJson()).toList(),
+      'totalViews': allLinks.fold(0, (sum, link) => sum + link.viewCount),
+    };
+  }
 }
 

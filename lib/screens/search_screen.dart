@@ -336,6 +336,7 @@ class SearchScreenState extends State<SearchScreen> {
           linkType: link.type,
           title: link.title,
           description: link.description,
+          linkId: link.id, // Pass linkId to track views
         );
       },
       child: Container(

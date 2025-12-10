@@ -9,6 +9,10 @@ class SavedLink {
   final LinkType type;
   final List<String> listIds; // Changed from single listId to multiple listIds
   final DateTime savedAt;
+  final bool isFavorite; // Favorite/starred link
+  final String? notes; // Personal notes/annotations
+  final DateTime? lastViewedAt; // Last time link was viewed
+  final int viewCount; // Number of times viewed
 
   SavedLink({
     required this.id,
@@ -19,6 +23,10 @@ class SavedLink {
     required this.type,
     required this.listIds,
     required this.savedAt,
+    this.isFavorite = false,
+    this.notes,
+    this.lastViewedAt,
+    this.viewCount = 0,
   });
 
   // Helper getter for backward compatibility (returns first listId)
@@ -34,6 +42,10 @@ class SavedLink {
         'listIds': listIds, // New field
         'listId': listIds.isNotEmpty ? listIds.first : null, // Keep for backward compatibility
         'savedAt': savedAt.toIso8601String(),
+        'isFavorite': isFavorite,
+        'notes': notes,
+        'lastViewedAt': lastViewedAt?.toIso8601String(),
+        'viewCount': viewCount,
       };
 
   factory SavedLink.fromJson(Map<String, dynamic> json) {
@@ -59,6 +71,43 @@ class SavedLink {
       type: LinkType.fromString(json['type'] as String),
       listIds: listIds,
       savedAt: DateTime.parse(json['savedAt'] as String),
+      isFavorite: json['isFavorite'] as bool? ?? false,
+      notes: json['notes'] as String?,
+      lastViewedAt: json['lastViewedAt'] != null
+          ? DateTime.parse(json['lastViewedAt'] as String)
+          : null,
+      viewCount: json['viewCount'] as int? ?? 0,
+    );
+  }
+
+  // Helper method to create a copy with updated fields
+  SavedLink copyWith({
+    String? id,
+    String? url,
+    String? title,
+    String? thumbnailUrl,
+    String? description,
+    LinkType? type,
+    List<String>? listIds,
+    DateTime? savedAt,
+    bool? isFavorite,
+    String? notes,
+    DateTime? lastViewedAt,
+    int? viewCount,
+  }) {
+    return SavedLink(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      title: title ?? this.title,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      description: description ?? this.description,
+      type: type ?? this.type,
+      listIds: listIds ?? this.listIds,
+      savedAt: savedAt ?? this.savedAt,
+      isFavorite: isFavorite ?? this.isFavorite,
+      notes: notes ?? this.notes,
+      lastViewedAt: lastViewedAt ?? this.lastViewedAt,
+      viewCount: viewCount ?? this.viewCount,
     );
   }
 }

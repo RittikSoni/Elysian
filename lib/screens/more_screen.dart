@@ -3,6 +3,8 @@ import 'package:elysian/widgets/widgets.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/screens/lists_management_screen.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
+import 'package:elysian/screens/statistics_screen.dart';
+import 'package:elysian/main.dart';
 
 class MoreScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -175,6 +177,115 @@ class MoreScreenState extends State<MoreScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const SavedLinksScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.upload_file,
+                    title: 'Export Data',
+                    onTap: () async {
+                      try {
+                        final data = await StorageService.exportData();
+                        // Copy to clipboard or share
+                        await showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: Colors.grey[900],
+                            title: const Text('Export Data', style: TextStyle(color: Colors.white)),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Your data has been exported. You can copy it or share it.',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                const SizedBox(height: 16),
+                                SelectableText(
+                                  data,
+                                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error exporting data: $e')),
+                        );
+                      }
+                    },
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.download,
+                    title: 'Import Data',
+                    onTap: () async {
+                      final controller = TextEditingController();
+                      final result = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Colors.grey[900],
+                          title: const Text('Import Data', style: TextStyle(color: Colors.white)),
+                          content: TextField(
+                            controller: controller,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              labelText: 'Paste exported data',
+                              labelStyle: TextStyle(color: Colors.grey),
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: 10,
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                              ),
+                              child: const Text('Import'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (result == true && controller.text.isNotEmpty) {
+                        try {
+                          await StorageService.importData(controller.text);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Data imported successfully!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          onLinkSavedCallback?.call();
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error importing data: $e')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  _MoreMenuItem(
+                    icon: Icons.analytics,
+                    title: 'Statistics',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const StatisticsScreen(),
                         ),
                       );
                     },

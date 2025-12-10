@@ -14,6 +14,7 @@ class LinkHandler {
     LinkType? linkType,
     String? title,
     String? description,
+    String? linkId, // Optional link ID to track views
   }) async {
     // Determine link type if not provided
     final type = linkType ?? LinkParser.parseLinkType(url);
@@ -22,6 +23,20 @@ class LinkHandler {
       // Unknown link type, open externally
       await _openExternally(url);
       return;
+    }
+
+    // Track view if linkId is provided or find by URL
+    if (linkId != null) {
+      await StorageService.recordLinkView(linkId);
+    } else {
+      // Try to find link by URL to track view
+      try {
+        final allLinks = await StorageService.getSavedLinks();
+        final matchingLink = allLinks.firstWhere((link) => link.url == url);
+        await StorageService.recordLinkView(matchingLink.id);
+      } catch (e) {
+        // Link not found in saved links, skip tracking
+      }
     }
 
     // Check user preference

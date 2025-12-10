@@ -1,75 +1,48 @@
 import 'package:elysian/models/models.dart';
-import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/link_handler.dart';
-import 'package:elysian/services/storage_service.dart';
 import 'package:flutter/material.dart';
 
-class ListContentSection extends StatelessWidget {
-  final UserList list;
-  final List<SavedLink> links;
+class RecentActivitySection extends StatelessWidget {
+  final List<SavedLink> recentLinks;
   final VoidCallback? onRefresh;
 
-  const ListContentSection({
+  const RecentActivitySection({
     super.key,
-    required this.list,
-    required this.links,
+    required this.recentLinks,
     this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (links.isEmpty) {
+    if (recentLinks.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Row(
                 children: [
-                  if (list.id == StorageService.defaultListId)
-                    const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                      size: 20,
-                    ),
-                  if (list.id == StorageService.defaultListId)
-                    const SizedBox(width: 8),
+                  Icon(Icons.history, color: Colors.white, size: 24),
+                  SizedBox(width: 8),
                   Text(
-                    list.name,
-                    style: const TextStyle(
+                    'Continue Watching',
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '(${links.length})',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[400],
                     ),
                   ),
                 ],
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SavedLinksScreen(
-                        listId: list.id,
-                        listName: list.name,
-                      ),
-                    ),
-                  ).then((_) => onRefresh?.call());
+                  // Navigate to watch history screen (can be implemented later)
                 },
                 child: const Text(
                   'See All',
@@ -79,15 +52,14 @@ class ListContentSection extends StatelessWidget {
             ],
           ),
         ),
-        // Links List
         SizedBox(
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            itemCount: links.length > 10 ? 10 : links.length,
+            itemCount: recentLinks.length > 10 ? 10 : recentLinks.length,
             itemBuilder: (context, index) {
-              final link = links[index];
+              final link = recentLinks[index];
               return _buildLinkCard(context, link);
             },
           ),
@@ -97,6 +69,8 @@ class ListContentSection extends StatelessWidget {
   }
 
   Widget _buildLinkCard(BuildContext context, SavedLink link) {
+    final timeAgo = _getTimeAgo(link.lastViewedAt);
+    
     return GestureDetector(
       onTap: () {
         LinkHandler.openLink(
@@ -105,8 +79,9 @@ class ListContentSection extends StatelessWidget {
           linkType: link.type,
           title: link.title,
           description: link.description,
-          linkId: link.id, // Pass linkId to track views
+          linkId: link.id,
         );
+        onRefresh?.call();
       },
       child: Container(
         width: 250,
@@ -118,39 +93,88 @@ class ListContentSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              child: link.thumbnailUrl != null
-                  ? Image.network(
-                      link.thumbnailUrl!,
-                      width: double.infinity,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: double.infinity,
-                        height: 120,
-                        color: Colors.grey[800],
-                        child: Icon(
-                          _getIconForType(link.type),
-                          color: Colors.grey[600],
-                          size: 40,
+            // Thumbnail with time badge
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  child: link.thumbnailUrl != null
+                      ? Image.network(
+                          link.thumbnailUrl!,
+                          width: double.infinity,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: double.infinity,
+                            height: 120,
+                            color: Colors.grey[800],
+                            child: Icon(
+                              _getIconForType(link.type),
+                              color: Colors.grey[600],
+                              size: 40,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: double.infinity,
+                          height: 120,
+                          color: Colors.grey[800],
+                          child: Icon(
+                            _getIconForType(link.type),
+                            color: Colors.grey[600],
+                            size: 40,
+                          ),
                         ),
-                      ),
-                    )
-                  : Container(
-                      width: double.infinity,
-                      height: 120,
-                      color: Colors.grey[800],
-                      child: Icon(
-                        _getIconForType(link.type),
-                        color: Colors.grey[600],
-                        size: 40,
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      timeAgo,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
                       ),
                     ),
+                  ),
+                ),
+                if (link.viewCount > 1)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.play_arrow, color: Colors.white, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${link.viewCount}x',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
             // Content
             Padding(
@@ -193,6 +217,23 @@ class ListContentSection extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getTimeAgo(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 
   IconData _getIconForType(LinkType type) {

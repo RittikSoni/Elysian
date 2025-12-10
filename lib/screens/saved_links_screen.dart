@@ -22,8 +22,14 @@ class SavedLinksScreen extends StatefulWidget {
 
 class _SavedLinksScreenState extends State<SavedLinksScreen> {
   List<SavedLink> _savedLinks = [];
+  List<SavedLink> _filteredLinks = [];
+  Set<String> _selectedLinkIds = {};
   bool _isLoading = true;
+  bool _isSelectionMode = false;
   String? _selectedListId;
+  String _sortBy = 'date'; // 'date', 'title', 'type'
+  String _filterBy = 'all'; // 'all', 'favorites', 'type'
+  LinkType? _filterType;
 
   @override
   void initState() {
@@ -40,10 +46,206 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           : await StorageService.getSavedLinks();
       setState(() {
         _savedLinks = links;
+        _applyFiltersAndSort();
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  void _applyFiltersAndSort() {
+    var filtered = List<SavedLink>.from(_savedLinks);
+
+    // Apply filters
+    if (_filterBy == 'favorites') {
+      filtered = filtered.where((link) => link.isFavorite).toList();
+    } else if (_filterBy == 'type' && _filterType != null) {
+      filtered = filtered.where((link) => link.type == _filterType).toList();
+    }
+
+    // Apply sorting
+    switch (_sortBy) {
+      case 'title':
+        filtered.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case 'type':
+        filtered.sort((a, b) => a.type.toString().compareTo(b.type.toString()));
+        break;
+      case 'date':
+      default:
+        filtered.sort((a, b) => b.savedAt.compareTo(a.savedAt)); // Newest first
+        break;
+    }
+
+    setState(() {
+      _filteredLinks = filtered;
+    });
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedLinkIds.clear();
+      }
+    });
+  }
+
+  void _toggleLinkSelection(String linkId) {
+    setState(() {
+      if (_selectedLinkIds.contains(linkId)) {
+        _selectedLinkIds.remove(linkId);
+      } else {
+        _selectedLinkIds.add(linkId);
+      }
+    });
+  }
+
+  Future<void> _bulkDelete() async {
+    if (_selectedLinkIds.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Delete Links', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to delete ${_selectedLinkIds.length} link(s)?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await StorageService.deleteLinks(_selectedLinkIds.toList());
+        await _loadLinks();
+        onLinkSavedCallback?.call();
+        setState(() {
+          _selectedLinkIds.clear();
+          _isSelectionMode = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_selectedLinkIds.length} link(s) deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting links: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkMoveToLists() async {
+    if (_selectedLinkIds.isEmpty) return;
+
+    List<String> selectedListIds = [];
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Move to Lists', style: TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: MultiListPicker(
+            selectedListIds: selectedListIds,
+            onSelectionChanged: (listIds) {
+              selectedListIds = listIds;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, selectedListIds),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Move'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      try {
+        await StorageService.moveLinksToLists(_selectedLinkIds.toList(), result);
+        await _loadLinks();
+        onLinkSavedCallback?.call();
+        setState(() {
+          _selectedLinkIds.clear();
+          _isSelectionMode = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Links moved successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error moving links: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkToggleFavorites(bool isFavorite) async {
+    if (_selectedLinkIds.isEmpty) return;
+
+    try {
+      await StorageService.toggleFavoritesForLinks(_selectedLinkIds.toList(), isFavorite);
+      await _loadLinks();
+      onLinkSavedCallback?.call();
+      setState(() {
+        _selectedLinkIds.clear();
+        _isSelectionMode = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating favorites: $e')),
+        );
+      }
     }
   }
 
@@ -105,10 +307,12 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
     final titleController = TextEditingController(text: link.title);
     final urlController = TextEditingController(text: link.url);
     final descriptionController = TextEditingController(text: link.description ?? '');
+    final notesController = TextEditingController(text: link.notes ?? '');
     final newListNameController = TextEditingController();
     final newListDescriptionController = TextEditingController();
     final listPickerKey = GlobalKey();
     List<String> selectedListIds = List<String>.from(link.listIds);
+    bool isFavorite = link.isFavorite;
     bool isCreatingList = false;
     bool showCreateListForm = false;
 
@@ -170,6 +374,56 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                     ),
                   ),
                   maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                // Notes Field
+                TextField(
+                  controller: notesController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Notes (Optional)',
+                    labelStyle: const TextStyle(color: Colors.grey),
+                    hintText: 'Add personal notes about this link...',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    filled: true,
+                    fillColor: Colors.grey[800],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[700]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white),
+                    ),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                // Favorite toggle
+                Row(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Add to Favorites',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                    Switch(
+                      value: isFavorite,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          isFavorite = value;
+                        });
+                      },
+                      activeColor: Colors.amber,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 // Lists Section
@@ -344,6 +598,8 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                   'title': titleController.text.trim(),
                   'url': urlController.text.trim(),
                   'description': descriptionController.text.trim(),
+                  'notes': notesController.text.trim(),
+                  'isFavorite': isFavorite,
                   'listIds': selectedListIds,
                 });
               },
@@ -421,6 +677,12 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
           type: linkType,
           listIds: selectedListIds,
           savedAt: link.savedAt,
+          isFavorite: result['isFavorite'] as bool? ?? link.isFavorite,
+          notes: (result['notes'] as String?)?.isEmpty ?? true
+              ? null
+              : result['notes'] as String?,
+          lastViewedAt: link.lastViewedAt,
+          viewCount: link.viewCount,
         );
         await StorageService.saveLink(updatedLink);
         await _loadLinks();
@@ -485,6 +747,10 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         type: link.type,
         listIds: link.listIds, // Keep existing listIds
         savedAt: link.savedAt,
+        isFavorite: link.isFavorite,
+        notes: link.notes,
+        lastViewedAt: link.lastViewedAt,
+        viewCount: link.viewCount,
       );
       await StorageService.saveLink(updatedLink);
       await _loadLinks();
@@ -517,25 +783,191 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: Icon(
+            _isSelectionMode ? Icons.close : Icons.arrow_back,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            if (_isSelectionMode) {
+              _toggleSelectionMode();
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
-        title: Text(
-          widget.listName ?? 'Saved Links',
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          if (_savedLinks.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadLinks,
-              tooltip: 'Refresh',
-            ),
-        ],
+        title: _isSelectionMode
+            ? Text(
+                '${_selectedLinkIds.length} selected',
+                style: const TextStyle(color: Colors.white),
+              )
+            : Text(
+                widget.listName ?? 'Saved Links',
+                style: const TextStyle(color: Colors.white),
+              ),
+        actions: _isSelectionMode
+            ? [
+                if (_selectedLinkIds.isNotEmpty) ...[
+                  IconButton(
+                    icon: const Icon(Icons.star_border, color: Colors.amber),
+                    onPressed: () => _bulkToggleFavorites(true),
+                    tooltip: 'Add to Favorites',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.folder, color: Colors.white),
+                    onPressed: _bulkMoveToLists,
+                    tooltip: 'Move to Lists',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: _bulkDelete,
+                    tooltip: 'Delete',
+                  ),
+                ],
+              ]
+            : [
+                // Sort/Filter menu
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.sort, color: Colors.white),
+                  color: Colors.grey[900],
+                  onSelected: (value) {
+                    if (value.startsWith('sort_')) {
+                      setState(() {
+                        _sortBy = value.replaceFirst('sort_', '');
+                        _applyFiltersAndSort();
+                      });
+                    } else if (value.startsWith('filter_')) {
+                      setState(() {
+                        _filterBy = value.replaceFirst('filter_', '');
+                        if (_filterBy == 'type') {
+                          _showTypeFilterDialog();
+                        } else {
+                          _filterType = null;
+                          _applyFiltersAndSort();
+                        }
+                      });
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Text(
+                        'Sort By',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'sort_date',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortBy == 'date' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Date', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'sort_title',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortBy == 'title' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Title', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'sort_type',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _sortBy == 'type' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Type', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Text(
+                        'Filter By',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'filter_all',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _filterBy == 'all' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('All', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'filter_favorites',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _filterBy == 'favorites' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Favorites', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'filter_type',
+                      child: Row(
+                        children: [
+                          Icon(
+                            _filterBy == 'type' ? Icons.check : null,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('By Type', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                // Selection mode toggle
+                IconButton(
+                  icon: const Icon(Icons.checklist, color: Colors.white),
+                  onPressed: _toggleSelectionMode,
+                  tooltip: 'Select Multiple',
+                ),
+              ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _savedLinks.isEmpty
+          : _filteredLinks.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -558,30 +990,50 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _savedLinks.length,
+                  itemCount: _filteredLinks.length,
                   itemBuilder: (context, index) {
-                    final link = _savedLinks[index];
+                    final link = _filteredLinks[index];
+                    final isSelected = _selectedLinkIds.contains(link.id);
                     final thumbnailUrl = link.thumbnailUrl;
                     final videoId = link.type == LinkType.youtube
                         ? LinkParser.extractYouTubeVideoId(link.url)
                         : null;
 
                     return Card(
-                      color: Colors.grey[900],
+                      color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.grey[900],
                       margin: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
-                        onTap: () => LinkHandler.openLink(
-                          context,
-                          link.url,
-                          linkType: link.type,
-                          title: link.title,
-                          description: link.description,
-                        ),
+                        onTap: _isSelectionMode
+                            ? () => _toggleLinkSelection(link.id)
+                            : () => LinkHandler.openLink(
+                                  context,
+                                  link.url,
+                                  linkType: link.type,
+                                  title: link.title,
+                                  description: link.description,
+                                  linkId: link.id,
+                                ),
+                        onLongPress: () {
+                          if (!_isSelectionMode) {
+                            _toggleSelectionMode();
+                            _toggleLinkSelection(link.id);
+                          }
+                        },
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Selection checkbox
+                              if (_isSelectionMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Checkbox(
+                                    value: isSelected,
+                                    onChanged: (value) => _toggleLinkSelection(link.id),
+                                    activeColor: Colors.blue,
+                                  ),
+                                ),
                               // Thumbnail
                               Container(
                                 width: 120,
@@ -720,6 +1172,33 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
         return Icons.language;
       case LinkType.unknown:
         return Icons.link;
+    }
+  }
+
+  Future<void> _showTypeFilterDialog() async {
+    final result = await showDialog<LinkType>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Filter by Type', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: LinkType.values.map((type) {
+            return ListTile(
+              leading: Icon(_getIconForType(type), color: Colors.white),
+              title: Text(_getTypeLabel(type), style: const TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, type),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _filterType = result;
+        _applyFiltersAndSort();
+      });
     }
   }
 

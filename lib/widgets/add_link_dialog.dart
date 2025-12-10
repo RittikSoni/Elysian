@@ -18,6 +18,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
   final TextEditingController _newListNameController = TextEditingController();
   final TextEditingController _newListDescriptionController = TextEditingController();
   final GlobalKey _listPickerKey = GlobalKey();
@@ -26,6 +27,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   bool _isFetchingTitle = false;
   bool _isCreatingList = false;
   bool _showCreateListForm = false;
+  bool _isFavorite = false;
   LinkType? _detectedLinkType;
 
   @override
@@ -46,6 +48,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     _urlController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _notesController.dispose();
     _newListNameController.dispose();
     _newListDescriptionController.dispose();
     super.dispose();
@@ -180,6 +183,43 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
       return;
     }
 
+    // Check for duplicates
+    final duplicates = await StorageService.findDuplicates(url);
+    if (duplicates.isNotEmpty) {
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text(
+            'Duplicate Link Found',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            'This link already exists in your saved links:\n\n${duplicates.map((l) => l.title).join('\n')}\n\nDo you want to add it anyway?',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Add Anyway'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) {
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -214,6 +254,10 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         type: _detectedLinkType!,
         listIds: _selectedListIds,
         savedAt: DateTime.now(),
+        isFavorite: _isFavorite,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
       await StorageService.saveLink(savedLink);
@@ -340,6 +384,48 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                   ),
                 ),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              // Notes Field
+              TextField(
+                controller: _notesController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Notes (Optional)',
+                  labelStyle: TextStyle(color: Colors.grey[400]),
+                  hintText: 'Add personal notes about this link...',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  focusedBorder: const UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              // Favorite toggle
+              Row(
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 24),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Add to Favorites',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                  Switch(
+                    value: _isFavorite,
+                    onChanged: (value) {
+                      setState(() {
+                        _isFavorite = value;
+                      });
+                    },
+                    activeColor: Colors.amber,
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               // Lists Section

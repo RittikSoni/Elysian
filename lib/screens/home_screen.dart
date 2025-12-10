@@ -5,6 +5,8 @@ import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/saved_links_list.dart';
 import 'package:elysian/widgets/user_lists_widget.dart';
 import 'package:elysian/widgets/list_content_section.dart';
+import 'package:elysian/widgets/favorites_section.dart';
+import 'package:elysian/widgets/recent_activity_section.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -22,6 +24,8 @@ class HomeScreenState extends State<HomeScreen> {
   double _scollOffset = 0.0;
   List<SavedLink> _savedLinks = [];
   List<UserList> _userLists = [];
+  List<SavedLink> _favoriteLinks = [];
+  List<SavedLink> _recentLinks = [];
 
   @override
   void initState() {
@@ -43,9 +47,14 @@ class HomeScreenState extends State<HomeScreen> {
     try {
       final links = await StorageService.getSavedLinks();
       final lists = await StorageService.getUserLists();
+      final favorites = await StorageService.getFavoriteLinks();
+      final recent = await StorageService.getRecentlyViewedLinks(limit: 10);
+      
       setState(() {
         _savedLinks = links;
         _userLists = lists;
+        _favoriteLinks = favorites;
+        _recentLinks = recent;
       });
     } catch (e) {
       // Handle error silently
@@ -103,6 +112,22 @@ class HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(
             key: PageStorageKey('userLists'),
             child: UserListsWidget(
+              onRefresh: _loadSavedLinks,
+            ),
+          ),
+          // Favorites Section
+          SliverToBoxAdapter(
+            key: PageStorageKey('favorites'),
+            child: FavoritesSection(
+              favoriteLinks: _favoriteLinks,
+              onRefresh: _loadSavedLinks,
+            ),
+          ),
+          // Recent Activity / Continue Watching
+          SliverToBoxAdapter(
+            key: PageStorageKey('recentActivity'),
+            child: RecentActivitySection(
+              recentLinks: _recentLinks,
               onRefresh: _loadSavedLinks,
             ),
           ),

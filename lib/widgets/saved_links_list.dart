@@ -32,6 +32,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
       linkType: link.type,
       title: link.title,
       description: link.description,
+      linkId: link.id, // Pass linkId to track views
     );
   }
 
@@ -92,10 +93,12 @@ class _SavedLinksListState extends State<SavedLinksList> {
     final descriptionController = TextEditingController(
       text: link.description ?? '',
     );
+    final notesController = TextEditingController(text: link.notes ?? '');
     final newListNameController = TextEditingController();
     final newListDescriptionController = TextEditingController();
     final listPickerKey = GlobalKey();
     List<String> selectedListIds = List<String>.from(link.listIds);
+    bool isFavorite = link.isFavorite;
     bool isCreatingList = false;
     bool showCreateListForm = false;
 
@@ -303,6 +306,56 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Notes field
+                  TextField(
+                    controller: notesController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Notes (Optional)',
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      hintText: 'Add personal notes about this link...',
+                      hintStyle: TextStyle(color: Colors.grey[600]),
+                      filled: true,
+                      fillColor: Colors.grey[800],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.white),
+                      ),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  // Favorite toggle
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 24),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Add to Favorites',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                      ),
+                      Switch(
+                        value: isFavorite,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            isFavorite = value;
+                          });
+                        },
+                        activeColor: Colors.amber,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
                 // Multi-List Picker
                 MultiListPicker(
@@ -328,6 +381,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
                   'title': titleController.text.trim(),
                   'url': urlController.text.trim(),
                   'description': descriptionController.text.trim(),
+                  'notes': notesController.text.trim(),
+                  'isFavorite': isFavorite,
                   'listIds': selectedListIds,
                 });
               },
@@ -398,6 +453,12 @@ class _SavedLinksListState extends State<SavedLinksList> {
           type: linkType,
           listIds: selectedListIds,
           savedAt: link.savedAt,
+          isFavorite: result['isFavorite'] as bool? ?? link.isFavorite,
+          notes: (result['notes'] as String?)?.isEmpty ?? true
+              ? null
+              : result['notes'] as String?,
+          lastViewedAt: link.lastViewedAt,
+          viewCount: link.viewCount,
         );
         await StorageService.saveLink(updatedLink);
 
@@ -639,6 +700,24 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             ListTile(
+                              leading: Icon(
+                                link.isFavorite ? Icons.star : Icons.star_border,
+                                color: link.isFavorite ? Colors.amber : Colors.white,
+                              ),
+                              title: Text(
+                                link.isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
+                                style: TextStyle(
+                                  color: link.isFavorite ? Colors.amber : Colors.white,
+                                ),
+                              ),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                await StorageService.toggleFavorite(link.id);
+                                widget.onRefresh?.call();
+                                onLinkSavedCallback?.call();
+                              },
+                            ),
+                            ListTile(
                               leading: const Icon(
                                 Icons.edit,
                                 color: Colors.white,
@@ -748,6 +827,54 @@ class _SavedLinksListState extends State<SavedLinksList> {
                           )
                         else
                           _buildPlaceholder(link.type),
+                        // Favorite button
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () async {
+                              await StorageService.toggleFavorite(link.id);
+                              widget.onRefresh?.call();
+                              onLinkSavedCallback?.call();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: link.isFavorite 
+                                    ? Colors.amber.withOpacity(0.9)
+                                    : Colors.black.withOpacity(0.7),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: link.isFavorite ? Colors.amber : Colors.white.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                link.isFavorite ? Icons.star : Icons.star_border,
+                                color: link.isFavorite ? Colors.black : Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Notes indicator
+                        if (link.notes != null && link.notes!.isNotEmpty)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.note,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                            ),
+                          ),
                         Positioned(
                           bottom: 0,
                           left: 0,

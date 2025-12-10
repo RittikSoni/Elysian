@@ -6,3 +6,4 @@ export 'downloads_screen.dart';
 export 'more_screen.dart';
 export 'saved_links_screen.dart';
 export 'lists_management_screen.dart';
+export 'statistics_screen.dart';

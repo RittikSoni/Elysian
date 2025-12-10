@@ -1,75 +1,48 @@
 import 'package:elysian/models/models.dart';
-import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/link_handler.dart';
-import 'package:elysian/services/storage_service.dart';
 import 'package:flutter/material.dart';
 
-class ListContentSection extends StatelessWidget {
-  final UserList list;
-  final List<SavedLink> links;
+class FavoritesSection extends StatelessWidget {
+  final List<SavedLink> favoriteLinks;
   final VoidCallback? onRefresh;
 
-  const ListContentSection({
+  const FavoritesSection({
     super.key,
-    required this.list,
-    required this.links,
+    required this.favoriteLinks,
     this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (links.isEmpty) {
+    if (favoriteLinks.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Row(
                 children: [
-                  if (list.id == StorageService.defaultListId)
-                    const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                      size: 20,
-                    ),
-                  if (list.id == StorageService.defaultListId)
-                    const SizedBox(width: 8),
+                  Icon(Icons.star, color: Colors.amber, size: 24),
+                  SizedBox(width: 8),
                   Text(
-                    list.name,
-                    style: const TextStyle(
+                    'Favorites',
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '(${links.length})',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[400],
                     ),
                   ),
                 ],
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SavedLinksScreen(
-                        listId: list.id,
-                        listName: list.name,
-                      ),
-                    ),
-                  ).then((_) => onRefresh?.call());
+                  // Navigate to favorites screen (can be implemented later)
                 },
                 child: const Text(
                   'See All',
@@ -79,15 +52,14 @@ class ListContentSection extends StatelessWidget {
             ],
           ),
         ),
-        // Links List
         SizedBox(
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            itemCount: links.length > 10 ? 10 : links.length,
+            itemCount: favoriteLinks.length > 10 ? 10 : favoriteLinks.length,
             itemBuilder: (context, index) {
-              final link = links[index];
+              final link = favoriteLinks[index];
               return _buildLinkCard(context, link);
             },
           ),
@@ -105,8 +77,9 @@ class ListContentSection extends StatelessWidget {
           linkType: link.type,
           title: link.title,
           description: link.description,
-          linkId: link.id, // Pass linkId to track views
+          linkId: link.id,
         );
+        onRefresh?.call();
       },
       child: Container(
         width: 250,
@@ -114,43 +87,64 @@ class ListContentSection extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.grey[900],
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              child: link.thumbnailUrl != null
-                  ? Image.network(
-                      link.thumbnailUrl!,
-                      width: double.infinity,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: double.infinity,
-                        height: 120,
-                        color: Colors.grey[800],
-                        child: Icon(
-                          _getIconForType(link.type),
-                          color: Colors.grey[600],
-                          size: 40,
+            // Thumbnail with favorite badge
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  child: link.thumbnailUrl != null
+                      ? Image.network(
+                          link.thumbnailUrl!,
+                          width: double.infinity,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: double.infinity,
+                            height: 120,
+                            color: Colors.grey[800],
+                            child: Icon(
+                              _getIconForType(link.type),
+                              color: Colors.grey[600],
+                              size: 40,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: double.infinity,
+                          height: 120,
+                          color: Colors.grey[800],
+                          child: Icon(
+                            _getIconForType(link.type),
+                            color: Colors.grey[600],
+                            size: 40,
+                          ),
                         ),
-                      ),
-                    )
-                  : Container(
-                      width: double.infinity,
-                      height: 120,
-                      color: Colors.grey[800],
-                      child: Icon(
-                        _getIconForType(link.type),
-                        color: Colors.grey[600],
-                        size: 40,
-                      ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(
+                      Icons.star,
+                      color: Colors.black,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
             ),
             // Content
             Padding(
