@@ -132,25 +132,10 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         print('Error fetching title: $e');
       }
 
-      // Generate thumbnail URL based on link type
-      String? thumbnailUrl;
-      switch (linkType) {
-        case LinkType.youtube:
-          final videoId = LinkParser.extractYouTubeVideoId(widget.sharedUrl);
-          if (videoId != null) {
-            thumbnailUrl =
-                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-          }
-          break;
-        case LinkType.vimeo:
-        case LinkType.googledrive:
-        case LinkType.instagram:
-        case LinkType.directVideo:
-        case LinkType.web:
-        case LinkType.unknown:
-          // These don't have easy thumbnail access
-          break;
-      }
+      // Fetch metadata (thumbnail, description) from URL
+      final metadata = await LinkParser.fetchMetadataFromUrl(widget.sharedUrl, linkType);
+      final thumbnailUrl = metadata['thumbnailUrl'];
+      final description = metadata['description'];
 
       // Close loading dialog
       if (mounted) {
@@ -162,6 +147,7 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         url: widget.sharedUrl,
         title: title,
         thumbnailUrl: thumbnailUrl,
+        description: description,
         type: linkType,
         listIds: [listId], // Convert single listId to listIds
         savedAt: DateTime.now(),

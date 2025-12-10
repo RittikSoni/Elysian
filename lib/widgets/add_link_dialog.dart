@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/thumbnail_service.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddLinkDialog extends StatefulWidget {
   final String? initialListId;
@@ -29,6 +32,9 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
   bool _showCreateListForm = false;
   bool _isFavorite = false;
   LinkType? _detectedLinkType;
+  File? _customThumbnailFile;
+  String? _customThumbnailUrl;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -85,12 +91,129 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
       if (mounted) {
         _titleController.text = title;
       }
+      
+      // Also fetch metadata (thumbnail, description) if not already set
+      if (mounted && _customThumbnailFile == null && _customThumbnailUrl == null) {
+        final metadata = await LinkParser.fetchMetadataFromUrl(
+          _urlController.text.trim(),
+          _detectedLinkType!,
+        );
+        if (mounted) {
+          setState(() {
+            if (metadata['thumbnailUrl'] != null && _customThumbnailUrl == null) {
+              _customThumbnailUrl = metadata['thumbnailUrl'];
+            }
+            if (metadata['description'] != null && _descriptionController.text.isEmpty) {
+              _descriptionController.text = metadata['description']!;
+            }
+          });
+        }
+      }
     } catch (e) {
       // Silently fail, user can enter title manually
     } finally {
       if (mounted) {
         setState(() => _isFetchingTitle = false);
       }
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _customThumbnailFile = File(image.path);
+          _customThumbnailUrl = null; // Clear URL if file is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _customThumbnailFile = File(image.path);
+          _customThumbnailUrl = null; // Clear URL if file is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error taking photo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showThumbnailUrlDialog() async {
+    final urlController = TextEditingController(text: _customThumbnailUrl);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Enter Thumbnail URL',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: urlController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'https://example.com/image.jpg',
+            hintStyle: TextStyle(color: Colors.grey[600]),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, urlController.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null && mounted) {
+      setState(() {
+        if (result.isEmpty) {
+          _customThumbnailUrl = null;
+        } else {
+          _customThumbnailUrl = result;
+          _customThumbnailFile = null; // Clear file if URL is set
+        }
+      });
     }
   }
 
@@ -223,38 +346,54 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
     setState(() => _isLoading = true);
 
     try {
-      // Generate thumbnail URL and fetch duration based on link type
+      final linkId = DateTime.now().millisecondsSinceEpoch.toString();
+      
+      // Handle custom thumbnail
+      String? customThumbnailPath;
       String? thumbnailUrl;
-      String? duration;
-      switch (_detectedLinkType!) {
-        case LinkType.youtube:
-          final videoId = LinkParser.extractYouTubeVideoId(url);
-          if (videoId != null) {
-            thumbnailUrl =
-                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
-            // Fetch duration for YouTube videos
-            try {
-              duration = await LinkParser.fetchYouTubeDuration(url);
-            } catch (e) {
-              // Silently fail, duration is optional
+      
+      if (_customThumbnailFile != null) {
+        // Save local thumbnail
+        customThumbnailPath = await ThumbnailService.saveThumbnail(_customThumbnailFile!, linkId);
+      } else if (_customThumbnailUrl != null && _customThumbnailUrl!.isNotEmpty) {
+        // Use custom URL
+        thumbnailUrl = _customThumbnailUrl;
+      } else {
+        // Generate thumbnail URL based on link type
+        switch (_detectedLinkType!) {
+          case LinkType.youtube:
+            final videoId = LinkParser.extractYouTubeVideoId(url);
+            if (videoId != null) {
+              thumbnailUrl =
+                  'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
             }
-          }
-          break;
-        case LinkType.vimeo:
-        case LinkType.googledrive:
-        case LinkType.instagram:
-        case LinkType.directVideo:
-        case LinkType.web:
-        case LinkType.unknown:
-          // These don't have easy thumbnail access
-          break;
+            break;
+          case LinkType.vimeo:
+          case LinkType.googledrive:
+          case LinkType.instagram:
+          case LinkType.directVideo:
+          case LinkType.web:
+          case LinkType.unknown:
+            // Try to fetch metadata for these types
+            try {
+              final metadata = await LinkParser.fetchMetadataFromUrl(url, _detectedLinkType!);
+              thumbnailUrl = metadata['thumbnailUrl'];
+              if (metadata['description'] != null && _descriptionController.text.isEmpty) {
+                _descriptionController.text = metadata['description']!;
+              }
+            } catch (e) {
+              // Silently fail
+            }
+            break;
+        }
       }
 
       final savedLink = SavedLink(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: linkId,
         url: url,
         title: title,
         thumbnailUrl: thumbnailUrl,
+        customThumbnailPath: customThumbnailPath,
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
@@ -265,7 +404,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
-        duration: duration,
+        duration: null, // Duration can be fetched separately if needed
       );
 
       await StorageService.saveLink(savedLink);
@@ -360,6 +499,110 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                   ],
                 ),
               ],
+              const SizedBox(height: 16),
+              // Custom Thumbnail Section
+              Row(
+                children: [
+                  const Text(
+                    'Custom Thumbnail (Optional)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_customThumbnailFile != null || _customThumbnailUrl != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _customThumbnailFile = null;
+                          _customThumbnailUrl = null;
+                        });
+                      },
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Thumbnail Preview
+              if (_customThumbnailFile != null || _customThumbnailUrl != null)
+                Container(
+                  height: 120,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[700]!),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _customThumbnailFile != null
+                        ? Image.file(
+                            _customThumbnailFile!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                          )
+                        : Image.network(
+                            _customThumbnailUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child: Icon(Icons.broken_image, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              // Thumbnail Picker Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickImageFromGallery,
+                      icon: const Icon(Icons.photo_library, size: 18),
+                      label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.grey[700]!),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickImageFromCamera,
+                      icon: const Icon(Icons.camera_alt, size: 18),
+                      label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.grey[700]!),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showThumbnailUrlDialog,
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('URL', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.grey[700]!),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               // Title Field
               TextField(

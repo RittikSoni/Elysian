@@ -550,4 +550,163 @@ class LinkParser {
       return 'Instagram Post';
     }
   }
+
+  /// Fetches enhanced metadata from URL (thumbnail, description, etc.)
+  static Future<Map<String, String?>> fetchMetadataFromUrl(String url, LinkType type) async {
+    final metadata = <String, String?>{
+      'thumbnailUrl': null,
+      'description': null,
+    };
+
+    try {
+      switch (type) {
+        case LinkType.youtube:
+          final videoId = extractYouTubeVideoId(url);
+          if (videoId != null) {
+            metadata['thumbnailUrl'] = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            // Try to fetch description from YouTube
+            try {
+              final response = await http
+                  .get(Uri.parse(url))
+                  .timeout(const Duration(seconds: 5));
+              if (response.statusCode == 200) {
+                final html = response.body;
+                // Extract og:description
+                final ogDescMatch = RegExp(
+                  r'<meta\s+property="og:description"\s+content="([^"]+)"',
+                  caseSensitive: false,
+                ).firstMatch(html);
+                if (ogDescMatch != null) {
+                  metadata['description'] = ogDescMatch.group(1)?.trim();
+                }
+              }
+            } catch (e) {
+              // Silently fail
+            }
+          }
+          break;
+        case LinkType.instagram:
+          // Try to extract og:image and og:description
+          try {
+            final response = await http
+                .get(Uri.parse(url))
+                .timeout(const Duration(seconds: 5));
+            if (response.statusCode == 200) {
+              final html = response.body;
+              
+              // Extract og:image
+              RegExpMatch? ogImageMatch = RegExp(
+                r'<meta\s+property="og:image"\s+content="([^"]+)"',
+                caseSensitive: false,
+              ).firstMatch(html);
+              if (ogImageMatch == null) {
+                ogImageMatch = RegExp(
+                  r"<meta\s+property='og:image'\s+content='([^']+)'",
+                  caseSensitive: false,
+                ).firstMatch(html);
+              }
+              if (ogImageMatch != null) {
+                metadata['thumbnailUrl'] = ogImageMatch.group(1)?.trim();
+              }
+
+              // Extract og:description
+              RegExpMatch? ogDescMatch = RegExp(
+                r'<meta\s+property="og:description"\s+content="([^"]+)"',
+                caseSensitive: false,
+              ).firstMatch(html);
+              if (ogDescMatch == null) {
+                ogDescMatch = RegExp(
+                  r"<meta\s+property='og:description'\s+content='([^']+)'",
+                  caseSensitive: false,
+                ).firstMatch(html);
+              }
+              if (ogDescMatch != null) {
+                metadata['description'] = ogDescMatch.group(1)?.trim();
+              }
+            }
+          } catch (e) {
+            // Silently fail
+          }
+          break;
+        case LinkType.vimeo:
+          try {
+            final videoId = extractVimeoVideoId(url);
+            if (videoId != null) {
+              final oEmbedUrl = Uri.parse('https://vimeo.com/api/oembed.json?url=$url');
+              final response = await http
+                  .get(oEmbedUrl)
+                  .timeout(const Duration(seconds: 5));
+              if (response.statusCode == 200) {
+                final data = jsonDecode(response.body) as Map<String, dynamic>;
+                metadata['thumbnailUrl'] = data['thumbnail_url'] as String?;
+                metadata['description'] = data['description'] as String?;
+              }
+            }
+          } catch (e) {
+            // Silently fail
+          }
+          break;
+        case LinkType.web:
+        case LinkType.googledrive:
+        case LinkType.directVideo:
+          // Extract og:image and og:description from web pages
+          try {
+            final response = await http
+                .get(Uri.parse(url))
+                .timeout(const Duration(seconds: 5));
+            if (response.statusCode == 200) {
+              final html = response.body;
+              
+              // Extract og:image
+              RegExpMatch? ogImageMatch = RegExp(
+                r'<meta\s+property="og:image"\s+content="([^"]+)"',
+                caseSensitive: false,
+              ).firstMatch(html);
+              if (ogImageMatch == null) {
+                ogImageMatch = RegExp(
+                  r"<meta\s+property='og:image'\s+content='([^']+)'",
+                  caseSensitive: false,
+                ).firstMatch(html);
+              }
+              if (ogImageMatch != null) {
+                metadata['thumbnailUrl'] = ogImageMatch.group(1)?.trim();
+              }
+
+              // Extract og:description
+              RegExpMatch? ogDescMatch = RegExp(
+                r'<meta\s+property="og:description"\s+content="([^"]+)"',
+                caseSensitive: false,
+              ).firstMatch(html);
+              if (ogDescMatch == null) {
+                ogDescMatch = RegExp(
+                  r"<meta\s+property='og:description'\s+content='([^']+)'",
+                  caseSensitive: false,
+                ).firstMatch(html);
+              }
+              if (ogDescMatch != null) {
+                metadata['description'] = ogDescMatch.group(1)?.trim();
+              } else {
+                // Fallback to meta description
+                final metaDescMatch = RegExp(
+                  r'<meta\s+name="description"\s+content="([^"]+)"',
+                  caseSensitive: false,
+                ).firstMatch(html);
+                if (metaDescMatch != null) {
+                  metadata['description'] = metaDescMatch.group(1)?.trim();
+                }
+              }
+            }
+          } catch (e) {
+            // Silently fail
+          }
+          break;
+        case LinkType.unknown:
+          break;
+      }
+    } catch (e) {
+      // Return empty metadata on error
+    }
+
+    return metadata;
+  }
 }

@@ -2,6 +2,7 @@ import 'package:elysian/data/data.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/link_handler.dart';
+import 'package:elysian/widgets/thumbnail_image.dart';
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -439,25 +440,11 @@ class SearchScreenState extends State<SearchScreen> {
                 topLeft: Radius.circular(8.0),
                 bottomLeft: Radius.circular(8.0),
               ),
-              child: link.thumbnailUrl != null
-                  ? Image.network(
-                      link.thumbnailUrl!,
-                      width: 120,
-                      height: 200,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 120,
-                        height: 200,
-                        color: Colors.grey[800],
-                        child: const Icon(Icons.link, color: Colors.grey),
-                      ),
-                    )
-                  : Container(
-                      width: 120,
-                      height: 200,
-                      color: Colors.grey[800],
-                      child: const Icon(Icons.link, color: Colors.grey),
-                    ),
+              child: ThumbnailImage(
+                link: link,
+                width: 120,
+                height: 200,
+              ),
             ),
             // Content
             Expanded(

@@ -5,6 +5,7 @@ class SavedLink {
   final String url;
   final String title;
   final String? thumbnailUrl;
+  final String? customThumbnailPath; // Local file path for custom thumbnail
   final String? description;
   final LinkType type;
   final List<String> listIds; // Changed from single listId to multiple listIds
@@ -20,6 +21,7 @@ class SavedLink {
     required this.url,
     required this.title,
     this.thumbnailUrl,
+    this.customThumbnailPath,
     this.description,
     required this.type,
     required this.listIds,
@@ -39,6 +41,7 @@ class SavedLink {
         'url': url,
         'title': title,
         'thumbnailUrl': thumbnailUrl,
+        'customThumbnailPath': customThumbnailPath,
         'description': description,
         'type': type.toString(),
         'listIds': listIds, // New field
@@ -70,6 +73,7 @@ class SavedLink {
       url: json['url'] as String,
       title: json['title'] as String,
       thumbnailUrl: json['thumbnailUrl'] as String?,
+      customThumbnailPath: json['customThumbnailPath'] as String?,
       description: json['description'] as String?,
       type: LinkType.fromString(json['type'] as String),
       listIds: listIds,
@@ -90,6 +94,7 @@ class SavedLink {
     String? url,
     String? title,
     String? thumbnailUrl,
+    String? customThumbnailPath,
     String? description,
     LinkType? type,
     List<String>? listIds,
@@ -105,6 +110,7 @@ class SavedLink {
       url: url ?? this.url,
       title: title ?? this.title,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      customThumbnailPath: customThumbnailPath ?? this.customThumbnailPath,
       description: description ?? this.description,
       type: type ?? this.type,
       listIds: listIds ?? this.listIds,

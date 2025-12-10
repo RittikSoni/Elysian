@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/thumbnail_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -169,6 +172,17 @@ class _SavedLinksListState extends State<SavedLinksList> {
     bool isFavorite = link.isFavorite;
     bool isCreatingList = false;
     bool showCreateListForm = false;
+    File? customThumbnailFile;
+    String? customThumbnailUrl = link.customThumbnailPath == null ? link.thumbnailUrl : null;
+    final ImagePicker imagePicker = ImagePicker();
+    
+    // Load existing custom thumbnail if it exists
+    if (link.customThumbnailPath != null) {
+      final thumbnailFile = await ThumbnailService.getThumbnailFile(link.customThumbnailPath);
+      if (thumbnailFile != null) {
+        customThumbnailFile = thumbnailFile;
+      }
+    }
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -225,6 +239,201 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     ),
                   ),
                   maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                // Custom Thumbnail Section
+                Row(
+                  children: [
+                    const Text(
+                      'Custom Thumbnail (Optional)',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (customThumbnailFile != null || customThumbnailUrl != null)
+                      TextButton.icon(
+                        onPressed: () {
+                          setDialogState(() {
+                            customThumbnailFile = null;
+                            customThumbnailUrl = null;
+                          });
+                        },
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Thumbnail Preview
+                if (customThumbnailFile != null || customThumbnailUrl != null)
+                  Container(
+                    height: 120,
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[700]!),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: customThumbnailFile != null
+                          ? Image.file(
+                              customThumbnailFile!,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.network(
+                              customThumbnailUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey[800],
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, color: Colors.grey),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                // Thumbnail Picker Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final XFile? image = await imagePicker.pickImage(
+                              source: ImageSource.gallery,
+                              maxWidth: 1920,
+                              maxHeight: 1080,
+                              imageQuality: 85,
+                            );
+                            if (image != null) {
+                              setDialogState(() {
+                                customThumbnailFile = File(image.path);
+                                customThumbnailUrl = null;
+                              });
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error picking image: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library, size: 18),
+                        label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey[700]!),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final XFile? image = await imagePicker.pickImage(
+                              source: ImageSource.camera,
+                              maxWidth: 1920,
+                              maxHeight: 1080,
+                              imageQuality: 85,
+                            );
+                            if (image != null) {
+                              setDialogState(() {
+                                customThumbnailFile = File(image.path);
+                                customThumbnailUrl = null;
+                              });
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error taking photo: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.camera_alt, size: 18),
+                        label: const Text('Camera', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey[700]!),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final urlController = TextEditingController(text: customThumbnailUrl);
+                          final result = await showDialog<String>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: Colors.grey[900],
+                              title: const Text(
+                                'Enter Thumbnail URL',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              content: TextField(
+                                controller: urlController,
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: 'https://example.com/image.jpg',
+                                  hintStyle: TextStyle(color: Colors.grey[600]),
+                                  enabledBorder: UnderlineInputBorder(
+                                    borderSide: BorderSide(color: Colors.grey[700]!),
+                                  ),
+                                  focusedBorder: const UnderlineInputBorder(
+                                    borderSide: BorderSide(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, urlController.text.trim()),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.black,
+                                  ),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (result != null) {
+                            setDialogState(() {
+                              if (result.isEmpty) {
+                                customThumbnailUrl = null;
+                              } else {
+                                customThumbnailUrl = result;
+                                customThumbnailFile = null;
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.link, size: 18),
+                        label: const Text('URL', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey[700]!),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 // Lists Section
@@ -481,6 +690,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
                   'notes': notesController.text.trim(),
                   'isFavorite': isFavorite,
                   'listIds': selectedListIds,
+                  'customThumbnailFile': customThumbnailFile,
+                  'customThumbnailUrl': customThumbnailUrl,
                 });
               },
               style: ElevatedButton.styleFrom(
@@ -511,12 +722,45 @@ class _SavedLinksListState extends State<SavedLinksList> {
           return;
         }
 
+        // Handle custom thumbnail
+        String? customThumbnailPath;
         String? thumbnailUrl;
-        if (linkType == LinkType.youtube) {
-          final videoId = LinkParser.extractYouTubeVideoId(newUrl);
-          if (videoId != null) {
-            thumbnailUrl =
-                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+        final customThumbnailFile = result['customThumbnailFile'] as File?;
+        final customThumbnailUrl = result['customThumbnailUrl'] as String?;
+        
+        if (customThumbnailFile != null) {
+          // Delete old thumbnail if exists
+          if (link.customThumbnailPath != null) {
+            await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
+          }
+          // Save new thumbnail
+          customThumbnailPath = await ThumbnailService.saveThumbnail(customThumbnailFile, link.id);
+        } else if (customThumbnailUrl != null && customThumbnailUrl.isNotEmpty) {
+          // Use custom URL
+          thumbnailUrl = customThumbnailUrl;
+          // Delete old local thumbnail if exists
+          if (link.customThumbnailPath != null) {
+            await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
+          }
+        } else {
+          // Generate thumbnail based on link type or fetch metadata
+          final metadata = await LinkParser.fetchMetadataFromUrl(newUrl, linkType);
+          thumbnailUrl = metadata['thumbnailUrl'];
+          if (metadata['description'] != null && result['description']!.isEmpty) {
+            result['description'] = metadata['description'];
+          }
+          
+          // If no metadata thumbnail, try YouTube default
+          if (thumbnailUrl == null && linkType == LinkType.youtube) {
+            final videoId = LinkParser.extractYouTubeVideoId(newUrl);
+            if (videoId != null) {
+              thumbnailUrl = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            }
+          }
+          
+          // Delete old local thumbnail if exists
+          if (link.customThumbnailPath != null) {
+            await ThumbnailService.deleteThumbnail(link.customThumbnailPath);
           }
         }
 
@@ -541,10 +785,11 @@ class _SavedLinksListState extends State<SavedLinksList> {
 
         await StorageService.deleteLink(link.id);
         final updatedLink = SavedLink(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: link.id, // Keep same ID
           url: newUrl,
           title: title,
           thumbnailUrl: thumbnailUrl,
+          customThumbnailPath: customThumbnailPath,
           description: result['description']!.isEmpty
               ? null
               : result['description'],
@@ -597,7 +842,12 @@ class _SavedLinksListState extends State<SavedLinksList> {
   }
 
   String? _getThumbnailUrl(SavedLink link) {
-    // First, try to use saved thumbnail URL
+    // First, try custom thumbnail (local file path takes priority)
+    if (link.customThumbnailPath != null && link.customThumbnailPath!.isNotEmpty) {
+      return link.customThumbnailPath!;
+    }
+    
+    // Then try saved thumbnail URL
     if (link.thumbnailUrl != null && link.thumbnailUrl!.isNotEmpty) {
       return link.thumbnailUrl!;
     }
