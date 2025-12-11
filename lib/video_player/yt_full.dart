@@ -9,12 +9,15 @@ import 'package:video_player/video_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:elysian/video_player/shared_video_widgets.dart';
+import 'package:elysian/utils/kroute.dart';
 
 class YTFull extends StatefulWidget {
   final String? mediaUrl;
   final String? videoId;
   final String? title;
   final String? description;
+  final Duration? initialPosition;
 
   const YTFull({
     super.key,
@@ -22,6 +25,7 @@ class YTFull extends StatefulWidget {
     this.videoId,
     this.title,
     this.description,
+    this.initialPosition,
   });
 
   @override
@@ -75,6 +79,13 @@ class _YTFullState extends State<YTFull> {
   Timer? _adCountdownTimer;
 
   bool _isLocked = false;
+
+  // PiP state
+  bool _isInPiP = false;
+  OverlayEntry? _pipOverlayEntry;
+  Offset _pipPosition = const Offset(20, 100);
+  final GlobalKey _pipKey = GlobalKey();
+  bool _isDisposed = false;
 
   // call this to show one slider and auto‐hide it
   void _showSliderOverlay({required bool isVolume}) {
@@ -146,8 +157,14 @@ class _YTFullState extends State<YTFull> {
           Duration(milliseconds: (totalDuration.inMilliseconds * 0.5).toInt()),
           // Duration(milliseconds: (total_duration.inMilliseconds * 0.8).toInt()),
         ]);
-        _controller.play();
       });
+
+      // Seek to initial position if provided
+      if (widget.initialPosition != null) {
+        _controller.seekTo(widget.initialPosition!);
+      }
+
+      _controller.play();
 
       _controller.addListener(() {
         // trigger ad break
@@ -220,19 +237,306 @@ class _YTFullState extends State<YTFull> {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _sliderHideTimer?.cancel();
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
+    
+    if (!_isInPiP) {
+      _pipOverlayEntry?.remove();
+      _pipOverlayEntry = null;
+      _controller.removeListener(listener);
     _controller.dispose();
+    } else {
+      // In PiP mode, keep the controller alive but remove listener
+      // The overlay will handle cleanup when PiP is exited
+      _controller.removeListener(listener);
+    }
+
     _adController?.dispose();
     super.dispose();
   }
 
-  String _formatTime(Duration position) {
-    final hours = position.inHours.toString().padLeft(2, '0');
-    final minutes = position.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = position.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
+  // Use shared format time function
+  String _formatTime(Duration position) => sharedFormatTime(position);
+
+  // Build video player - YouTube player always uses 16:9 aspect ratio
+  Widget _buildVideoPlayer() {
+    final player = YoutubePlayer(
+                controller: _controller,
+                showVideoProgressIndicator: true,
+                progressIndicatorColor: Colors.amber,
+                progressColors: const ProgressBarColors(
+                  playedColor: Colors.amber,
+                  handleColor: Colors.amberAccent,
+                ),
+                onReady: () {
+                  _controller.addListener(listener);
+                },
+                onEnded: (metaData) {
+                  int currentVideoIndex = _ids.indexOf(
+                    _controller.metadata.videoId,
+                  );
+                  if (currentVideoIndex + 1 < _ids.length) {
+                    currentVideoIndex++;
+                    _controller.load(_ids[currentVideoIndex]);
+                  }
+                },
+    );
+
+    // YouTube player always uses 16:9 aspect ratio
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: player,
+      ),
+    );
+  }
+
+  void _enterPiPMode() {
+    if (_isInPiP || !mounted || _isDisposed) return;
+
+    // Use root navigator to get the overlay - this persists after route pop
+    final navigatorState = Navigator.of(context, rootNavigator: true);
+    final overlay = navigatorState.overlay;
+    if (overlay == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PiP mode not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Reset orientation to portrait before entering PiP
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+
+    // Hide controls and enter PiP
+    setState(() {
+      _isInPiP = true;
+      _showControls = false;
+    });
+
+    // Create overlay entry for PiP - pass controller reference
+    final controllerRef = _controller;
+    _pipOverlayEntry = OverlayEntry(
+      builder: (context) => _buildPiPOverlay(controllerRef),
+    );
+
+    // Insert overlay in root navigator's overlay
+    overlay.insert(_pipOverlayEntry!);
+
+    // Use post-frame callback to ensure overlay is inserted before popping
+    // Add a small delay to ensure overlay is fully rendered
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted && !_isDisposed) {
+        // Navigate back to previous screen
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  void _exitPiPMode() {
+    if (!_isInPiP) return;
+
+    // Remove overlay
+    _pipOverlayEntry?.remove();
+    _pipOverlayEntry = null;
+
+    // Clean up controller if widget was disposed
+    if (_isDisposed) {
+      _controller.removeListener(listener);
+      _controller.dispose();
+    } else if (mounted) {
+      setState(() {
+        _isInPiP = false;
+        _showControls = true;
+      });
+    }
+  }
+
+  Widget _buildPiPOverlay(YoutubePlayerController controller) {
+    // Use Builder to get a valid context from the overlay
+    return Builder(
+      builder: (overlayContext) {
+        // Use StatefulBuilder to manage local state for position
+        return StatefulBuilder(
+          builder: (context, setOverlayState) {
+            return Positioned(
+              left: _pipPosition.dx,
+              top: _pipPosition.dy,
+              child: GestureDetector(
+                key: _pipKey,
+                onPanUpdate: (details) {
+                  setOverlayState(() {
+                    _pipPosition += details.delta;
+                    // Keep within screen bounds
+                    final screenSize = MediaQuery.of(overlayContext).size;
+                    _pipPosition = Offset(
+                      _pipPosition.dx.clamp(0.0, screenSize.width - 200),
+                      _pipPosition.dy.clamp(0.0, screenSize.height - 150),
+                    );
+                  });
+                  _pipOverlayEntry?.markNeedsBuild();
+                },
+                onTap: () {
+                  // Single tap - toggle play/pause instead of exiting
+                  if (controller.value.isPlaying) {
+                    controller.pause();
+                  } else {
+                    controller.play();
+                  }
+                },
+                onLongPress: () {
+                  // Long press to exit PiP
+                  _exitPiPMode();
+                },
+                child: Container(
+                  width: 200,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      children: [
+                        // Video player in PiP
+                        ValueListenableBuilder<YoutubePlayerValue>(
+                          valueListenable: controller,
+                          builder: (context, value, child) {
+                            return AspectRatio(
+                              aspectRatio: 16 / 9,
+                              child: YoutubePlayer(
+                                controller: controller,
+                                showVideoProgressIndicator: false,
+                              ),
+                            );
+                          },
+                        ),
+                        // Control buttons row
+                Positioned(
+                          top: 4,
+                          left: 4,
+                          right: 4,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+                              // Full screen button
+                              GestureDetector(
+                                onTap: () {
+                                  // Store current position before exiting
+                                  final currentPosition = controller.value.position;
+
+                                  // Remove PiP overlay but keep controller alive
+                                  _pipOverlayEntry?.remove();
+                                  _pipOverlayEntry = null;
+
+                                  // Re-open video player in full screen with preserved position
+                                  // Use a small delay to ensure overlay is removed
+                                  Future.delayed(
+                                    const Duration(milliseconds: 100),
+                                    () {
+                                      // Mark PiP as exited after pushing new route
+                                      _isInPiP = false;
+                                      
+                                      navigatorKey.currentState?.push(
+                                        MaterialPageRoute(
+                                          builder: (context) => YTFull(
+                                            videoId: widget.videoId,
+                                            title: widget.title,
+                                            description: widget.description,
+                                            initialPosition: currentPosition,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.fullscreen,
+                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                              // Close button
+                              GestureDetector(
+                onTap: () {
+                                  controller.pause();
+                                  _exitPiPMode();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                    color: Colors.white,
+                                    size: 16,
+                  ),
+                                ),
+                ),
+            ],
+          ),
+              ),
+                        // Play/Pause button overlay
+                        ValueListenableBuilder<YoutubePlayerValue>(
+                          valueListenable: controller,
+                          builder: (context, value, child) {
+                            // Show play button when paused
+                            if (!value.isPlaying) {
+                              return Center(
+                                child: GestureDetector(
+                onTap: () {
+                                    controller.play();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.7),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.play_arrow,
+                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                  ),
+      ),
+    );
+  }
+                            return const SizedBox.shrink();
+                          },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -247,81 +551,117 @@ class _YTFullState extends State<YTFull> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         body: Stack(
-          children: [
+        children: [
             if (_inAdBreak &&
                 _adController != null &&
                 _adController!.value.isInitialized)
               VideoPlayer(_adController!)
             else if (!_inAdBreak)
-              YoutubePlayer(
-                controller: _controller,
-                showVideoProgressIndicator: true,
-
-                progressIndicatorColor: Colors.amber,
-                progressColors: const ProgressBarColors(
-                  playedColor: Colors.amber,
-                  handleColor: Colors.amberAccent,
-                ),
-                onReady: () {
-                  _controller.addListener(listener);
-                },
-
-                onEnded: (metaData) {
-                  int currentVideoIndex = _ids.indexOf(
-                    _controller.metadata.videoId,
-                  );
-                  if (currentVideoIndex + 1 < _ids.length) {
-                    currentVideoIndex++;
-                    _controller.load(_ids[currentVideoIndex]);
-                  }
-                },
-              )
+              _buildVideoPlayer()
             else
               const Center(child: CircularProgressIndicator()),
 
             // Black overlay
             if (_showControls)
-              Positioned.fill(
-                child: Container(color: const Color.fromARGB(87, 0, 0, 0)),
-              ),
+              const Positioned.fill(child: SharedControlsOverlay()),
             if (_inAdBreak)
-              Positioned(
-                bottom: 20,
-                right: 20,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  color: Colors.black54,
-                  child: Text(
-                    'Ad ends in $_adSecondsRemaining s',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                ),
-              ),
+              SharedAdCountdownOverlay(secondsRemaining: _adSecondsRemaining),
 
             if (!_inAdBreak) ...[
-              GestureDetectorOverlay(),
-              if (_showBrightnessSlider || _showControls && !_isLocked)
+              SharedGestureDetectorOverlay(
+                onTap: () {
+                  setState(() {
+                    _showControls = !_showControls;
+                  });
+                },
+                onDoubleTap: (isRight) {
+                  if (isRight) {
+                    _controller.seekTo(
+                      _controller.value.position + const Duration(seconds: 10),
+                    );
+                  } else {
+                    _controller.seekTo(
+                      _controller.value.position - const Duration(seconds: 10),
+                    );
+                  }
+                },
+                onVerticalDrag: (isRight, delta) {
+                  if (isRight) {
+                    // Volume
+                    _volume = (_volume + delta).clamp(0.0, 1.0);
+                    FlutterVolumeController.updateShowSystemUI(false);
+                    FlutterVolumeController.setVolume(_volume);
+                    _showSliderOverlay(isVolume: true);
+                  } else {
+                    // Brightness
+                    _brightness = (_brightness + delta).clamp(0.0, 1.0);
+                    ScreenBrightness.instance.setApplicationScreenBrightness(
+                      _brightness,
+                    );
+                    _showSliderOverlay(isVolume: false);
+                  }
+                },
+              ),
+              if (_showBrightnessSlider || (_showControls && !_isLocked))
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Padding(
                     padding: const EdgeInsets.only(left: 16),
-                    child: _buildBrightnessOverlay(),
+                    child: SharedBrightnessOverlay(brightness: _brightness),
                   ),
                 ),
-              if (_showVolumeSlider || _showControls && !_isLocked)
+              if (_showVolumeSlider || (_showControls && !_isLocked))
                 Align(
                   alignment: Alignment.centerRight,
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16),
-                    child: _buildVolumeOverlay(),
+                    child: SharedVolumeOverlay(volume: _volume),
                   ),
                 ),
-              _appBar(context),
-              if (_showControls && !_isLocked) const PlayPauseControlBar(),
+              SharedVideoAppBar(
+                title: _controller.metadata.title.isNotEmpty
+                    ? _controller.metadata.title
+                    : widget.title ?? 'Video',
+                showControls: _showControls,
+                isLocked: _isLocked,
+                onLockToggle: () {
+                  setState(() {
+                    _isLocked = !_isLocked;
+                  });
+                },
+              ),
+              if (_showControls && !_isLocked)
+                ValueListenableBuilder<YoutubePlayerValue>(
+                  valueListenable: _controller,
+                  builder: (context, value, child) {
+                    return SharedPlayPauseControlBar(
+                      isPlaying: value.isPlaying,
+                      onPlayPause: () {
+                        if (value.isPlaying) {
+                          _controller.pause();
+                        } else {
+                          _controller.play();
+                        }
+                      },
+                      onSkipBackward: () {
+                        _controller.seekTo(
+                          _controller.value.position -
+                              const Duration(seconds: 10),
+                        );
+                      },
+                      onSkipForward: () {
+                        _controller.seekTo(
+                          _controller.value.position +
+                              const Duration(seconds: 10),
+                        );
+                      },
+                    );
+                  },
+                ),
               if (_showControls && !_isLocked)
                 Positioned(
                   bottom: 0,
-                  child: ControlBar(formatTime: _formatTime),
+                  child: ControlBar(formatTime: sharedFormatTime),
                 ),
               if (_showControls && _showEpisodeList && !_isLocked)
                 const Positioned(
@@ -334,128 +674,6 @@ class _YTFullState extends State<YTFull> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _appBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              if (_showControls && !_isLocked)
-                IconButton(
-                  onPressed: () {
-                    SystemChrome.setPreferredOrientations([
-                      DeviceOrientation.portraitUp,
-                    ]);
-                    SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
-                    Navigator.pop(context);
-                  },
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                ),
-              if (_showControls && !_isLocked)
-                Text(
-                  (_controller.metadata.title.isNotEmpty
-                      ? _controller.metadata.title
-                      : widget.title ?? 'Shared Video'),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-            ],
-          ),
-          if (_showControls)
-            Container(
-              margin: _isLocked
-                  ? const EdgeInsets.only(right: 30, top: 10)
-                  : EdgeInsets.only(right: 10),
-              child: InkWell(
-                onTap: () {
-                  setState(() {
-                    _isLocked = !_isLocked;
-                  });
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Icon(
-                      _isLocked
-                          ? Icons.lock_outline_rounded
-                          : Icons.lock_open_rounded,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      _isLocked ? 'Unlock' : 'Lock',
-                      style: TextStyle(color: Colors.white, fontSize: 15),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVolumeOverlay() {
-    return Container(
-      width: 60,
-      height: 700,
-      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.volume_up_outlined, color: Colors.white),
-          const SizedBox(height: 8),
-          Expanded(
-            child: RotatedBox(
-              quarterTurns: 3,
-              child: LinearProgressIndicator(
-                value: _volume,
-                backgroundColor: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-                minHeight: 10,
-                valueColor: const AlwaysStoppedAnimation(Colors.greenAccent),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBrightnessOverlay() {
-    return Container(
-      width: 60,
-      height: 700,
-      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.wb_sunny_outlined, color: Colors.white),
-          const SizedBox(height: 8),
-          Expanded(
-            child: RotatedBox(
-              quarterTurns: 3,
-              child: LinearProgressIndicator(
-                value: _brightness,
-                backgroundColor: Colors.white24,
-                borderRadius: BorderRadius.circular(10),
-                minHeight: 10,
-                valueColor: const AlwaysStoppedAnimation(Colors.white),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -478,8 +696,18 @@ class ControlBarState extends State<ControlBar> {
   Widget build(BuildContext context) {
     final state = context.findAncestorStateOfType<_YTFullState>()!;
     final controller = state._controller;
-    final position = controller.value.position;
-    final duration = controller.value.metaData.duration;
+
+    // Use ValueListenableBuilder to update when controller value changes
+    return ValueListenableBuilder<YoutubePlayerValue>(
+      valueListenable: controller,
+      builder: (context, value, child) {
+        final isReady = value.isReady;
+        final position = value.position;
+        final duration = value.metaData.duration;
+
+        // Check if video is initialized and has valid duration
+        final bool isInitialized =
+            isReady && duration.inMilliseconds > 0;
 
     // compute slider values
     final maxMillis = duration.inMilliseconds.toDouble();
@@ -498,7 +726,7 @@ class ControlBarState extends State<ControlBar> {
               children: [
                 // current time
                 Text(
-                  widget.formatTime(position),
+                  isInitialized ? widget.formatTime(position) : '00:00:00',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -551,7 +779,7 @@ class ControlBarState extends State<ControlBar> {
                 const SizedBox(width: 5),
                 // total time
                 Text(
-                  widget.formatTime(duration),
+                  isInitialized ? widget.formatTime(duration) : '00:00:00',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -639,15 +867,20 @@ class ControlBarState extends State<ControlBar> {
                           state.setState(() => state._showEpisodeList = true),
                     ),
                     IconButton(
-                      onPressed: () {},
-                      icon: Icon(Icons.settings, color: Colors.white),
-                    ),
-                    IconButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        if (state._isInPiP) {
+                          state._exitPiPMode();
+                        } else {
+                          state._enterPiPMode();
+                        }
+                      },
                       icon: Icon(
-                        Icons.picture_in_picture_alt_rounded,
+                        state._isInPiP
+                            ? Icons.picture_in_picture_outlined
+                            : Icons.picture_in_picture_alt_rounded,
                         color: Colors.white,
                       ),
+                      tooltip: state._isInPiP ? 'Exit PiP' : 'Enter PiP',
                     ),
                     IconButton(
                       icon: const Icon(
@@ -671,6 +904,8 @@ class ControlBarState extends State<ControlBar> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }
