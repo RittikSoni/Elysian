@@ -2,7 +2,6 @@
 
 import 'dart:async';
 
-import 'package:elysian/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -11,6 +10,11 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:elysian/video_player/shared_video_widgets.dart';
 import 'package:elysian/utils/kroute.dart';
+import 'package:elysian/models/models.dart';
+import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/screens/video_detail_screen.dart';
 
 class YTFull extends StatefulWidget {
   final String? mediaUrl;
@@ -18,6 +22,9 @@ class YTFull extends StatefulWidget {
   final String? title;
   final String? description;
   final Duration? initialPosition;
+  final String? url; // Full URL to find the link in storage
+  final List<String>? listIds; // List IDs this video belongs to
+  final bool autoEnterPiP; // Auto-enter PiP mode after initialization
 
   const YTFull({
     super.key,
@@ -26,6 +33,9 @@ class YTFull extends StatefulWidget {
     this.title,
     this.description,
     this.initialPosition,
+    this.url,
+    this.listIds,
+    this.autoEnterPiP = false,
   });
 
   @override
@@ -164,7 +174,16 @@ class _YTFullState extends State<YTFull> {
         _controller.seekTo(widget.initialPosition!);
       }
 
-      _controller.play();
+        _controller.play();
+
+      // Auto-enter PiP if requested
+      if (widget.autoEnterPiP && mounted && !_isDisposed) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && !_isDisposed && _controller.value.isReady) {
+            _enterPiPMode();
+          }
+        });
+      }
 
       _controller.addListener(() {
         // trigger ad break
@@ -457,6 +476,8 @@ class _YTFullState extends State<YTFull> {
                                             title: widget.title,
                                             description: widget.description,
                                             initialPosition: currentPosition,
+                                            url: widget.url,
+                                            listIds: widget.listIds,
                                           ),
                                         ),
                                       );
@@ -664,12 +685,15 @@ class _YTFullState extends State<YTFull> {
                   child: ControlBar(formatTime: sharedFormatTime),
                 ),
               if (_showControls && _showEpisodeList && !_isLocked)
-                const Positioned(
+                Positioned(
                   top: 0,
                   right: 0,
                   bottom: 0,
-                  // alignment: Alignment.centerRight,
-                  child: EpisodeListOverlay(),
+                  child: ListContentOverlay(
+                    url: widget.url,
+                    listIds: widget.listIds,
+                    currentVideoId: _controller.metadata.videoId,
+                  ),
                 ),
             ],
           ],
@@ -850,13 +874,13 @@ class ControlBarState extends State<ControlBar> {
                   children: [
                     TextButton.icon(
                       icon: Icon(
-                        Icons.list,
+                        Icons.playlist_play,
                         color: state._showEpisodeList
                             ? Colors.amber
                             : Colors.white,
                       ),
                       label: Text(
-                        "Episode",
+                        "List Content",
                         style: TextStyle(
                           color: state._showEpisodeList
                               ? Colors.amber
@@ -1070,27 +1094,333 @@ class PlayPauseControlBar extends StatelessWidget {
   }
 }
 
-class EpisodeListOverlay extends StatefulWidget {
-  const EpisodeListOverlay({super.key});
+class ListContentOverlay extends StatefulWidget {
+  final String? url;
+  final List<String>? listIds;
+  final String? currentVideoId;
+
+  const ListContentOverlay({
+    super.key,
+    this.url,
+    this.listIds,
+    this.currentVideoId,
+  });
 
   @override
-  State<EpisodeListOverlay> createState() => _EpisodeListOverlayState();
+  State<ListContentOverlay> createState() => _ListContentOverlayState();
 }
 
-class _EpisodeListOverlayState extends State<EpisodeListOverlay>
+class _ListContentOverlayState extends State<ListContentOverlay>
     with SingleTickerProviderStateMixin {
+  List<UserList> _lists = [];
+  List<List<SavedLink>> _listVideos = [];
+  int _selectedTabIndex = 0;
+  bool _isLoading = true;
+  TabController? _tabController;
+
   @override
-  Widget build(BuildContext ctx) {
-    return Positioned(
-      right: 0,
-      top: 0,
-      child: Container(
-        width: MediaQuery.of(ctx).size.width / 2,
-        margin: EdgeInsets.only(
-          bottom: Responsive.isMobile(context) ? 120 : 80,
+  void initState() {
+    super.initState();
+    _loadListsAndVideos();
+  }
+
+  Future<void> _loadListsAndVideos() async {
+    setState(() => _isLoading = true);
+    try {
+      // Get all lists
+      final allLists = await StorageService.getUserLists();
+      
+      // Get list IDs for current video
+      List<String> targetListIds = widget.listIds ?? [];
+      if (targetListIds.isEmpty && widget.url != null) {
+        // Try to find the link by URL
+        final allLinks = await StorageService.getSavedLinks();
+        try {
+          final currentLink = allLinks.firstWhere((l) => l.url == widget.url);
+          targetListIds = currentLink.listIds;
+        } catch (e) {
+          // Link not found, use default list
+          targetListIds = [StorageService.defaultListId];
+        }
+      }
+      
+      if (targetListIds.isEmpty) {
+        targetListIds = [StorageService.defaultListId];
+      }
+
+      // Show ALL lists, not just those containing this video
+      _lists = allLists;
+      
+      // Find the index of the first list that contains this video (for default selection)
+      // Prioritize the primary list (first in targetListIds)
+      int defaultTabIndex = 0;
+      if (targetListIds.isNotEmpty) {
+        final primaryListId = targetListIds.first;
+        // First try to find the primary list
+        for (int i = 0; i < _lists.length; i++) {
+          if (_lists[i].id == primaryListId) {
+            defaultTabIndex = i;
+            break;
+          }
+        }
+        // If primary list not found, find any list containing the video
+        if (defaultTabIndex == 0 && !targetListIds.contains(_lists[0].id)) {
+          for (int i = 0; i < _lists.length; i++) {
+            if (targetListIds.contains(_lists[i].id)) {
+              defaultTabIndex = i;
+              break;
+            }
+          }
+        }
+      }
+
+      // Load videos for each list
+      final allLinks = await StorageService.getSavedLinks();
+      _listVideos = _lists.map((list) {
+        final videos = allLinks
+            .where((link) => link.listIds.contains(list.id))
+            .toList();
+        // Sort by date (latest first)
+        videos.sort((a, b) => b.savedAt.compareTo(a.savedAt));
+        return videos;
+      }).toList();
+
+      // Initialize tab controller
+      if (_lists.isNotEmpty) {
+        _tabController = TabController(
+          length: _lists.length,
+          initialIndex: defaultTabIndex,
+          vsync: this,
+        );
+        _selectedTabIndex = defaultTabIndex;
+        _tabController!.addListener(() {
+          if (_tabController!.indexIsChanging) {
+            setState(() => _selectedTabIndex = _tabController!.index);
+          }
+        });
+      }
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
+
+  void _playVideo(SavedLink link) {
+    final state = context.findAncestorStateOfType<_YTFullState>()!;
+    
+    if (link.type == LinkType.youtube) {
+      final videoId = LinkParser.extractYouTubeVideoId(link.url);
+      if (videoId != null) {
+        state._controller.load(videoId);
+        setState(() => state._showEpisodeList = false);
+      }
+    } else {
+      // For non-YouTube videos, navigate to detail page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VideoDetailScreen(link: link),
         ),
-        decoration: BoxDecoration(color: const Color.fromARGB(223, 0, 0, 0)),
-        child: Column(children: [Expanded(child: EpisodeViewMovieScreen())]),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        width: MediaQuery.of(context).size.width / 2,
+        decoration: const BoxDecoration(color: Color.fromARGB(223, 0, 0, 0)),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_lists.isEmpty) {
+      return Container(
+        width: MediaQuery.of(context).size.width / 2,
+        decoration: const BoxDecoration(color: Color.fromARGB(223, 0, 0, 0)),
+        child: const Center(
+          child: Text(
+            'No lists available',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: MediaQuery.of(context).size.width / 2,
+      decoration: const BoxDecoration(color: Color.fromARGB(223, 0, 0, 0)),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.only(left: 12.0, top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Lists',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () {
+                    final state = context.findAncestorStateOfType<_YTFullState>()!;
+                    state.setState(() => state._showEpisodeList = false);
+                  },
+                ),
+              ],
+            ),
+          ),
+          
+          // Tab Bar
+          if (_tabController != null)
+            TabBar(
+              controller: _tabController,
+              padding: EdgeInsets.zero,
+              labelPadding: const EdgeInsets.only(left: 10.0),
+              isScrollable: true,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white,
+              tabs: _lists.asMap().entries.map((entry) {
+                final index = entry.key;
+                final list = entry.value;
+                final isSelected = _selectedTabIndex == index;
+                return Tab(
+      child: Container(
+                    height: 40.0,
+                    decoration: !isSelected
+                        ? BoxDecoration(
+                            color: const Color(0xff2C2C2C),
+                            borderRadius: BorderRadius.circular(100.0),
+                          )
+                        : BoxDecoration(
+                            color: const Color(0xff16A34A),
+                            borderRadius: BorderRadius.circular(100.0),
+                          ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Center(
+                      child: Text(
+                        list.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+              indicator: const BoxDecoration(),
+            ),
+          
+          const SizedBox(height: 5),
+          
+          // Videos List
+          Expanded(
+            child: _listVideos.isEmpty || _selectedTabIndex >= _listVideos.length
+                ? const Center(
+                    child: Text(
+                      'No videos in this list',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _listVideos[_selectedTabIndex].length,
+                    itemBuilder: (context, index) {
+                      final video = _listVideos[_selectedTabIndex][index];
+                      final isCurrentVideo = widget.currentVideoId != null &&
+                          video.type == LinkType.youtube &&
+                          LinkParser.extractYouTubeVideoId(video.url) == widget.currentVideoId;
+                      
+                      return GestureDetector(
+                        onTap: () => _playVideo(video),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
+                          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
+                          color: isCurrentVideo ? Colors.amber.withOpacity(0.2) : Colors.transparent,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    ThumbnailImage(
+                                      link: video,
+                                      width: 50,
+                                      height: 35,
+                                    ),
+                                    Container(
+                                      width: 50,
+                                      height: 35,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        video.title,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: isCurrentVideo
+                                              ? Colors.amber
+                                              : Theme.of(context).primaryColor,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (video.description != null && video.description!.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          video.description!,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 10,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

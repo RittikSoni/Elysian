@@ -3,11 +3,12 @@ import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/video_player/yt_full.dart';
 import 'package:elysian/video_player/video_player_full.dart';
+import 'package:elysian/screens/video_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LinkHandler {
-  /// Handles opening a link based on user's player preference
+  /// Handles opening a link - always goes through detail page first
   static Future<void> openLink(
     BuildContext context,
     String url, {
@@ -15,6 +16,7 @@ class LinkHandler {
     String? title,
     String? description,
     String? linkId, // Optional link ID to track views
+    SavedLink? savedLink, // Optional SavedLink object
   }) async {
     // Determine link type if not provided
     final type = linkType ?? LinkParser.parseLinkType(url);
@@ -25,37 +27,42 @@ class LinkHandler {
       return;
     }
 
-    // Track view if linkId is provided or find by URL
-    if (linkId != null) {
-      await StorageService.recordLinkView(linkId);
-    } else {
-      // Try to find link by URL to track view
+    // Try to get SavedLink if not provided
+    SavedLink? link = savedLink;
+    if (link == null) {
       try {
         final allLinks = await StorageService.getSavedLinks();
-        final matchingLink = allLinks.firstWhere((link) => link.url == url);
-        await StorageService.recordLinkView(matchingLink.id);
+        link = allLinks.firstWhere((l) => l.url == url);
       } catch (e) {
-        // Link not found in saved links, skip tracking
+        // Link not found in saved links, create a temporary one
+        link = SavedLink(
+          id: linkId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          url: url,
+          title: title ?? 'Video',
+          description: description,
+          type: type,
+          listIds: [StorageService.defaultListId],
+          savedAt: DateTime.now(),
+        );
       }
     }
 
-    // Check user preference
-    final useInbuilt = await StorageService.isInbuiltPlayer();
-
-    if (useInbuilt) {
-      await _openInbuilt(
-        context,
-        url,
-        type,
-        title: title,
-        description: description,
-      );
-    } else {
-      await _openExternally(url);
+    // Track view
+    if (link.id.isNotEmpty) {
+      await StorageService.recordLinkView(link.id);
     }
+
+    // Always navigate to detail page first
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoDetailScreen(link: link!),
+      ),
+    );
   }
 
-  /// Opens link in inbuilt player with fallback to external
+  /// Opens link in inbuilt player with fallback to external (kept for backward compatibility)
+  @Deprecated('Use openLink which navigates to detail page')
   static Future<void> _openInbuilt(
     BuildContext context,
     String url,

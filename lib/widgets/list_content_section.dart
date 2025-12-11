@@ -107,6 +107,7 @@ class ListContentSection extends StatelessWidget {
           title: link.title,
           description: link.description,
           linkId: link.id, // Pass linkId to track views
+          savedLink: link, // Pass the full SavedLink object to preserve listIds
         );
       },
       child: Container(

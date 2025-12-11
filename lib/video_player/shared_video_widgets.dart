@@ -172,36 +172,38 @@ class SharedVideoAppBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              if (showControls && !isLocked)
-                IconButton(
-                  onPressed: onBackPressed ??
-                      () {
-                        SystemChrome.setPreferredOrientations([
-                          DeviceOrientation.portraitUp,
-                        ]);
-                        SystemChrome.setEnabledSystemUIMode(
-                          SystemUiMode.leanBack,
-                        );
-                        Navigator.pop(context);
-                      },
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                ),
-              if (showControls && !isLocked && title != null)
-                Expanded(
-                  child: Text(
-                    title!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          Expanded(
+            child: Row(
+              children: [
+                if (showControls && !isLocked)
+                  IconButton(
+                    onPressed: onBackPressed ??
+                        () {
+                          SystemChrome.setPreferredOrientations([
+                            DeviceOrientation.portraitUp,
+                          ]);
+                          SystemChrome.setEnabledSystemUIMode(
+                            SystemUiMode.leanBack,
+                          );
+                          Navigator.pop(context);
+                        },
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
-                ),
-            ],
+                if (showControls && !isLocked && title != null)
+                  Expanded(
+                    child: Text(
+                      title!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (showControls)
             Container(
@@ -212,6 +214,7 @@ class SharedVideoAppBar extends StatelessWidget {
                 onTap: onLockToggle,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       isLocked
