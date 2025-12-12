@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/services/watch_party_global_manager.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +26,8 @@ class _ElysianState extends State<Elysian> {
     super.initState();
     _handleInitialSharedIntent();
     _handleIncomingSharedIntents();
+    // Initialize global watch party manager
+    WatchPartyGlobalManager().initialize();
   }
 
   void _handleInitialSharedIntent() async {
@@ -139,6 +142,7 @@ class _ElysianState extends State<Elysian> {
         ChangeNotifierProvider(create: (_) => LinksProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ListsProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => AppStateProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => WatchPartyProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

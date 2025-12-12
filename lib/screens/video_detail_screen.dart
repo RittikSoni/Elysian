@@ -1,10 +1,12 @@
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/watch_party_service.dart';
 import 'package:elysian/video_player/yt_full.dart';
 import 'package:elysian/video_player/video_player_full.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
+import 'package:elysian/widgets/watch_party_room_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/providers/providers.dart';
@@ -28,6 +30,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   List<SavedLink> _relatedVideos = [];
   bool _isFavorite = false;
   List<String> _currentListIds = [];
+  final _watchPartyService = WatchPartyService();
 
   @override
   void initState() {
@@ -35,6 +38,91 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     _isFavorite = widget.link.isFavorite;
     _currentListIds = List.from(widget.link.listIds);
     _loadLinkDetails();
+    _initWatchParty();
+  }
+  
+  void _initWatchParty() {
+    // Handle video changes when joining a room
+    _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
+      if (mounted) {
+        // Navigate to the video that host is watching
+        _navigateToVideo(videoUrl);
+      }
+    };
+    
+    // Handle room updates (when joining)
+    _watchPartyService.onRoomUpdate = (room) {
+      if (mounted && !_watchPartyService.isHost) {
+        // Guest joined - navigate to the video
+        _navigateToVideo(room.videoUrl);
+      }
+    };
+  }
+  
+  Future<void> _navigateToVideo(String videoUrl) async {
+    try {
+      final allLinks = await StorageService.getSavedLinks();
+      final link = allLinks.firstWhere(
+        (l) => l.url == videoUrl,
+        orElse: () => SavedLink(
+          id: '',
+          url: videoUrl,
+          title: 'Video',
+          type: LinkType.unknown,
+          listIds: [],
+          savedAt: DateTime.now(),
+        ),
+      );
+      
+      // Navigate to full screen player
+      if (link.type == LinkType.youtube) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => YTFull(
+              url: link.url,
+              title: link.title,
+              listIds: link.listIds,
+            ),
+          ),
+        );
+      } else if (link.type.canPlayInbuilt) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RSNewVideoPlayerScreen(
+              url: link.url,
+              title: link.title,
+              listIds: link.listIds,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error navigating to video: $e');
+    }
+  }
+  
+  Future<void> _showWatchPartyDialog() async {
+    final room = await showDialog<WatchPartyRoom>(
+      context: context,
+      builder: (context) => WatchPartyRoomDialog(
+        videoUrl: widget.link.url,
+        videoTitle: widget.link.title.isNotEmpty ? widget.link.title : 'Video',
+        currentPosition: Duration.zero,
+        isPlaying: false,
+      ),
+    );
+
+    if (room != null && mounted) {
+      // If guest joined, navigate to video player
+      if (!_watchPartyService.isHost) {
+        _navigateToVideo(room.videoUrl);
+      } else {
+        // Host - open full screen player
+        _openFullScreen(null);
+      }
+    }
   }
 
   Future<void> _loadLinkDetails() async {
@@ -495,6 +583,23 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[900],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey[700]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: IconButton(
+                                  onPressed: _showWatchPartyDialog,
+                                  icon: const Icon(Icons.people, color: Colors.amber),
+                                  tooltip: 'Watch Party',
+                                  iconSize: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Container(
                                 decoration: BoxDecoration(
                                   color: Colors.grey[900],

@@ -12,8 +12,15 @@ import 'package:elysian/video_player/shared_video_widgets.dart';
 import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/watch_party_service.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/providers/providers.dart';
+import 'package:provider/provider.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/widgets/watch_party_room_dialog.dart';
+import 'package:elysian/widgets/watch_party_participants_overlay.dart';
+import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
+import 'package:elysian/widgets/watch_party_chat_notification.dart';
 import 'package:elysian/screens/video_detail_screen.dart';
 
 class YTFull extends StatefulWidget {
@@ -46,6 +53,7 @@ class _YTFullState extends State<YTFull> {
   late YoutubePlayerController _controller;
 
   final bool _isPlayerReady = false;
+  bool _wasPlayerReady = false; // Track if player was ready before
 
   final List<String> _ids = [
     'QdBZY2fkU-0',
@@ -67,11 +75,23 @@ class _YTFullState extends State<YTFull> {
   // UI state
   bool _showControls = true;
   bool _showEpisodeList = false;
+  bool _showWatchParty = false;
   double _brightness = 0.5, _volume = 0.5;
   bool _showVolumeSlider = false;
   bool _showBrightnessSlider = false;
   Timer? _sliderHideTimer;
   Timer? _hideTimer;
+
+  // WatchParty state
+  final _watchPartyService = WatchPartyService();
+  WatchPartyRoom? _watchPartyRoom;
+  Timer? _watchPartySyncTimer;
+  final List<Reaction> _activeReactions = [];
+  ChatMessage? _latestChatMessage;
+  bool _isVideoInitializing = false; // Track if video is being loaded/initialized
+  DateTime? _lastSeekTime; // Track last seek to prevent rapid seeks
+  bool _isSyncing = false; // Flag to prevent concurrent sync operations
+  Duration? _lastSyncedPosition; // Track last synced position to avoid unnecessary seeks
 
   // Ad state
   final List<Duration> _adPositions = [];
@@ -138,9 +158,417 @@ class _YTFullState extends State<YTFull> {
       ),
     )..addListener(listener);
     initializeVid();
+    _initWatchParty();
+  }
+
+  void _initWatchParty() {
+    _watchPartyService.onSyncMessage = (message) {
+      if (!_isDisposed && mounted && !_watchPartyService.isHost) {
+        _handleSyncMessage(message);
+      }
+    };
+    
+    // Handle sync from room updates (polling) - for guests
+    _watchPartyService.onRoomUpdate = (room) {
+      if (!_isDisposed && mounted) {
+        if (!_watchPartyService.isHost && _controller.value.isReady) {
+          // Don't sync if video is still initializing or already syncing
+          if (_isVideoInitializing || _isSyncing) return;
+          
+          // Ensure video has valid duration before syncing
+          final duration = _controller.value.metaData.duration;
+          if (duration.inMilliseconds <= 0) return;
+          
+          // Check if current video URL matches room video URL
+          // If not, trigger video change to load correct video
+          final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
+          if (room.videoUrl.isNotEmpty && currentVideoUrl != room.videoUrl) {
+            // Video mismatch - load the correct video
+            _loadVideoFromUrl(room.videoUrl, room.videoTitle);
+            return;
+          }
+          
+          // Sync play/pause state (only if state actually changed)
+          final currentIsPlaying = _controller.value.isPlaying;
+          if (room.isPlaying != currentIsPlaying) {
+            if (room.isPlaying) {
+              _controller.play();
+            } else {
+              _controller.pause();
+            }
+          }
+          
+          // Sync position - only if there's a significant difference and enough time has passed
+          final now = DateTime.now();
+          final currentPosition = _controller.value.position;
+          
+          // Only sync if:
+          // 1. Enough time has passed since last seek (3 seconds debounce)
+          // 2. Position difference is significant (3+ seconds)
+          // 3. Video is playing (don't sync during pauses)
+          // 4. Position actually changed from last sync
+          if ((_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 3000) &&
+              room.isPlaying) {
+            final positionDiff = (room.currentPosition.inMilliseconds - 
+                currentPosition.inMilliseconds).abs();
+            
+            // Check if position changed significantly from last synced position
+            final lastSyncedDiff = _lastSyncedPosition != null
+                ? (room.currentPosition.inMilliseconds -
+                        _lastSyncedPosition!.inMilliseconds)
+                    .abs()
+                : 999999;
+            
+            // Only seek if:
+            // - Difference is more than 3 seconds (larger threshold)
+            // - Host position actually changed (not just polling noise)
+            // - Video is playing
+            if (positionDiff > 3000 && lastSyncedDiff > 500) {
+              _isSyncing = true;
+              // Ensure seek position is within valid range
+              final seekPosition = room.currentPosition.inMilliseconds.clamp(
+                0, 
+                duration.inMilliseconds
+              );
+              _controller.seekTo(Duration(milliseconds: seekPosition));
+              _lastSeekTime = now;
+              _lastSyncedPosition = room.currentPosition;
+              
+              // Reset sync flag after a short delay
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (!_isDisposed && mounted) {
+                  _isSyncing = false;
+                }
+              });
+            } else {
+              // Update last synced position even if we don't seek
+              _lastSyncedPosition = room.currentPosition;
+            }
+          } else if (!room.isPlaying) {
+            // When paused, just update last synced position
+            _lastSyncedPosition = room.currentPosition;
+          }
+        }
+        // Room is managed by provider
+      }
+    };
+    
+    // Chain chat callback to ensure global manager also receives it
+    final existingChatCallback = _watchPartyService.onChatMessage;
+    _watchPartyService.onChatMessage = (message) {
+      // Call existing callback first (from global manager)
+      existingChatCallback?.call(message);
+      // Then show chat notification overlay in video player
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _latestChatMessage = message;
+        });
+        // Auto-hide after animation completes
+        Future.delayed(const Duration(milliseconds: 3300), () {
+          if (!_isDisposed && mounted && _latestChatMessage?.id == message.id) {
+            setState(() {
+              _latestChatMessage = null;
+            });
+          }
+        });
+      }
+    };
+    
+    _watchPartyService.onReaction = (reaction) {
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _activeReactions.add(reaction);
+        });
+        // Remove reaction after animation
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!_isDisposed && mounted) {
+            setState(() {
+              _activeReactions.remove(reaction);
+            });
+          }
+        });
+      }
+    };
+    
+    // Handle video changes from host
+    _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
+      if (!_isDisposed && mounted && !_watchPartyService.isHost) {
+        // Guest should switch to the new video
+        _loadVideoFromUrl(videoUrl, videoTitle);
+      }
+    };
+  }
+  
+  Future<void> _loadVideoFromUrl(String videoUrl, String videoTitle) async {
+    try {
+      // Mark video as initializing
+      _isVideoInitializing = true;
+      _lastSeekTime = null;
+      _lastSyncedPosition = null;
+      _isSyncing = false;
+      
+      // Extract YouTube video ID
+      final videoId = LinkParser.extractYouTubeVideoId(videoUrl);
+      if (videoId != null) {
+        // Load the new video
+        _controller.load(videoId);
+        if (mounted) {
+          setState(() {
+            // Video will be ready when listener fires
+          });
+        }
+        
+        // Wait for video to be ready, then allow sync
+        // Use a delay to ensure video is fully loaded
+        Future.delayed(const Duration(milliseconds: 2000), () {
+          if (!_isDisposed && mounted && _controller.value.isReady) {
+            _isVideoInitializing = false;
+            // Now sync to host's position if available
+            final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+            final room = provider.currentRoom;
+            if (room != null && room.videoUrl == videoUrl) {
+              final duration = _controller.value.metaData.duration;
+              if (duration.inMilliseconds > 0) {
+                final seekPosition = room.currentPosition.inMilliseconds.clamp(
+                  0,
+                  duration.inMilliseconds
+                );
+                _controller.seekTo(Duration(milliseconds: seekPosition));
+                if (room.isPlaying) {
+                  _controller.play();
+                } else {
+                  _controller.pause();
+                }
+                _lastSeekTime = DateTime.now();
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading video from watch party: $e');
+      _isVideoInitializing = false;
+    }
+  }
+
+  void _handleSyncMessage(SyncMessage message) {
+    if (!_controller.value.isReady) return;
+    
+    // Don't handle sync messages if video is still initializing or already syncing
+    if (_isVideoInitializing || _isSyncing) return;
+    
+    // Ensure video has valid duration
+    final duration = _controller.value.metaData.duration;
+    if (duration.inMilliseconds <= 0) return;
+    
+    // Check if message has room info and verify video URL matches
+    if (message.room != null && message.room!.videoUrl.isNotEmpty) {
+      final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
+      if (currentVideoUrl != message.room!.videoUrl) {
+        // Video mismatch - load the correct video
+        _loadVideoFromUrl(message.room!.videoUrl, message.room!.videoTitle);
+        return;
+      }
+    }
+    
+    switch (message.type) {
+      case SyncMessageType.play:
+        _isSyncing = true;
+        if (message.position != null) {
+          // Ensure position is within valid range
+          final seekPosition = message.position!.inMilliseconds.clamp(
+            0, 
+            duration.inMilliseconds
+          );
+          // Add debounce to prevent rapid seeks
+          final now = DateTime.now();
+          if (_lastSeekTime == null || now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+            _controller.seekTo(Duration(milliseconds: seekPosition));
+            _lastSeekTime = now;
+            _lastSyncedPosition = message.position;
+          }
+        }
+        _controller.play();
+        // Reset sync flag after delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!_isDisposed && mounted) {
+            _isSyncing = false;
+          }
+        });
+        break;
+      case SyncMessageType.pause:
+        _controller.pause();
+        break;
+      case SyncMessageType.seek:
+        if (message.position != null) {
+          _isSyncing = true;
+          // Ensure position is within valid range
+          final seekPosition = message.position!.inMilliseconds.clamp(
+            0, 
+            duration.inMilliseconds
+          );
+          // Add debounce to prevent rapid seeks
+          final now = DateTime.now();
+          if (_lastSeekTime == null || now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+            _controller.seekTo(Duration(milliseconds: seekPosition));
+            _lastSeekTime = now;
+            _lastSyncedPosition = message.position;
+          }
+          // Reset sync flag after delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!_isDisposed && mounted) {
+              _isSyncing = false;
+            }
+          });
+        }
+        break;
+      case SyncMessageType.roomUpdate:
+        // Room updates are handled by provider
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> _showWatchPartyDialog() async {
+    final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+    final videoTitle = widget.title ?? 'YouTube Video';
+    
+    final room = await showDialog<WatchPartyRoom>(
+      context: context,
+      builder: (context) => WatchPartyRoomDialog(
+        videoUrl: videoUrl,
+        videoTitle: videoTitle,
+        currentPosition: _controller.value.position,
+        isPlaying: _controller.value.isPlaying,
+      ),
+    );
+
+    if (room != null && mounted) {
+      setState(() {
+        _watchPartyRoom = room;
+        _showWatchParty = true;
+      });
+      
+      // Start syncing if host
+      if (_watchPartyService.isHost) {
+        _startHostSync();
+      }
+    }
+  }
+
+  void _startHostSync() {
+    _watchPartySyncTimer?.cancel();
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    
+    // First update with video URL and title when sync starts
+    if (provider.isHost && provider.isInRoom) {
+      final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+      final videoTitle = widget.title ?? 'YouTube Video';
+      provider.updateRoomState(
+        videoUrl: videoUrl,
+        videoTitle: videoTitle,
+        position: _controller.value.isReady ? _controller.value.position : Duration.zero,
+        isPlaying: _controller.value.isReady ? _controller.value.isPlaying : false,
+      );
+    }
+    
+    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (!_isDisposed && _controller.value.isReady) {
+        final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+        final videoTitle = widget.title ?? 'YouTube Video';
+        provider.updateRoomState(
+          position: _controller.value.position,
+          isPlaying: _controller.value.isPlaying,
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+        );
+      }
+    });
+  }
+
+  void _syncPlayPause(bool isPlaying) {
+    if (!_watchPartyService.isInRoom) return;
+    
+    if (_watchPartyService.isHost) {
+      _watchPartyService.updateRoomState(isPlaying: isPlaying);
+    } else {
+      // Guest sends command to host
+      _watchPartyService.sendSyncCommand(
+        type: isPlaying ? SyncMessageType.play : SyncMessageType.pause,
+        position: _controller.value.position,
+        isPlaying: isPlaying,
+      );
+    }
+  }
+
+  void _syncSeek(Duration position) {
+    if (!_watchPartyService.isInRoom) return;
+    
+    if (_watchPartyService.isHost) {
+      _watchPartyService.updateRoomState(position: position);
+    } else {
+      // Guest sends command to host
+      _watchPartyService.sendSyncCommand(
+        type: SyncMessageType.seek,
+        position: position,
+      );
+    }
   }
 
   void listener() {
+    // Update watch party room state if host (when video becomes ready)
+    if (_controller.value.isReady && !_wasPlayerReady) {
+      _wasPlayerReady = true;
+      final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+      if (provider.isHost && provider.isInRoom) {
+        final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+        final videoTitle = widget.title ?? 'YouTube Video';
+        provider.updateRoomState(
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+          position: _controller.value.position,
+          isPlaying: _controller.value.isPlaying,
+        );
+        // Host: mark as initialized immediately
+        _isVideoInitializing = false;
+      } else if (!provider.isHost && provider.isInRoom) {
+        // Guest: wait a bit before allowing sync to prevent rapid seeks during initialization
+        Future.delayed(const Duration(milliseconds: 2000), () {
+          if (!_isDisposed && mounted && _controller.value.isReady) {
+            _isVideoInitializing = false;
+            // Now sync to host's position if available
+            final room = provider.currentRoom;
+            if (room != null) {
+              final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+              if (room.videoUrl == videoUrl) {
+                final duration = _controller.value.metaData.duration;
+                if (duration.inMilliseconds > 0) {
+                  final seekPosition = room.currentPosition.inMilliseconds.clamp(
+                    0,
+                    duration.inMilliseconds
+                  );
+                  _controller.seekTo(Duration(milliseconds: seekPosition));
+                  if (room.isPlaying) {
+                    _controller.play();
+                  } else {
+                    _controller.pause();
+                  }
+                  _lastSeekTime = DateTime.now();
+                  _lastSyncedPosition = room.currentPosition;
+                  _isSyncing = false;
+                }
+              } else if (room.videoUrl.isNotEmpty && room.videoUrl != videoUrl) {
+                // Video URL mismatch - load the correct video
+                _loadVideoFromUrl(room.videoUrl, room.videoTitle);
+              }
+            }
+          }
+        });
+      }
+    }
+    
     if (_isPlayerReady && mounted && !_controller.value.isFullScreen) {
       setState(() {});
     }
@@ -260,6 +688,26 @@ class _YTFullState extends State<YTFull> {
     _sliderHideTimer?.cancel();
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
+    _watchPartySyncTimer?.cancel();
+    
+    // Update watch party room state if host (set video URL to empty when closing)
+    try {
+      final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+      if (provider.isHost && provider.isInRoom) {
+        provider.updateRoomState(
+          videoUrl: '',
+          videoTitle: '',
+          position: Duration.zero,
+          isPlaying: false,
+        );
+      }
+    } catch (e) {
+      // Context might not be available, ignore
+    }
+    
+    _watchPartyService.onRoomUpdate = null;
+    _watchPartyService.onSyncMessage = null;
+    _watchPartyService.onReaction = null;
     
     if (!_isInPiP) {
       _pipOverlayEntry?.remove();
@@ -444,7 +892,7 @@ class _YTFullState extends State<YTFull> {
                           },
                         ),
                         // Control buttons row
-                Positioned(
+              Positioned(
                           top: 4,
                           left: 4,
                           right: 4,
@@ -484,7 +932,7 @@ class _YTFullState extends State<YTFull> {
                                     },
                                   );
                                 },
-                                child: Container(
+                child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withValues(alpha: 0.7),
@@ -597,13 +1045,13 @@ class _YTFullState extends State<YTFull> {
                 },
                 onDoubleTap: (isRight) {
                   if (isRight) {
-                    _controller.seekTo(
-                      _controller.value.position + const Duration(seconds: 10),
-                    );
+                    final newPosition = _controller.value.position + const Duration(seconds: 10);
+                    _controller.seekTo(newPosition);
+                    _syncSeek(newPosition);
                   } else {
-                    _controller.seekTo(
-                      _controller.value.position - const Duration(seconds: 10),
-                    );
+                    final newPosition = _controller.value.position - const Duration(seconds: 10);
+                    _controller.seekTo(newPosition);
+                    _syncSeek(newPosition);
                   }
                 },
                 onVerticalDrag: (isRight, delta) {
@@ -660,21 +1108,23 @@ class _YTFullState extends State<YTFull> {
                       onPlayPause: () {
                         if (value.isPlaying) {
                           _controller.pause();
+                          _syncPlayPause(false);
                         } else {
                           _controller.play();
+                          _syncPlayPause(true);
                         }
                       },
                       onSkipBackward: () {
-                        _controller.seekTo(
-                          _controller.value.position -
-                              const Duration(seconds: 10),
-                        );
+                        final newPosition = _controller.value.position -
+                            const Duration(seconds: 10);
+                        _controller.seekTo(newPosition);
+                        _syncSeek(newPosition);
                       },
                       onSkipForward: () {
-                        _controller.seekTo(
-                          _controller.value.position +
-                              const Duration(seconds: 10),
-                        );
+                        final newPosition = _controller.value.position +
+                            const Duration(seconds: 10);
+                        _controller.seekTo(newPosition);
+                        _syncSeek(newPosition);
                       },
                     );
                   },
@@ -693,6 +1143,57 @@ class _YTFullState extends State<YTFull> {
                     url: widget.url,
                     listIds: widget.listIds,
                     currentVideoId: _controller.metadata.videoId,
+                  ),
+                ),
+              if (_showControls && _showWatchParty && _watchPartyRoom != null && !_isLocked)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0,
+                  child: WatchPartyParticipantsOverlay(
+                    room: _watchPartyRoom!,
+                    isHost: _watchPartyService.isHost,
+                    onClose: () {
+                      if (mounted) {
+                        setState(() {
+                          _showWatchParty = false;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              // Show active reactions on video
+              ..._activeReactions.map((reaction) => WatchPartyReactionOverlay(
+                    reaction: reaction,
+                    onComplete: () {
+                      if (mounted) {
+                        setState(() {
+                          _activeReactions.remove(reaction);
+                        });
+                      }
+                    },
+                  )),
+              // Show chat notification overlay
+              if (_latestChatMessage != null)
+                Positioned(
+                  top: 60,
+                  left: 0,
+                  right: 0,
+                  child: WatchPartyChatNotification(
+                    message: _latestChatMessage!,
+                onTap: () {
+                  setState(() {
+                        _showWatchParty = true;
+                  });
+                },
+                    onComplete: () {
+                      if (mounted) {
+                        setState(() {
+                          _latestChatMessage = null;
+                        });
+                      }
+                    },
                   ),
                 ),
             ],
@@ -791,7 +1292,9 @@ class ControlBarState extends State<ControlBar> {
                         });
                       },
                       onChangeEnd: (v) {
-                        controller.seekTo(Duration(milliseconds: v.toInt()));
+                        final seekPosition = Duration(milliseconds: v.toInt());
+                        controller.seekTo(seekPosition);
+                        state._syncSeek(seekPosition);
                         setState(() {
                           _isDragging = false;
                         });
@@ -889,6 +1392,31 @@ class ControlBarState extends State<ControlBar> {
                       ),
                       onPressed: () =>
                           state.setState(() => state._showEpisodeList = true),
+                    ),
+                    TextButton.icon(
+                      icon: Icon(
+                        Icons.people,
+                        color: state._watchPartyRoom != null
+                            ? Colors.amber
+                            : Colors.white,
+                      ),
+                      label: Text(
+                        "Watch Party",
+                        style: TextStyle(
+                          color: state._watchPartyRoom != null
+                              ? Colors.amber
+                              : Colors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        if (state.mounted) {
+                          if (state._watchPartyRoom != null) {
+                            state.setState(() => state._showWatchParty = true);
+                          } else {
+                            state._showWatchPartyDialog();
+                          }
+                        }
+                      },
                     ),
                     IconButton(
                       onPressed: () {
@@ -1219,7 +1747,19 @@ class _ListContentOverlayState extends State<ListContentOverlay>
       final videoId = LinkParser.extractYouTubeVideoId(link.url);
       if (videoId != null) {
         state._controller.load(videoId);
-        setState(() => state._showEpisodeList = false);
+        if (mounted) {
+          setState(() => state._showEpisodeList = false);
+        }
+        
+        // Update watch party room state if host
+        if (state._watchPartyService.isHost && state._watchPartyRoom != null) {
+          state._watchPartyService.updateRoomState(
+            videoUrl: link.url,
+            videoTitle: link.title.isNotEmpty ? link.title : 'YouTube Video',
+            position: Duration.zero,
+            isPlaying: false,
+          );
+        }
       }
     } else {
       // For non-YouTube videos, navigate to detail page
