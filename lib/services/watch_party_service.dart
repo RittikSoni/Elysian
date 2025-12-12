@@ -356,7 +356,8 @@ class WatchPartyService {
   /// Start polling for room updates (guest)
   void _startPolling(String hostIp, int hostPort) {
     _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(milliseconds: 500), (
+    // Increased polling frequency for more responsive sync (250ms instead of 500ms)
+    _syncTimer = Timer.periodic(const Duration(milliseconds: 250), (
       timer,
     ) async {
       if (!_isHost && _currentRoom != null) {
@@ -647,11 +648,16 @@ class WatchPartyService {
         (videoUrl != null && videoUrl != _currentRoom!.videoUrl) ||
         (videoTitle != null && videoTitle != _currentRoom!.videoTitle);
 
+    // Update position timestamp when position changes
+    final positionChanged = position != null && 
+        position != _currentRoom!.currentPosition;
+
     _currentRoom = _currentRoom!.copyWith(
       currentPosition: position ?? _currentRoom!.currentPosition,
       isPlaying: isPlaying ?? _currentRoom!.isPlaying,
       videoUrl: videoUrl ?? _currentRoom!.videoUrl,
       videoTitle: videoTitle ?? _currentRoom!.videoTitle,
+      positionUpdatedAt: positionChanged ? DateTime.now() : _currentRoom!.positionUpdatedAt,
     );
 
     // Broadcast update

@@ -198,52 +198,67 @@ class _YTFullState extends State<YTFull> {
             }
           }
           
-          // Sync position - only if there's a significant difference and enough time has passed
+          // Sync position with position prediction for better accuracy
           final now = DateTime.now();
           final currentPosition = _controller.value.position;
-          
+
+          // Calculate predicted host position based on elapsed time since last update
+          Duration predictedHostPosition = room.currentPosition;
+          if (room.isPlaying && room.positionUpdatedAt != null) {
+            final elapsedMs = now.difference(room.positionUpdatedAt!).inMilliseconds;
+            predictedHostPosition = Duration(
+              milliseconds: room.currentPosition.inMilliseconds + elapsedMs,
+            );
+            // Clamp to video duration
+            if (predictedHostPosition.inMilliseconds > duration.inMilliseconds) {
+              predictedHostPosition = duration;
+            }
+          }
+
           // Only sync if:
-          // 1. Enough time has passed since last seek (3 seconds debounce)
-          // 2. Position difference is significant (3+ seconds)
-          // 3. Video is playing (don't sync during pauses)
+          // 1. Enough time has passed since last seek (1 second debounce - reduced for better sync)
+          // 2. Position difference is significant (1+ seconds - reduced threshold)
+          // 3. Video is playing OR paused (sync during pauses too for accuracy)
           // 4. Position actually changed from last sync
-          if ((_lastSeekTime == null ||
-              now.difference(_lastSeekTime!).inMilliseconds > 3000) &&
-              room.isPlaying) {
-            final positionDiff = (room.currentPosition.inMilliseconds - 
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 1000) {
+            // Use predicted position if video is playing, otherwise use actual position
+            final targetPosition = room.isPlaying ? predictedHostPosition : room.currentPosition;
+            
+            final positionDiff = (targetPosition.inMilliseconds - 
                 currentPosition.inMilliseconds).abs();
             
             // Check if position changed significantly from last synced position
             final lastSyncedDiff = _lastSyncedPosition != null
-                ? (room.currentPosition.inMilliseconds -
+                ? (targetPosition.inMilliseconds -
                         _lastSyncedPosition!.inMilliseconds)
                     .abs()
                 : 999999;
             
             // Only seek if:
-            // - Difference is more than 3 seconds (larger threshold)
+            // - Difference is more than 1 second (reduced threshold for better sync)
             // - Host position actually changed (not just polling noise)
-            // - Video is playing
-            if (positionDiff > 3000 && lastSyncedDiff > 500) {
+            // - Or if this is initial sync (lastSyncedPosition is null)
+            if ((positionDiff > 1000 && lastSyncedDiff > 200) || _lastSyncedPosition == null) {
               _isSyncing = true;
               // Ensure seek position is within valid range
-              final seekPosition = room.currentPosition.inMilliseconds.clamp(
+              final seekPosition = targetPosition.inMilliseconds.clamp(
                 0, 
                 duration.inMilliseconds
               );
               _controller.seekTo(Duration(milliseconds: seekPosition));
               _lastSeekTime = now;
-              _lastSyncedPosition = room.currentPosition;
+              _lastSyncedPosition = targetPosition;
               
               // Reset sync flag after a short delay
-              Future.delayed(const Duration(milliseconds: 500), () {
+              Future.delayed(const Duration(milliseconds: 300), () {
                 if (!_isDisposed && mounted) {
                   _isSyncing = false;
                 }
               });
             } else {
               // Update last synced position even if we don't seek
-              _lastSyncedPosition = room.currentPosition;
+              _lastSyncedPosition = targetPosition;
             }
           } else if (!room.isPlaying) {
             // When paused, just update last synced position
@@ -474,7 +489,8 @@ class _YTFullState extends State<YTFull> {
       );
     }
     
-    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+    // Increased sync frequency for more responsive updates (250ms instead of 500ms)
+    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (!_isDisposed && _controller.value.isReady) {
         final videoUrl = widget.url ?? widget.mediaUrl ?? '';
         final videoTitle = widget.title ?? 'YouTube Video';
@@ -534,18 +550,29 @@ class _YTFullState extends State<YTFull> {
         // Host: mark as initialized immediately
         _isVideoInitializing = false;
       } else if (!provider.isHost && provider.isInRoom) {
-        // Guest: wait a bit before allowing sync to prevent rapid seeks during initialization
-        Future.delayed(const Duration(milliseconds: 2000), () {
+        // Guest: immediately sync to host's position for late joiners
+        Future.delayed(const Duration(milliseconds: 800), () {
           if (!_isDisposed && mounted && _controller.value.isReady) {
             _isVideoInitializing = false;
-            // Now sync to host's position if available
+            // Now sync to host's position with position prediction for late joiners
             final room = provider.currentRoom;
             if (room != null) {
               final videoUrl = widget.url ?? widget.mediaUrl ?? '';
               if (room.videoUrl == videoUrl) {
                 final duration = _controller.value.metaData.duration;
                 if (duration.inMilliseconds > 0) {
-                  final seekPosition = room.currentPosition.inMilliseconds.clamp(
+                  // Calculate predicted position for late joiners
+                  Duration targetPosition = room.currentPosition;
+                  if (room.isPlaying && room.positionUpdatedAt != null) {
+                    final now = DateTime.now();
+                    final elapsedMs = now.difference(room.positionUpdatedAt!).inMilliseconds;
+                    targetPosition = Duration(
+                      milliseconds: (room.currentPosition.inMilliseconds + elapsedMs)
+                          .clamp(0, duration.inMilliseconds),
+                    );
+                  }
+                  
+                  final seekPosition = targetPosition.inMilliseconds.clamp(
                     0,
                     duration.inMilliseconds
                   );
@@ -556,7 +583,7 @@ class _YTFullState extends State<YTFull> {
                     _controller.pause();
                   }
                   _lastSeekTime = DateTime.now();
-                  _lastSyncedPosition = room.currentPosition;
+                  _lastSyncedPosition = targetPosition;
                   _isSyncing = false;
                 }
               } else if (room.videoUrl.isNotEmpty && room.videoUrl != videoUrl) {

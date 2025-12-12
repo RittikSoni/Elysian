@@ -12,6 +12,7 @@ class WatchPartyRoom {
   final DateTime createdAt;
   final List<WatchPartyParticipant> participants;
   final String? roomCode; // 6-digit code for easy joining
+  final DateTime? positionUpdatedAt; // Timestamp when position was last updated (for sync prediction)
 
   WatchPartyRoom({
     required this.roomId,
@@ -24,6 +25,7 @@ class WatchPartyRoom {
     required this.createdAt,
     required this.participants,
     this.roomCode,
+    this.positionUpdatedAt,
   });
 
   WatchPartyRoom copyWith({
@@ -37,6 +39,7 @@ class WatchPartyRoom {
     DateTime? createdAt,
     List<WatchPartyParticipant>? participants,
     String? roomCode,
+    DateTime? positionUpdatedAt,
   }) {
     return WatchPartyRoom(
       roomId: roomId ?? this.roomId,
@@ -49,6 +52,7 @@ class WatchPartyRoom {
       createdAt: createdAt ?? this.createdAt,
       participants: participants ?? this.participants,
       roomCode: roomCode ?? this.roomCode,
+      positionUpdatedAt: positionUpdatedAt ?? this.positionUpdatedAt,
     );
   }
 
@@ -64,6 +68,7 @@ class WatchPartyRoom {
       'createdAt': createdAt.toIso8601String(),
       'participants': participants.map((p) => p.toJson()).toList(),
       'roomCode': roomCode,
+      'positionUpdatedAt': positionUpdatedAt?.toIso8601String(),
     };
   }
 
@@ -81,6 +86,9 @@ class WatchPartyRoom {
           .map((p) => WatchPartyParticipant.fromJson(p as Map<String, dynamic>))
           .toList(),
       roomCode: json['roomCode'] as String?,
+      positionUpdatedAt: json['positionUpdatedAt'] != null
+          ? DateTime.parse(json['positionUpdatedAt'] as String)
+          : null,
     );
   }
 }
