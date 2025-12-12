@@ -34,6 +34,10 @@ class WatchPartyService {
   // Message persistence for session (last 100 messages)
   static const int _maxSessionMessages = 100;
   final List<ChatMessage> _sessionMessages = [];
+  
+  // Recent reactions (last 50, transient)
+  static const int _maxRecentReactions = 50;
+  final List<Reaction> _recentReactions = [];
 
   List<ChatMessage> get sessionMessages => List.unmodifiable(_sessionMessages);
 
@@ -160,12 +164,17 @@ class WatchPartyService {
           await request.response.close();
         }
       } else if (request.method == 'GET') {
-        // Return current room state
+        // Return current room state along with recent messages and reactions
         if (_currentRoom != null) {
+          final responseData = {
+            'room': _currentRoom!.toJson(),
+            'recentMessages': _sessionMessages.map((m) => m.toJson()).toList(),
+            'recentReactions': _recentReactions.map((r) => r.toJson()).toList(),
+          };
           request.response
             ..statusCode = 200
             ..headers.contentType = ContentType.json
-            ..write(jsonEncode(_currentRoom!.toJson()));
+            ..write(jsonEncode(responseData));
         } else {
           request.response.statusCode = 404;
         }
@@ -279,8 +288,17 @@ class WatchPartyService {
 
       if (response.statusCode == 200) {
         final body = await response.transform(utf8.decoder).join();
-        final roomData = jsonDecode(body) as Map<String, dynamic>;
-        final room = WatchPartyRoom.fromJson(roomData);
+        final responseData = jsonDecode(body) as Map<String, dynamic>;
+        
+        // Handle both old format (just room) and new format (room + messages + reactions)
+        WatchPartyRoom room;
+        if (responseData.containsKey('room')) {
+          // New format with messages and reactions
+          room = WatchPartyRoom.fromJson(responseData['room'] as Map<String, dynamic>);
+        } else {
+          // Old format (backward compatibility)
+          room = WatchPartyRoom.fromJson(responseData);
+        }
 
         // Check room code if provided
         if (roomCode != null && room.roomCode != roomCode) {
@@ -351,8 +369,26 @@ class WatchPartyService {
 
           if (response.statusCode == 200) {
             final body = await response.transform(utf8.decoder).join();
-            final roomData = jsonDecode(body) as Map<String, dynamic>;
-            final updatedRoom = WatchPartyRoom.fromJson(roomData);
+            final responseData = jsonDecode(body) as Map<String, dynamic>;
+            
+            // Handle both old format (just room) and new format (room + messages + reactions)
+            WatchPartyRoom updatedRoom;
+            List<ChatMessage> recentMessages = [];
+            List<Reaction> recentReactions = [];
+            
+            if (responseData.containsKey('room')) {
+              // New format with messages and reactions
+              updatedRoom = WatchPartyRoom.fromJson(responseData['room'] as Map<String, dynamic>);
+              recentMessages = (responseData['recentMessages'] as List<dynamic>?)
+                  ?.map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
+                  .toList() ?? [];
+              recentReactions = (responseData['recentReactions'] as List<dynamic>?)
+                  ?.map((r) => Reaction.fromJson(r as Map<String, dynamic>))
+                  .toList() ?? [];
+            } else {
+              // Old format (backward compatibility)
+              updatedRoom = WatchPartyRoom.fromJson(responseData);
+            }
 
             _isConnected = true;
             _connectionError = null;
@@ -361,6 +397,40 @@ class WatchPartyService {
             _currentRoom = updatedRoom;
             _isConnected = true;
             _connectionError = null;
+            
+            // Process new messages (check against session messages to avoid duplicates)
+            for (final message in recentMessages) {
+              // Check if we've already seen this message
+              if (!_sessionMessages.any((m) => m.id == message.id)) {
+                _sessionMessages.add(message);
+                if (_sessionMessages.length > _maxSessionMessages) {
+                  _sessionMessages.removeAt(0);
+                }
+                // Trigger callback for new message
+                onChatMessage?.call(message);
+              }
+            }
+            
+            // Process new reactions (check against recent reactions to avoid duplicates)
+            // Reactions are transient, so we check by timestamp and participant
+            for (final reaction in recentReactions) {
+              // Check if we've already seen this reaction (same ID or very recent from same participant)
+              final isNew = !_recentReactions.any((r) => 
+                r.id == reaction.id || 
+                (r.participantId == reaction.participantId && 
+                 r.type == reaction.type &&
+                 (reaction.timestamp.difference(r.timestamp).inSeconds < 2))
+              );
+              
+              if (isNew) {
+                _recentReactions.add(reaction);
+                if (_recentReactions.length > _maxRecentReactions) {
+                  _recentReactions.removeAt(0);
+                }
+                // Trigger callback for new reaction
+                onReaction?.call(reaction);
+              }
+            }
             
             // Always notify room update (provider will handle deduplication)
             onRoomUpdate?.call(updatedRoom);
@@ -549,6 +619,11 @@ class WatchPartyService {
     );
 
     if (_isHost) {
+      // Store reaction for session
+      _recentReactions.add(reaction);
+      if (_recentReactions.length > _maxRecentReactions) {
+        _recentReactions.removeAt(0);
+      }
       // Host broadcasts directly (will trigger onReaction via _broadcastSync)
       _broadcastSync(
         SyncMessage(type: SyncMessageType.reaction, reaction: reaction),
@@ -614,8 +689,9 @@ class WatchPartyService {
     _hostPort = null;
     _isConnected = false;
     _connectionError = null;
-    // Clear session messages when leaving room
+    // Clear session messages and reactions when leaving room
     _sessionMessages.clear();
+    _recentReactions.clear();
   }
 
   /// Get server port (for sharing with guests)
