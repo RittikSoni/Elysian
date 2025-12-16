@@ -203,7 +203,10 @@ void _showWatchPartyDialog(BuildContext context) async {
                 WatchPartyParticipantsOverlay(
                   room: room,
                   isHost: watchPartyProvider.isHost,
-                  onClose: () => Navigator.pop(context),
+                  onClose: () {
+                    // Close dialog
+                    Navigator.of(context).pop();
+                  },
                 ),
                 // Close button
                 Positioned(

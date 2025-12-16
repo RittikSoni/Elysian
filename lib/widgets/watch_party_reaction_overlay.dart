@@ -104,25 +104,28 @@ class ReactionPicker extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey[700]!),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: ReactionType.values.map((type) {
-          return GestureDetector(
-            onTap: () => onReactionSelected(type),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: ReactionType.values.map((type) {
+            return GestureDetector(
+              onTap: () => onReactionSelected(type),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  type.emoji,
+                  style: const TextStyle(fontSize: 24),
+                ),
               ),
-              child: Text(
-                type.emoji,
-                style: const TextStyle(fontSize: 24),
-              ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

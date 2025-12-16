@@ -103,6 +103,7 @@ class _WatchPartyParticipantsOverlayState
       color: Colors.black.withOpacity(0.9),
       child: SafeArea(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Header
             Padding(
@@ -291,7 +292,7 @@ class _WatchPartyParticipantsOverlayState
                       );
 
                       if (shouldExit == true) {
-                        // Close this dialog first
+                        // Close confirmation dialog first
                         if (context.mounted) {
                           Navigator.of(context).pop();
                         }
@@ -299,18 +300,28 @@ class _WatchPartyParticipantsOverlayState
                         // Leave the room (this will clean up state)
                         await provider.leaveRoom();
                         
-                        // Call onClose callback if provided
-                        if (widget.onClose != null) {
+                        // Small delay to ensure state is cleaned up
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        
+                        // Call onClose callback if provided (this closes the watch party dialog)
+                        if (widget.onClose != null && context.mounted) {
                           widget.onClose!();
                         }
                         
-                        // If we're in a video player, navigate back to home
+                        // Additional delay to ensure dialogs are closed
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        
+                        // Ensure we're back to home screen - but only if still mounted
                         if (context.mounted) {
                           final navigator = Navigator.of(context);
-                          // Check if we can pop (we're in a pushed route like video player)
+                          // Check if we can still pop
                           if (navigator.canPop()) {
-                            // Pop back to home/main screen
-                            navigator.popUntil((route) => route.isFirst);
+                            // Pop until we're back to the first route (home screen)
+                            // But don't pop if we're already at the first route
+                            final currentRoute = ModalRoute.of(context);
+                            if (currentRoute != null && !currentRoute.isFirst) {
+                              navigator.popUntil((route) => route.isFirst);
+                            }
                           }
                         }
                       }
@@ -333,7 +344,7 @@ class _WatchPartyParticipantsOverlayState
             // Participants List
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 itemCount: widget.room.participants.length,
                 itemBuilder: (context, index) {
                   final participant = widget.room.participants[index];
@@ -420,6 +431,8 @@ class _WatchPartyParticipantsOverlayState
                 },
               ),
             ),
+            // Small padding to prevent 1px overflow
+            const SizedBox(height: 1),
           ],
         ),
       ),
@@ -427,8 +440,10 @@ class _WatchPartyParticipantsOverlayState
   }
 
   Widget _buildConnectionStatus() {
-    final isConnected = _watchPartyService.isConnected;
-    final error = _watchPartyService.connectionError;
+    // Use provider to get connection status (works for both Firebase and local)
+    final watchPartyProvider = Provider.of<WatchPartyProvider>(context, listen: true);
+    final isConnected = watchPartyProvider.isConnected;
+    final error = watchPartyProvider.connectionError;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

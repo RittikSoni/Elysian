@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:elysian/services/watch_party_service.dart';
+import 'package:elysian/services/watch_party_firebase_service.dart';
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -16,6 +17,11 @@ import 'dart:async';
 /// Watch Party Provider - Manages watch party state globally
 class WatchPartyProvider with ChangeNotifier {
   final WatchPartyService _watchPartyService = WatchPartyService();
+  final WatchPartyFirebaseService _firebaseService = WatchPartyFirebaseService();
+  
+  // Use Firebase if available, otherwise fall back to local
+  bool _useFirebase = false;
+  bool get useFirebase => _useFirebase;
   
   // Expose service for widgets that need direct access
   WatchPartyService get watchPartyService => _watchPartyService;
@@ -36,7 +42,9 @@ class WatchPartyProvider with ChangeNotifier {
   // Getters
   WatchPartyRoom? get currentRoom => _currentRoom;
   bool get isInRoom => _currentRoom != null;
-  bool get isHost => _watchPartyService.isHost;
+  bool get isHost => _useFirebase 
+      ? _firebaseService.isHost 
+      : _watchPartyService.isHost;
   bool get isConnected => _isConnected;
   String? get connectionError => _connectionError;
   List<ChatMessage> get recentMessages => List.unmodifiable(_recentMessages);
@@ -49,34 +57,81 @@ class WatchPartyProvider with ChangeNotifier {
   
   WatchPartyProvider() {
     _initializeCallbacks();
+    _checkFirebaseAvailability();
+  }
+  
+  /// Check if Firebase is available and prefer it over local
+  Future<void> _checkFirebaseAvailability() async {
+    try {
+      final isAvailable = await WatchPartyFirebaseService.isAvailable();
+      _useFirebase = isAvailable;
+      if (_useFirebase) {
+        debugPrint('WatchParty: Using Firebase for online sync');
+      } else {
+        debugPrint('WatchParty: Firebase not available, using local network');
+      }
+    } catch (e) {
+      _useFirebase = false;
+      debugPrint('WatchParty: Firebase check failed, using local network: $e');
+    }
   }
   
   /// Initialize all callbacks
   void _initializeCallbacks() {
-    // Room updates
+    // Local service callbacks
     _watchPartyService.onRoomUpdate = (room) {
-      _handleRoomUpdate(room);
+      if (!_useFirebase) {
+        _handleRoomUpdate(room);
+      }
     };
     
-    // Video changes
     _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
-      _handleVideoChange(videoUrl, videoTitle);
+      if (!_useFirebase) {
+        _handleVideoChange(videoUrl, videoTitle);
+      }
     };
     
-    // Chat messages
     _watchPartyService.onChatMessage = (message) {
-      _handleChatMessage(message);
+      if (!_useFirebase) {
+        _handleChatMessage(message);
+      }
     };
     
-    // Reactions
     _watchPartyService.onReaction = (reaction) {
-      _handleReaction(reaction);
+      if (!_useFirebase) {
+        _handleReaction(reaction);
+      }
     };
     
-    // Sync messages
     _watchPartyService.onSyncMessage = (message) {
-      // Sync messages are handled by video players
-      notifyListeners();
+      if (!_useFirebase) {
+        notifyListeners();
+      }
+    };
+    
+    // Firebase service callbacks
+    _firebaseService.onRoomUpdate = (room) {
+      if (_useFirebase) {
+        _handleRoomUpdate(room);
+      }
+    };
+    
+    _firebaseService.onVideoChange = (videoUrl, videoTitle) {
+      if (_useFirebase) {
+        _handleVideoChange(videoUrl, videoTitle);
+      }
+    };
+    
+    _firebaseService.onChatMessage = (message) {
+      if (_useFirebase) {
+        _handleChatMessage(message);
+      }
+    };
+    
+    _firebaseService.onReaction = (reaction) {
+      if (_useFirebase) {
+        _handleReaction(reaction);
+      }
     };
   }
   
@@ -86,8 +141,21 @@ class WatchPartyProvider with ChangeNotifier {
                         _currentRoom?.videoTitle != room.videoTitle;
     
     _currentRoom = room;
-    _isConnected = _watchPartyService.isConnected;
-    _connectionError = _watchPartyService.connectionError;
+    
+    // Update connection state based on current mode
+    if (_useFirebase) {
+      _isConnected = _firebaseService.isConnected;
+      _connectionError = _firebaseService.connectionError;
+    } else {
+      _isConnected = _watchPartyService.isConnected;
+      _connectionError = _watchPartyService.connectionError;
+    }
+    
+    // IMPORTANT: Forward Firebase updates to local service callback
+    // This ensures video players receive updates (they listen to local service)
+    if (_useFirebase && _watchPartyService.onRoomUpdate != null) {
+      _watchPartyService.onRoomUpdate!(room);
+    }
     
     // Update indicator overlay
     _updateIndicatorOverlay();
@@ -95,10 +163,19 @@ class WatchPartyProvider with ChangeNotifier {
     notifyListeners();
     
     // If video changed and we're not in a video player, navigate
+    // IMPORTANT: Only guests should navigate - hosts are already in the video player
     // Use a delay to ensure context is available and avoid race conditions
-    if (videoChanged && room.videoUrl.isNotEmpty) {
+    if (videoChanged && room.videoUrl.isNotEmpty && !isHost) {
       Future.delayed(const Duration(milliseconds: 200), () {
+        // Check if we're already viewing this video - prevent infinite loop
+        if (_isInVideoPlayer() && _currentRoom?.videoUrl == room.videoUrl) {
+          debugPrint('WatchPartyProvider: Already in video player for ${room.videoUrl}, skipping navigation');
+          return;
+        }
+        
+        // Only navigate if we're not already in a video player
         if (!_isInVideoPlayer() && _currentRoom?.videoUrl == room.videoUrl) {
+          debugPrint('WatchPartyProvider: Navigating guest to video ${room.videoUrl}');
           _navigateToVideo(room.videoUrl, room.videoTitle);
         }
       });
@@ -109,11 +186,14 @@ class WatchPartyProvider with ChangeNotifier {
   void _handleVideoChange(String videoUrl, String videoTitle) {
     // Update room if we have one
     if (_currentRoom != null) {
-      _currentRoom = _currentRoom!.copyWith(
-        videoUrl: videoUrl,
-        videoTitle: videoTitle,
-      );
-      notifyListeners();
+      // Only update if video actually changed
+      if (_currentRoom!.videoUrl != videoUrl) {
+        _currentRoom = _currentRoom!.copyWith(
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+        );
+        notifyListeners();
+      }
     }
     
     // If video URL is empty, host closed the video - guests should also close
@@ -130,10 +210,26 @@ class WatchPartyProvider with ChangeNotifier {
       return;
     }
     
-    // Navigate if not already in video player
+    // IMPORTANT: Prevent infinite navigation loop
+    // Hosts should never navigate - they're already in the video player
+    if (isHost) {
+      debugPrint('WatchPartyProvider: Host updating video, skipping navigation');
+      return;
+    }
+    
+    // If we're already in a video player, don't navigate again
+    // The video player itself will handle video changes via onVideoChange callback
+    if (_isInVideoPlayer()) {
+      debugPrint('WatchPartyProvider: Already in video player, skipping navigation. Video player will handle change.');
+      return;
+    }
+    
+    // Navigate if not already in video player (guests only)
     // Use a delay to ensure context is available and avoid race conditions
     Future.delayed(const Duration(milliseconds: 200), () {
+      // Double-check we're not already in the video player
       if (!_isInVideoPlayer() && _currentRoom?.videoUrl == videoUrl) {
+        debugPrint('WatchPartyProvider: Navigating guest to video $videoUrl');
         _navigateToVideo(videoUrl, videoTitle);
       }
     });
@@ -232,10 +328,22 @@ class WatchPartyProvider with ChangeNotifier {
     final context = navigatorKey.currentContext;
     if (context == null) return;
     
+    // Hosts should never navigate - they're already in the video player
+    if (isHost) {
+      debugPrint('WatchPartyProvider: Host attempted navigation, skipping');
+      return;
+    }
+    
     // Double-check that the video URL matches the current room's video URL
     // This prevents navigation with stale/wrong video URLs
     if (_currentRoom != null && _currentRoom!.videoUrl != videoUrl) {
       debugPrint('WatchPartyProvider: Video URL mismatch, skipping navigation. Room: ${_currentRoom!.videoUrl}, Requested: $videoUrl');
+      return;
+    }
+    
+    // Final check: if we're already in a video player, don't navigate
+    if (_isInVideoPlayer()) {
+      debugPrint('WatchPartyProvider: Already in video player, skipping navigation to $videoUrl');
       return;
     }
     
@@ -492,47 +600,134 @@ class WatchPartyProvider with ChangeNotifier {
   }
   
   /// Create room
-  Future<WatchPartyRoom?> createRoom(String participantName) async {
-    final room = await _watchPartyService.createRoom(
-      hostName: participantName,
-      videoUrl: '',
-      videoTitle: 'Watch Party',
-      initialPosition: Duration.zero,
-      initialPlaying: false,
-    );
-    _currentRoom = room;
-    _isConnected = _watchPartyService.isConnected;
-    _updateIndicatorOverlay();
-    notifyListeners();
-    return room;
+  Future<WatchPartyRoom?> createRoom(
+    String participantName, {
+    bool useOnline = false,
+  }) async {
+    // Use Firebase if explicitly requested or if auto-detected
+    final shouldUseFirebase = useOnline || _useFirebase;
+    
+    try {
+      if (shouldUseFirebase) {
+        final room = await _firebaseService.createRoom(
+          hostName: participantName,
+          videoUrl: '',
+          videoTitle: 'Watch Party',
+          initialPosition: Duration.zero,
+          initialPlaying: false,
+        );
+        _currentRoom = room;
+        // Force update to use Firebase service
+        _useFirebase = true;
+        _isConnected = _firebaseService.isConnected;
+        _connectionError = _firebaseService.connectionError;
+        _updateIndicatorOverlay();
+        notifyListeners();
+        
+        // Trigger a room update to ensure connection state is synced
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (_currentRoom != null && _firebaseService.isConnected) {
+            _handleRoomUpdate(_currentRoom!);
+          }
+        });
+        
+        return room;
+      } else {
+        // Fall back to local network
+        final room = await _watchPartyService.createRoom(
+          hostName: participantName,
+          videoUrl: '',
+          videoTitle: 'Watch Party',
+          initialPosition: Duration.zero,
+          initialPlaying: false,
+        );
+        _currentRoom = room;
+        _isConnected = _watchPartyService.isConnected;
+        _connectionError = _watchPartyService.connectionError;
+        _updateIndicatorOverlay();
+        notifyListeners();
+        return room;
+      }
+    } catch (e) {
+      debugPrint('Error creating room: $e');
+      // If Firebase fails and not explicitly requested, try local as fallback
+      if (shouldUseFirebase && !useOnline) {
+        _useFirebase = false;
+        return createRoom(participantName, useOnline: false);
+      }
+      return null;
+    }
   }
   
-  /// Join room
+  /// Join room (local network)
   Future<WatchPartyRoom?> joinRoom(
     String participantName,
     String hostIp,
     int hostPort,
     String roomCode,
   ) async {
-    final room = await _watchPartyService.joinRoom(
-      hostIp: hostIp,
-      hostPort: hostPort,
-      participantName: participantName,
-      roomCode: roomCode.isEmpty ? null : roomCode,
-    );
-    if (room != null) {
-      _currentRoom = room;
-      _isConnected = _watchPartyService.isConnected;
-      _connectionError = _watchPartyService.connectionError;
-      _updateIndicatorOverlay();
-      notifyListeners();
+    try {
+      final room = await _watchPartyService.joinRoom(
+        hostIp: hostIp,
+        hostPort: hostPort,
+        participantName: participantName,
+        roomCode: roomCode.isEmpty ? null : roomCode,
+      );
+      if (room != null) {
+        _currentRoom = room;
+        _isConnected = _watchPartyService.isConnected;
+        _connectionError = _watchPartyService.connectionError;
+        _updateIndicatorOverlay();
+        notifyListeners();
+      }
+      return room;
+    } catch (e) {
+      debugPrint('Error joining room: $e');
+      return null;
     }
-    return room;
+  }
+  
+  /// Join room (online/Firebase)
+  Future<WatchPartyRoom?> joinRoomOnline(
+    String participantName,
+    String roomCode,
+  ) async {
+    try {
+      if (roomCode.isEmpty) {
+        _connectionError = 'Room code is required';
+        return null;
+      }
+      
+      final room = await _firebaseService.joinRoom(
+        participantName: participantName,
+        roomCode: roomCode,
+      );
+      
+      if (room != null) {
+        _currentRoom = room;
+        _isConnected = _firebaseService.isConnected;
+        _connectionError = _firebaseService.connectionError;
+        _updateIndicatorOverlay();
+        notifyListeners();
+      } else {
+        _connectionError = _firebaseService.connectionError ?? 'Failed to join room';
+      }
+      
+      return room;
+    } catch (e) {
+      debugPrint('Error joining online room: $e');
+      _connectionError = 'Failed to join room: $e';
+      return null;
+    }
   }
   
   /// Leave room
   Future<void> leaveRoom() async {
-    await _watchPartyService.leaveRoom();
+    if (_useFirebase) {
+      await _firebaseService.leaveRoom();
+    } else {
+      await _watchPartyService.leaveRoom();
+    }
     _currentRoom = null;
     _isConnected = false;
     _connectionError = null;
@@ -547,12 +742,20 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Send chat message
   Future<void> sendChatMessage(String message) async {
-    await _watchPartyService.sendChatMessage(message);
+    if (_useFirebase) {
+      await _firebaseService.sendChatMessage(message);
+    } else {
+      await _watchPartyService.sendChatMessage(message);
+    }
   }
   
   /// Send reaction
   Future<void> sendReaction(ReactionType type) async {
-    await _watchPartyService.sendReaction(type);
+    if (_useFirebase) {
+      await _firebaseService.sendReaction(type);
+    } else {
+      await _watchPartyService.sendReaction(type);
+    }
   }
   
   /// Update room state (host only)
@@ -562,19 +765,32 @@ class WatchPartyProvider with ChangeNotifier {
     String? videoUrl,
     String? videoTitle,
   }) {
-    _watchPartyService.updateRoomState(
-      position: position,
-      isPlaying: isPlaying,
-      videoUrl: videoUrl,
-      videoTitle: videoTitle,
-    );
+    if (_useFirebase) {
+      _firebaseService.updateRoomState(
+        position: position,
+        isPlaying: isPlaying,
+        videoUrl: videoUrl,
+        videoTitle: videoTitle,
+      );
+    } else {
+      _watchPartyService.updateRoomState(
+        position: position,
+        isPlaying: isPlaying,
+        videoUrl: videoUrl,
+        videoTitle: videoTitle,
+      );
+    }
   }
   
   @override
   void dispose() {
     _removeGlobalNotification();
     _hideIndicatorOverlay();
-    _watchPartyService.leaveRoom();
+    if (_useFirebase) {
+      _firebaseService.leaveRoom();
+    } else {
+      _watchPartyService.leaveRoom();
+    }
     super.dispose();
   }
 }

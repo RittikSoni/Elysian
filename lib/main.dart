@@ -3,13 +3,29 @@ import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/watch_party_global_manager.dart';
+import 'package:elysian/services/watch_party_firebase_service.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart' as sharing;
 import 'screens/screens.dart';
 
-void main() => runApp(Elysian());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp();
+    // Clean up expired rooms on app start (runs in background)
+    WatchPartyFirebaseService.cleanupExpiredRooms();
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+    // Continue without Firebase (will use local network fallback)
+  }
+
+  runApp(const Elysian());
+}
 
 class Elysian extends StatefulWidget {
   const Elysian({super.key});

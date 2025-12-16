@@ -348,7 +348,8 @@ class _YTFullState extends State<YTFull> {
         Future.delayed(const Duration(milliseconds: 2000), () {
           if (!_isDisposed && mounted && _controller.value.isReady) {
             _isVideoInitializing = false;
-            // Now sync to host's position if available
+            // When video changes, start from position 0 (new video)
+            // Only sync to host's position if it's the same video we're loading
             final provider = Provider.of<WatchPartyProvider>(
               context,
               listen: false,
@@ -357,6 +358,7 @@ class _YTFullState extends State<YTFull> {
             if (room != null && room.videoUrl == videoUrl) {
               final duration = _controller.value.metaData.duration;
               if (duration.inMilliseconds > 0) {
+                // Start from position 0 for new videos (position is reset when video changes)
                 final seekPosition = room.currentPosition.inMilliseconds.clamp(
                   0,
                   duration.inMilliseconds,
@@ -368,7 +370,13 @@ class _YTFullState extends State<YTFull> {
                   _controller.pause();
                 }
                 _lastSeekTime = DateTime.now();
+                _lastSyncedPosition = Duration(milliseconds: seekPosition);
               }
+            } else {
+              // No room or video mismatch - start from beginning
+              _controller.seekTo(Duration.zero);
+              _lastSeekTime = DateTime.now();
+              _lastSyncedPosition = Duration.zero;
             }
           }
         });
@@ -507,21 +515,38 @@ class _YTFullState extends State<YTFull> {
       );
     }
 
-    // Increased sync frequency for more responsive updates (250ms instead of 500ms)
-    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 250), (
-      timer,
-    ) {
-      if (!_isDisposed && _controller.value.isReady) {
-        final videoUrl = widget.url ?? widget.mediaUrl ?? '';
-        final videoTitle = widget.title ?? 'YouTube Video';
-        provider.updateRoomState(
-          position: _controller.value.position,
-          isPlaying: _controller.value.isPlaying,
-          videoUrl: videoUrl,
-          videoTitle: videoTitle,
-        );
-      }
-    });
+    // Adaptive sync frequency: faster when playing, slower when paused
+    // This reduces Firebase writes and battery usage when paused
+    void syncUpdate() {
+      if (_isDisposed || !_controller.value.isReady) return;
+
+      final isPlaying = _controller.value.isPlaying;
+      final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+      final videoTitle = widget.title ?? 'YouTube Video';
+
+      provider.updateRoomState(
+        position: _controller.value.position,
+        isPlaying: isPlaying,
+        videoUrl: videoUrl,
+        videoTitle: videoTitle,
+      );
+
+      // Schedule next update with adaptive frequency
+      _watchPartySyncTimer?.cancel();
+      final interval = isPlaying
+          ? const Duration(milliseconds: 250) // Fast when playing
+          : const Duration(seconds: 2); // Slow when paused
+
+      _watchPartySyncTimer = Timer(interval, syncUpdate);
+    }
+
+    // Start with initial interval based on current playing state
+    final initialInterval =
+        _controller.value.isReady && _controller.value.isPlaying
+        ? const Duration(milliseconds: 250)
+        : const Duration(seconds: 2);
+
+    _watchPartySyncTimer = Timer(initialInterval, syncUpdate);
   }
 
   void _syncPlayPause(bool isPlaying) {

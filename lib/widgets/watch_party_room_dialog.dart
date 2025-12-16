@@ -23,6 +23,8 @@ class WatchPartyRoomDialog extends StatefulWidget {
   State<WatchPartyRoomDialog> createState() => _WatchPartyRoomDialogState();
 }
 
+enum WatchPartyMode { localNetwork, online }
+
 class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
   final _nameController = TextEditingController();
   final _roomCodeController = TextEditingController();
@@ -34,6 +36,7 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
   WatchPartyRoom? _createdRoom;
   String? _localIp;
   int? _serverPort;
+  WatchPartyMode _mode = WatchPartyMode.localNetwork;
 
   @override
   void initState() {
@@ -64,13 +67,20 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
 
     try {
       final watchPartyProvider = Provider.of<WatchPartyProvider>(context, listen: false);
-      final room = await watchPartyProvider.createRoom(_nameController.text.trim());
+      final room = await watchPartyProvider.createRoom(
+        _nameController.text.trim(),
+        useOnline: _mode == WatchPartyMode.online,
+      );
 
-      final port = watchPartyProvider.watchPartyService.getServerPort();
+      if (_mode == WatchPartyMode.localNetwork) {
+        final port = watchPartyProvider.watchPartyService.getServerPort();
+        setState(() {
+          _serverPort = port;
+        });
+      }
       
       setState(() {
         _createdRoom = room;
-        _serverPort = port;
         _isCreating = false;
       });
     } catch (e) {
@@ -93,18 +103,29 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
       return;
     }
 
-    if (_ipController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter host IP address')),
-      );
-      return;
-    }
+    if (_mode == WatchPartyMode.online) {
+      // Online mode: Only need room code
+      if (_roomCodeController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter room code')),
+        );
+        return;
+      }
+    } else {
+      // Local network mode: Need IP and Port
+      if (_ipController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter host IP address')),
+        );
+        return;
+      }
 
-    if (_portController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter host port')),
-      );
-      return;
+      if (_portController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter host port')),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -112,24 +133,39 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
     });
 
     try {
-      final hostIp = _ipController.text.trim();
-      final hostPort = int.parse(_portController.text.trim());
-      final roomCode = _roomCodeController.text.trim().isEmpty 
-          ? null 
-          : _roomCodeController.text.trim();
-
       final watchPartyProvider = Provider.of<WatchPartyProvider>(context, listen: false);
-      final room = await watchPartyProvider.joinRoom(
-        _nameController.text.trim(),
-        hostIp,
-        hostPort,
-        roomCode ?? '',
-      );
+      final roomCode = _roomCodeController.text.trim();
+      
+      WatchPartyRoom? room;
+      
+      if (_mode == WatchPartyMode.online) {
+        // Online mode: Join using only room code
+        room = await watchPartyProvider.joinRoomOnline(
+          _nameController.text.trim(),
+          roomCode,
+        );
+      } else {
+        // Local network mode: Join using IP, Port, and optional room code
+        final hostIp = _ipController.text.trim();
+        final hostPort = int.parse(_portController.text.trim());
+        room = await watchPartyProvider.joinRoom(
+          _nameController.text.trim(),
+          hostIp,
+          hostPort,
+          roomCode.isEmpty ? '' : roomCode,
+        );
+      }
 
       if (room == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to join room. Check IP, port, and room code.')),
+            SnackBar(
+              content: Text(
+                _mode == WatchPartyMode.online
+                    ? 'Failed to join room. Check room code.'
+                    : 'Failed to join room. Check IP, port, and room code.',
+              ),
+            ),
           );
         }
       } else {
@@ -200,6 +236,141 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
             const Text(
               'Watch videos together with friends',
               style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            
+            // Mode selector
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Connection Mode',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _mode = WatchPartyMode.localNetwork;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _mode == WatchPartyMode.localNetwork
+                                  ? Colors.amber.withOpacity(0.2)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _mode == WatchPartyMode.localNetwork
+                                    ? Colors.amber
+                                    : Colors.grey[700]!,
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.wifi,
+                                  color: _mode == WatchPartyMode.localNetwork
+                                      ? Colors.amber
+                                      : Colors.grey[400],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Local Network',
+                                  style: TextStyle(
+                                    color: _mode == WatchPartyMode.localNetwork
+                                        ? Colors.amber
+                                        : Colors.grey[400],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Same WiFi',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _mode = WatchPartyMode.online;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _mode == WatchPartyMode.online
+                                  ? Colors.amber.withOpacity(0.2)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _mode == WatchPartyMode.online
+                                    ? Colors.amber
+                                    : Colors.grey[700]!,
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.cloud,
+                                  color: _mode == WatchPartyMode.online
+                                      ? Colors.amber
+                                      : Colors.grey[400],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    color: _mode == WatchPartyMode.online
+                                        ? Colors.amber
+                                        : Colors.grey[400],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Any Network',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             
@@ -278,109 +449,98 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
             const SizedBox(height: 16),
             
             // Join Room section
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: Colors.amber, size: 18),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Get connection info from the host',
-                          style: TextStyle(
-                            color: Colors.amber,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+            if (_mode == WatchPartyMode.online)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.amber, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Get room code from the host',
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'The host will see their IP address and Port number after creating a room. Ask them to share both values with you.',
-                    style: TextStyle(
-                      color: Colors.amber[200],
-                      fontSize: 12,
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'The host will see a 6-digit room code after creating a room. Ask them to share it with you.',
+                      style: TextStyle(
+                        color: Colors.amber[200],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Colors.amber, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Get connection info from the host',
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'The host will see their IP address and Port number after creating a room. Ask them to share both values with you.',
+                      style: TextStyle(
+                        color: Colors.amber[200],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _ipController,
-              decoration: InputDecoration(
-                labelText: 'Host IP Address',
-                hintText: '192.168.1.100',
-                helperText: 'Get this from the host (shown in their "Connection Info")',
-                helperMaxLines: 2,
-                labelStyle: const TextStyle(color: Colors.grey),
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[700]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.amber),
-                ),
-              ),
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _portController,
-              decoration: InputDecoration(
-                labelText: 'Port Number',
-                hintText: '8080',
-                helperText: 'Port is a number (like 8080, 54321, etc.). Get this from the host.',
-                helperMaxLines: 2,
-                labelStyle: const TextStyle(color: Colors.grey),
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[700]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.amber),
-                ),
-              ),
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
+            
+            // Room Code (always shown, required for online)
             TextField(
               controller: _roomCodeController,
               decoration: InputDecoration(
-                labelText: 'Room Code (Optional)',
+                labelText: _mode == WatchPartyMode.online
+                    ? 'Room Code *'
+                    : 'Room Code (Optional)',
                 hintText: '123456',
+                helperText: _mode == WatchPartyMode.online
+                    ? 'Required for online rooms'
+                    : 'Optional for local network rooms',
                 labelStyle: const TextStyle(color: Colors.grey),
                 hintStyle: TextStyle(color: Colors.grey[600]),
+                helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
                 filled: true,
                 fillColor: Colors.grey[800],
                 border: OutlineInputBorder(
@@ -400,6 +560,68 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
               keyboardType: TextInputType.number,
               maxLength: 6,
             ),
+            
+            // IP and Port (only for local network)
+            if (_mode == WatchPartyMode.localNetwork) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ipController,
+                decoration: InputDecoration(
+                  labelText: 'Host IP Address *',
+                  hintText: '192.168.1.100',
+                  helperText: 'Get this from the host (shown in their "Connection Info")',
+                  helperMaxLines: 2,
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.amber),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _portController,
+                decoration: InputDecoration(
+                  labelText: 'Port Number *',
+                  hintText: '8080',
+                  helperText: 'Port is a number (like 8080, 54321, etc.). Get this from the host.',
+                  helperMaxLines: 2,
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  helperStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.grey[700]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.amber),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.number,
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -440,8 +662,13 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
   }
 
   Widget _buildRoomCreatedView() {
-    final connectionInfo = '$_localIp:$_serverPort';
-    final qrData = '$_localIp:$_serverPort:${_createdRoom!.roomCode}';
+    final isOnline = _mode == WatchPartyMode.online;
+    final connectionInfo = isOnline 
+        ? _createdRoom!.roomCode ?? 'N/A'
+        : '$_localIp:$_serverPort';
+    final qrData = isOnline
+        ? _createdRoom!.roomCode ?? ''
+        : '$_localIp:$_serverPort:${_createdRoom!.roomCode}';
     
     return Dialog(
       backgroundColor: Colors.grey[900],
@@ -514,100 +741,142 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
             ),
             const SizedBox(height: 16),
             
-            // Connection Info - Split IP and Port
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[800],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Connection Info (Share with guests)',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'IP Address',
-                              style: TextStyle(color: Colors.grey, fontSize: 11),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _localIp ?? 'Unknown',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Port',
-                              style: TextStyle(color: Colors.grey, fontSize: 11),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _serverPort?.toString() ?? 'Unknown',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.amber),
-                        onPressed: () => _copyToClipboard(connectionInfo),
-                        tooltip: 'Copy connection info',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+            // Connection Info - Show different info based on mode
+            if (_mode == WatchPartyMode.online)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Share with guests',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline, color: Colors.amber, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Guests need both IP and Port to join',
-                            style: TextStyle(
-                              color: Colors.amber[200],
-                              fontSize: 11,
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Guests only need the room code to join from anywhere!',
+                              style: TextStyle(
+                                color: Colors.amber[200],
+                                fontSize: 11,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Connection Info (Share with guests)',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'IP Address',
+                                style: TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _localIp ?? 'Unknown',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Port',
+                                style: TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _serverPort?.toString() ?? 'Unknown',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy, color: Colors.amber),
+                          onPressed: () => _copyToClipboard(connectionInfo),
+                          tooltip: 'Copy connection info',
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Guests need both IP and Port to join',
+                              style: TextStyle(
+                                color: Colors.amber[200],
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 24),
             
             SizedBox(

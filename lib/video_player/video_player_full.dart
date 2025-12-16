@@ -485,19 +485,36 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
       );
     }
 
-    // Increased sync frequency for more responsive updates (250ms instead of 500ms)
-    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 250), (
-      timer,
-    ) {
-      if (!_isDisposed && _controller.value.isInitialized) {
-        provider.updateRoomState(
-          position: _controller.value.position,
-          isPlaying: _controller.value.isPlaying,
-          videoUrl: widget.url,
-          videoTitle: _videoTitle ?? widget.title,
-        );
-      }
-    });
+    // Adaptive sync frequency: faster when playing, slower when paused
+    // This reduces Firebase writes and battery usage when paused
+    void syncUpdate() {
+      if (_isDisposed || !_controller.value.isInitialized) return;
+
+      final isPlaying = _controller.value.isPlaying;
+
+      provider.updateRoomState(
+        position: _controller.value.position,
+        isPlaying: isPlaying,
+        videoUrl: widget.url,
+        videoTitle: _videoTitle ?? widget.title,
+      );
+
+      // Schedule next update with adaptive frequency
+      _watchPartySyncTimer?.cancel();
+      final interval = isPlaying
+          ? const Duration(milliseconds: 250) // Fast when playing
+          : const Duration(seconds: 2); // Slow when paused
+
+      _watchPartySyncTimer = Timer(interval, syncUpdate);
+    }
+
+    // Start with initial interval based on current playing state
+    final initialInterval =
+        _controller.value.isInitialized && _controller.value.isPlaying
+        ? const Duration(milliseconds: 250)
+        : const Duration(seconds: 2);
+
+    _watchPartySyncTimer = Timer(initialInterval, syncUpdate);
   }
 
   void _syncPlayPause(bool isPlaying) {
