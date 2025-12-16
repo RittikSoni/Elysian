@@ -9,6 +9,7 @@ import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/video_player/yt_full.dart';
 import 'package:elysian/video_player/video_player_full.dart';
 import 'package:elysian/utils/kroute.dart';
+import 'package:elysian/widgets/watch_party_indicator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
@@ -87,6 +88,9 @@ class WatchPartyProvider with ChangeNotifier {
     _currentRoom = room;
     _isConnected = _watchPartyService.isConnected;
     _connectionError = _watchPartyService.connectionError;
+    
+    // Update indicator overlay
+    _updateIndicatorOverlay();
     
     notifyListeners();
     
@@ -456,6 +460,30 @@ class WatchPartyProvider with ChangeNotifier {
     _notificationOverlay = null;
   }
   
+  /// Update indicator overlay
+  void _updateIndicatorOverlay() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    
+    if (_currentRoom != null) {
+      // Show or update indicator
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final ctx = navigatorKey.currentContext;
+        if (ctx != null && _currentRoom != null) {
+          WatchPartyIndicatorOverlay.show(ctx, _currentRoom!, isHost);
+        }
+      });
+    } else {
+      // Hide indicator
+      _hideIndicatorOverlay();
+    }
+  }
+  
+  /// Hide indicator overlay
+  void _hideIndicatorOverlay() {
+    WatchPartyIndicatorOverlay.hide();
+  }
+  
   /// Open chat (navigate to video player if needed)
   void _openChat() {
     if (_currentRoom?.videoUrl.isNotEmpty == true) {
@@ -474,6 +502,7 @@ class WatchPartyProvider with ChangeNotifier {
     );
     _currentRoom = room;
     _isConnected = _watchPartyService.isConnected;
+    _updateIndicatorOverlay();
     notifyListeners();
     return room;
   }
@@ -495,6 +524,7 @@ class WatchPartyProvider with ChangeNotifier {
       _currentRoom = room;
       _isConnected = _watchPartyService.isConnected;
       _connectionError = _watchPartyService.connectionError;
+      _updateIndicatorOverlay();
       notifyListeners();
     }
     return room;
@@ -511,6 +541,7 @@ class WatchPartyProvider with ChangeNotifier {
     _latestChatNotification = null;
     _latestReactionNotification = null;
     _removeGlobalNotification();
+    _hideIndicatorOverlay();
     notifyListeners();
   }
   
@@ -542,6 +573,7 @@ class WatchPartyProvider with ChangeNotifier {
   @override
   void dispose() {
     _removeGlobalNotification();
+    _hideIndicatorOverlay();
     _watchPartyService.leaveRoom();
     super.dispose();
   }

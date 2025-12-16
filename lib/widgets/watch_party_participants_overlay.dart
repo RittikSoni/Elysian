@@ -3,6 +3,8 @@ import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/services/watch_party_service.dart';
 import 'package:elysian/widgets/watch_party_chat_overlay.dart';
 import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
+import 'package:elysian/providers/providers.dart';
+import 'package:provider/provider.dart';
 
 class WatchPartyParticipantsOverlay extends StatefulWidget {
   final WatchPartyRoom room;
@@ -243,6 +245,87 @@ class _WatchPartyParticipantsOverlayState
                     ),
                   ),
                 ],
+              ),
+            ),
+            const Divider(color: Colors.grey),
+            
+            // Exit Watch Party Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Consumer<WatchPartyProvider>(
+                builder: (context, provider, child) {
+                  return ElevatedButton.icon(
+                    onPressed: () async {
+                      // Show confirmation dialog
+                      final shouldExit = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Colors.grey[900],
+                          title: const Text(
+                            'Exit Watch Party?',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          content: Text(
+                            widget.isHost
+                                ? 'Are you sure you want to end this watch party? All participants will be disconnected.'
+                                : 'Are you sure you want to leave this watch party?',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text(
+                                'Exit',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (shouldExit == true) {
+                        // Close this dialog first
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                        
+                        // Leave the room (this will clean up state)
+                        await provider.leaveRoom();
+                        
+                        // Call onClose callback if provided
+                        if (widget.onClose != null) {
+                          widget.onClose!();
+                        }
+                        
+                        // If we're in a video player, navigate back to home
+                        if (context.mounted) {
+                          final navigator = Navigator.of(context);
+                          // Check if we can pop (we're in a pushed route like video player)
+                          if (navigator.canPop()) {
+                            // Pop back to home/main screen
+                            navigator.popUntil((route) => route.isFirst);
+                          }
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.exit_to_app),
+                    label: Text(
+                      widget.isHost ? 'End Watch Party' : 'Leave Watch Party',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.withOpacity(0.8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  );
+                },
               ),
             ),
             const Divider(color: Colors.grey),

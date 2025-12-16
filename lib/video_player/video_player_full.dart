@@ -84,10 +84,10 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   final List<Duration> _adPositions = [];
 
   final List<String> _adUrls = [
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
   ];
   int _nextAdIndex = 0;
   bool _inAdBreak = false;
@@ -137,10 +137,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _currentVideoUrl =
         widget.url ?? widget.mediaUrl; // Initialize current video URL
     _controller = VideoPlayerController.networkUrl(
-      Uri.parse(
-        widget.mediaUrl ??
-            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      ),
+      Uri.parse(_currentVideoUrl ?? ''),
     );
     initializeVid();
     _initWatchParty();
@@ -605,133 +602,131 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     if (_isDisposed || !mounted) return;
 
     _controller
-      ..initialize()
-          .then((_) {
-            if (_isDisposed || !mounted) return;
-            // Calculate ad positions 10%, 25, 50%, 80%
-            final totalDuration = _controller.value.duration;
+        .initialize()
+        .then((_) {
+          if (_isDisposed || !mounted) return;
+          // Calculate ad positions 10%, 25, 50%, 80%
+          final totalDuration = _controller.value.duration;
 
-            if (totalDuration.inMilliseconds > 0) {
-              if (mounted) {
-                setState(() {
-                  _adPositions.addAll([
-                    Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.1)
-                          .toInt(),
-                    ),
-                    Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.25)
-                          .toInt(),
-                    ),
-                    Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.5)
-                          .toInt(),
-                    ),
-                    Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.8)
-                          .toInt(),
-                    ),
-                  ]);
+          if (totalDuration.inMilliseconds > 0) {
+            if (mounted) {
+              setState(() {
+                _adPositions.addAll([
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
+                  ),
+                ]);
 
-                  // If initial position is provided, seek to it
-                  if (widget.initialPosition != null) {
-                    final seekPosition = Duration(
-                      milliseconds: widget.initialPosition!.inMilliseconds
-                          .clamp(0, totalDuration.inMilliseconds),
-                    );
-                    _controller.seekTo(seekPosition);
-                  }
-
-                  _controller.play();
-
-                  // Update watch party room state if host (when video initializes)
-                  final provider = Provider.of<WatchPartyProvider>(
-                    context,
-                    listen: false,
+                // If initial position is provided, seek to it
+                if (widget.initialPosition != null) {
+                  final seekPosition = Duration(
+                    milliseconds: widget.initialPosition!.inMilliseconds.clamp(
+                      0,
+                      totalDuration.inMilliseconds,
+                    ),
                   );
-                  if (provider.isHost &&
-                      provider.isInRoom &&
-                      widget.url != null) {
-                    provider.updateRoomState(
-                      videoUrl: widget.url!,
-                      videoTitle: _videoTitle ?? widget.title ?? 'Video',
-                      position: Duration.zero,
-                      isPlaying: true,
-                    );
-                    // Host: mark as initialized immediately
-                    _isVideoInitializing = false;
-                  } else if (!provider.isHost && provider.isInRoom) {
-                    // Guest: immediately sync to host's position for late joiners
-                    Future.delayed(const Duration(milliseconds: 800), () {
-                      if (!_isDisposed && mounted) {
-                        _isVideoInitializing = false;
-                        // Now sync to host's position if available
-                        final room = provider.currentRoom;
-                        if (room != null &&
-                            (room.videoUrl == widget.url ||
-                                room.videoUrl == _currentVideoUrl)) {
-                          final duration = _controller.value.duration;
-                          if (duration.inMilliseconds > 0) {
-                            // Calculate predicted position for late joiners
-                            Duration targetPosition = room.currentPosition;
-                            if (room.isPlaying &&
-                                room.positionUpdatedAt != null) {
-                              final now = DateTime.now();
-                              final elapsedMs = now
-                                  .difference(room.positionUpdatedAt!)
-                                  .inMilliseconds;
-                              targetPosition = Duration(
-                                milliseconds:
-                                    (room.currentPosition.inMilliseconds +
-                                            elapsedMs)
-                                        .clamp(0, duration.inMilliseconds),
-                              );
-                            }
+                  _controller.seekTo(seekPosition);
+                }
 
-                            final seekPosition = targetPosition.inMilliseconds
-                                .clamp(0, duration.inMilliseconds);
-                            _controller.seekTo(
-                              Duration(milliseconds: seekPosition),
+                _controller.play();
+
+                // Update watch party room state if host (when video initializes)
+                final provider = Provider.of<WatchPartyProvider>(
+                  context,
+                  listen: false,
+                );
+                if (provider.isHost &&
+                    provider.isInRoom &&
+                    widget.url != null) {
+                  provider.updateRoomState(
+                    videoUrl: widget.url!,
+                    videoTitle: _videoTitle ?? widget.title ?? 'Video',
+                    position: Duration.zero,
+                    isPlaying: true,
+                  );
+                  // Host: mark as initialized immediately
+                  _isVideoInitializing = false;
+                } else if (!provider.isHost && provider.isInRoom) {
+                  // Guest: immediately sync to host's position for late joiners
+                  Future.delayed(const Duration(milliseconds: 800), () {
+                    if (!_isDisposed && mounted) {
+                      _isVideoInitializing = false;
+                      // Now sync to host's position if available
+                      final room = provider.currentRoom;
+                      if (room != null &&
+                          (room.videoUrl == widget.url ||
+                              room.videoUrl == _currentVideoUrl)) {
+                        final duration = _controller.value.duration;
+                        if (duration.inMilliseconds > 0) {
+                          // Calculate predicted position for late joiners
+                          Duration targetPosition = room.currentPosition;
+                          if (room.isPlaying &&
+                              room.positionUpdatedAt != null) {
+                            final now = DateTime.now();
+                            final elapsedMs = now
+                                .difference(room.positionUpdatedAt!)
+                                .inMilliseconds;
+                            targetPosition = Duration(
+                              milliseconds:
+                                  (room.currentPosition.inMilliseconds +
+                                          elapsedMs)
+                                      .clamp(0, duration.inMilliseconds),
                             );
-                            if (room.isPlaying) {
-                              _controller.play();
-                            } else {
-                              _controller.pause();
-                            }
-                            _lastSeekTime = DateTime.now();
-                            _lastSyncedPosition = targetPosition;
                           }
-                        } else if (room != null &&
-                            room.videoUrl.isNotEmpty &&
-                            room.videoUrl != widget.url &&
-                            room.videoUrl != _currentVideoUrl) {
-                          // Video URL mismatch - load the correct video
-                          _loadVideoFromUrl(room.videoUrl, room.videoTitle);
-                        }
-                      }
-                    });
-                  }
 
-                  // Auto-enter PiP if requested
-                  if (widget.autoEnterPiP && mounted && !_isDisposed) {
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      if (mounted &&
-                          !_isDisposed &&
-                          _controller.value.isInitialized) {
-                        _enterPiPMode();
+                          final seekPosition = targetPosition.inMilliseconds
+                              .clamp(0, duration.inMilliseconds);
+                          _controller.seekTo(
+                            Duration(milliseconds: seekPosition),
+                          );
+                          if (room.isPlaying) {
+                            _controller.play();
+                          } else {
+                            _controller.pause();
+                          }
+                          _lastSeekTime = DateTime.now();
+                          _lastSyncedPosition = targetPosition;
+                        }
+                      } else if (room != null &&
+                          room.videoUrl.isNotEmpty &&
+                          room.videoUrl != widget.url &&
+                          room.videoUrl != _currentVideoUrl) {
+                        // Video URL mismatch - load the correct video
+                        _loadVideoFromUrl(room.videoUrl, room.videoTitle);
                       }
-                    });
-                  }
-                });
-              }
+                    }
+                  });
+                }
+
+                // Auto-enter PiP if requested
+                if (widget.autoEnterPiP && mounted && !_isDisposed) {
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    if (mounted &&
+                        !_isDisposed &&
+                        _controller.value.isInitialized) {
+                      _enterPiPMode();
+                    }
+                  });
+                }
+              });
             }
-          })
-          .catchError((error) {
-            // Handle initialization errors
-            if (!_isDisposed && mounted) {
-              _handleVideoError(error);
-            }
-          });
+          }
+        })
+        .catchError((error) {
+          // Handle initialization errors
+          if (!_isDisposed && mounted) {
+            _handleVideoError(error);
+          }
+        });
 
     // Listen for video player errors - optimized to avoid unnecessary setState
     _controller.addListener(_videoPlayerListener);

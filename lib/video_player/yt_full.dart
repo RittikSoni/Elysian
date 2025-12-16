@@ -56,10 +56,10 @@ class _YTFullState extends State<YTFull> {
   bool _wasPlayerReady = false; // Track if player was ready before
 
   final List<String> _ids = [
-    'QdBZY2fkU-0',
-    'U_BEXuSlpeE',
-    'EeSELdjVLKA',
-    'nPt8bK2gbaU',
+    // 'QdBZY2fkU-0',
+    // 'U_BEXuSlpeE',
+    // 'EeSELdjVLKA',
+    // 'nPt8bK2gbaU',
     // 'gQDByCdjUXw',
     // 'iLnmTe5Q2Qw',
     // '_WoCV4c6XOE',
@@ -88,19 +88,21 @@ class _YTFullState extends State<YTFull> {
   Timer? _watchPartySyncTimer;
   final List<Reaction> _activeReactions = [];
   ChatMessage? _latestChatMessage;
-  bool _isVideoInitializing = false; // Track if video is being loaded/initialized
+  bool _isVideoInitializing =
+      false; // Track if video is being loaded/initialized
   DateTime? _lastSeekTime; // Track last seek to prevent rapid seeks
   bool _isSyncing = false; // Flag to prevent concurrent sync operations
-  Duration? _lastSyncedPosition; // Track last synced position to avoid unnecessary seeks
+  Duration?
+  _lastSyncedPosition; // Track last synced position to avoid unnecessary seeks
 
   // Ad state
   final List<Duration> _adPositions = [];
 
   final List<String> _adUrls = [
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
   ];
 
   int _nextAdIndex = 0;
@@ -167,18 +169,18 @@ class _YTFullState extends State<YTFull> {
         _handleSyncMessage(message);
       }
     };
-    
+
     // Handle sync from room updates (polling) - for guests
     _watchPartyService.onRoomUpdate = (room) {
       if (!_isDisposed && mounted) {
         if (!_watchPartyService.isHost && _controller.value.isReady) {
           // Don't sync if video is still initializing or already syncing
           if (_isVideoInitializing || _isSyncing) return;
-          
+
           // Ensure video has valid duration before syncing
           final duration = _controller.value.metaData.duration;
           if (duration.inMilliseconds <= 0) return;
-          
+
           // Check if current video URL matches room video URL
           // If not, trigger video change to load correct video
           final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
@@ -187,7 +189,7 @@ class _YTFullState extends State<YTFull> {
             _loadVideoFromUrl(room.videoUrl, room.videoTitle);
             return;
           }
-          
+
           // Sync play/pause state (only if state actually changed)
           final currentIsPlaying = _controller.value.isPlaying;
           if (room.isPlaying != currentIsPlaying) {
@@ -197,7 +199,7 @@ class _YTFullState extends State<YTFull> {
               _controller.pause();
             }
           }
-          
+
           // Sync position with position prediction for better accuracy
           final now = DateTime.now();
           final currentPosition = _controller.value.position;
@@ -205,12 +207,15 @@ class _YTFullState extends State<YTFull> {
           // Calculate predicted host position based on elapsed time since last update
           Duration predictedHostPosition = room.currentPosition;
           if (room.isPlaying && room.positionUpdatedAt != null) {
-            final elapsedMs = now.difference(room.positionUpdatedAt!).inMilliseconds;
+            final elapsedMs = now
+                .difference(room.positionUpdatedAt!)
+                .inMilliseconds;
             predictedHostPosition = Duration(
               milliseconds: room.currentPosition.inMilliseconds + elapsedMs,
             );
             // Clamp to video duration
-            if (predictedHostPosition.inMilliseconds > duration.inMilliseconds) {
+            if (predictedHostPosition.inMilliseconds >
+                duration.inMilliseconds) {
               predictedHostPosition = duration;
             }
           }
@@ -223,33 +228,37 @@ class _YTFullState extends State<YTFull> {
           if (_lastSeekTime == null ||
               now.difference(_lastSeekTime!).inMilliseconds > 1000) {
             // Use predicted position if video is playing, otherwise use actual position
-            final targetPosition = room.isPlaying ? predictedHostPosition : room.currentPosition;
-            
-            final positionDiff = (targetPosition.inMilliseconds - 
-                currentPosition.inMilliseconds).abs();
-            
+            final targetPosition = room.isPlaying
+                ? predictedHostPosition
+                : room.currentPosition;
+
+            final positionDiff =
+                (targetPosition.inMilliseconds - currentPosition.inMilliseconds)
+                    .abs();
+
             // Check if position changed significantly from last synced position
             final lastSyncedDiff = _lastSyncedPosition != null
                 ? (targetPosition.inMilliseconds -
-                        _lastSyncedPosition!.inMilliseconds)
-                    .abs()
+                          _lastSyncedPosition!.inMilliseconds)
+                      .abs()
                 : 999999;
-            
+
             // Only seek if:
             // - Difference is more than 1 second (reduced threshold for better sync)
             // - Host position actually changed (not just polling noise)
             // - Or if this is initial sync (lastSyncedPosition is null)
-            if ((positionDiff > 1000 && lastSyncedDiff > 200) || _lastSyncedPosition == null) {
+            if ((positionDiff > 1000 && lastSyncedDiff > 200) ||
+                _lastSyncedPosition == null) {
               _isSyncing = true;
               // Ensure seek position is within valid range
               final seekPosition = targetPosition.inMilliseconds.clamp(
-                0, 
-                duration.inMilliseconds
+                0,
+                duration.inMilliseconds,
               );
               _controller.seekTo(Duration(milliseconds: seekPosition));
               _lastSeekTime = now;
               _lastSyncedPosition = targetPosition;
-              
+
               // Reset sync flag after a short delay
               Future.delayed(const Duration(milliseconds: 300), () {
                 if (!_isDisposed && mounted) {
@@ -268,7 +277,7 @@ class _YTFullState extends State<YTFull> {
         // Room is managed by provider
       }
     };
-    
+
     // Chain chat callback to ensure global manager also receives it
     final existingChatCallback = _watchPartyService.onChatMessage;
     _watchPartyService.onChatMessage = (message) {
@@ -289,7 +298,7 @@ class _YTFullState extends State<YTFull> {
         });
       }
     };
-    
+
     _watchPartyService.onReaction = (reaction) {
       if (!_isDisposed && mounted) {
         setState(() {
@@ -305,7 +314,7 @@ class _YTFullState extends State<YTFull> {
         });
       }
     };
-    
+
     // Handle video changes from host
     _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
       if (!_isDisposed && mounted && !_watchPartyService.isHost) {
@@ -314,7 +323,7 @@ class _YTFullState extends State<YTFull> {
       }
     };
   }
-  
+
   Future<void> _loadVideoFromUrl(String videoUrl, String videoTitle) async {
     try {
       // Mark video as initializing
@@ -322,7 +331,7 @@ class _YTFullState extends State<YTFull> {
       _lastSeekTime = null;
       _lastSyncedPosition = null;
       _isSyncing = false;
-      
+
       // Extract YouTube video ID
       final videoId = LinkParser.extractYouTubeVideoId(videoUrl);
       if (videoId != null) {
@@ -333,21 +342,24 @@ class _YTFullState extends State<YTFull> {
             // Video will be ready when listener fires
           });
         }
-        
+
         // Wait for video to be ready, then allow sync
         // Use a delay to ensure video is fully loaded
         Future.delayed(const Duration(milliseconds: 2000), () {
           if (!_isDisposed && mounted && _controller.value.isReady) {
             _isVideoInitializing = false;
             // Now sync to host's position if available
-            final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+            final provider = Provider.of<WatchPartyProvider>(
+              context,
+              listen: false,
+            );
             final room = provider.currentRoom;
             if (room != null && room.videoUrl == videoUrl) {
               final duration = _controller.value.metaData.duration;
               if (duration.inMilliseconds > 0) {
                 final seekPosition = room.currentPosition.inMilliseconds.clamp(
                   0,
-                  duration.inMilliseconds
+                  duration.inMilliseconds,
                 );
                 _controller.seekTo(Duration(milliseconds: seekPosition));
                 if (room.isPlaying) {
@@ -369,14 +381,14 @@ class _YTFullState extends State<YTFull> {
 
   void _handleSyncMessage(SyncMessage message) {
     if (!_controller.value.isReady) return;
-    
+
     // Don't handle sync messages if video is still initializing or already syncing
     if (_isVideoInitializing || _isSyncing) return;
-    
+
     // Ensure video has valid duration
     final duration = _controller.value.metaData.duration;
     if (duration.inMilliseconds <= 0) return;
-    
+
     // Check if message has room info and verify video URL matches
     if (message.room != null && message.room!.videoUrl.isNotEmpty) {
       final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
@@ -386,19 +398,20 @@ class _YTFullState extends State<YTFull> {
         return;
       }
     }
-    
+
     switch (message.type) {
       case SyncMessageType.play:
         _isSyncing = true;
         if (message.position != null) {
           // Ensure position is within valid range
           final seekPosition = message.position!.inMilliseconds.clamp(
-            0, 
-            duration.inMilliseconds
+            0,
+            duration.inMilliseconds,
           );
           // Add debounce to prevent rapid seeks
           final now = DateTime.now();
-          if (_lastSeekTime == null || now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 2000) {
             _controller.seekTo(Duration(milliseconds: seekPosition));
             _lastSeekTime = now;
             _lastSyncedPosition = message.position;
@@ -420,12 +433,13 @@ class _YTFullState extends State<YTFull> {
           _isSyncing = true;
           // Ensure position is within valid range
           final seekPosition = message.position!.inMilliseconds.clamp(
-            0, 
-            duration.inMilliseconds
+            0,
+            duration.inMilliseconds,
           );
           // Add debounce to prevent rapid seeks
           final now = DateTime.now();
-          if (_lastSeekTime == null || now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 2000) {
             _controller.seekTo(Duration(milliseconds: seekPosition));
             _lastSeekTime = now;
             _lastSyncedPosition = message.position;
@@ -449,7 +463,7 @@ class _YTFullState extends State<YTFull> {
   Future<void> _showWatchPartyDialog() async {
     final videoUrl = widget.url ?? widget.mediaUrl ?? '';
     final videoTitle = widget.title ?? 'YouTube Video';
-    
+
     final room = await showDialog<WatchPartyRoom>(
       context: context,
       builder: (context) => WatchPartyRoomDialog(
@@ -465,7 +479,7 @@ class _YTFullState extends State<YTFull> {
         _watchPartyRoom = room;
         _showWatchParty = true;
       });
-      
+
       // Start syncing if host
       if (_watchPartyService.isHost) {
         _startHostSync();
@@ -476,7 +490,7 @@ class _YTFullState extends State<YTFull> {
   void _startHostSync() {
     _watchPartySyncTimer?.cancel();
     final provider = Provider.of<WatchPartyProvider>(context, listen: false);
-    
+
     // First update with video URL and title when sync starts
     if (provider.isHost && provider.isInRoom) {
       final videoUrl = widget.url ?? widget.mediaUrl ?? '';
@@ -484,13 +498,19 @@ class _YTFullState extends State<YTFull> {
       provider.updateRoomState(
         videoUrl: videoUrl,
         videoTitle: videoTitle,
-        position: _controller.value.isReady ? _controller.value.position : Duration.zero,
-        isPlaying: _controller.value.isReady ? _controller.value.isPlaying : false,
+        position: _controller.value.isReady
+            ? _controller.value.position
+            : Duration.zero,
+        isPlaying: _controller.value.isReady
+            ? _controller.value.isPlaying
+            : false,
       );
     }
-    
+
     // Increased sync frequency for more responsive updates (250ms instead of 500ms)
-    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+    _watchPartySyncTimer = Timer.periodic(const Duration(milliseconds: 250), (
+      timer,
+    ) {
       if (!_isDisposed && _controller.value.isReady) {
         final videoUrl = widget.url ?? widget.mediaUrl ?? '';
         final videoTitle = widget.title ?? 'YouTube Video';
@@ -506,7 +526,7 @@ class _YTFullState extends State<YTFull> {
 
   void _syncPlayPause(bool isPlaying) {
     if (!_watchPartyService.isInRoom) return;
-    
+
     if (_watchPartyService.isHost) {
       _watchPartyService.updateRoomState(isPlaying: isPlaying);
     } else {
@@ -521,7 +541,7 @@ class _YTFullState extends State<YTFull> {
 
   void _syncSeek(Duration position) {
     if (!_watchPartyService.isInRoom) return;
-    
+
     if (_watchPartyService.isHost) {
       _watchPartyService.updateRoomState(position: position);
     } else {
@@ -565,16 +585,19 @@ class _YTFullState extends State<YTFull> {
                   Duration targetPosition = room.currentPosition;
                   if (room.isPlaying && room.positionUpdatedAt != null) {
                     final now = DateTime.now();
-                    final elapsedMs = now.difference(room.positionUpdatedAt!).inMilliseconds;
+                    final elapsedMs = now
+                        .difference(room.positionUpdatedAt!)
+                        .inMilliseconds;
                     targetPosition = Duration(
-                      milliseconds: (room.currentPosition.inMilliseconds + elapsedMs)
-                          .clamp(0, duration.inMilliseconds),
+                      milliseconds:
+                          (room.currentPosition.inMilliseconds + elapsedMs)
+                              .clamp(0, duration.inMilliseconds),
                     );
                   }
-                  
+
                   final seekPosition = targetPosition.inMilliseconds.clamp(
                     0,
-                    duration.inMilliseconds
+                    duration.inMilliseconds,
                   );
                   _controller.seekTo(Duration(milliseconds: seekPosition));
                   if (room.isPlaying) {
@@ -586,7 +609,8 @@ class _YTFullState extends State<YTFull> {
                   _lastSyncedPosition = targetPosition;
                   _isSyncing = false;
                 }
-              } else if (room.videoUrl.isNotEmpty && room.videoUrl != videoUrl) {
+              } else if (room.videoUrl.isNotEmpty &&
+                  room.videoUrl != videoUrl) {
                 // Video URL mismatch - load the correct video
                 _loadVideoFromUrl(room.videoUrl, room.videoTitle);
               }
@@ -595,7 +619,7 @@ class _YTFullState extends State<YTFull> {
         });
       }
     }
-    
+
     if (_isPlayerReady && mounted && !_controller.value.isFullScreen) {
       setState(() {});
     }
@@ -629,7 +653,7 @@ class _YTFullState extends State<YTFull> {
         _controller.seekTo(widget.initialPosition!);
       }
 
-        _controller.play();
+      _controller.play();
 
       // Auto-enter PiP if requested
       if (widget.autoEnterPiP && mounted && !_isDisposed) {
@@ -716,7 +740,7 @@ class _YTFullState extends State<YTFull> {
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
     _watchPartySyncTimer?.cancel();
-    
+
     // Update watch party room state if host (set video URL to empty when closing)
     try {
       final provider = Provider.of<WatchPartyProvider>(context, listen: false);
@@ -731,16 +755,16 @@ class _YTFullState extends State<YTFull> {
     } catch (e) {
       // Context might not be available, ignore
     }
-    
+
     _watchPartyService.onRoomUpdate = null;
     _watchPartyService.onSyncMessage = null;
     _watchPartyService.onReaction = null;
-    
+
     if (!_isInPiP) {
       _pipOverlayEntry?.remove();
       _pipOverlayEntry = null;
       _controller.removeListener(listener);
-    _controller.dispose();
+      _controller.dispose();
     } else {
       // In PiP mode, keep the controller alive but remove listener
       // The overlay will handle cleanup when PiP is exited
@@ -757,33 +781,28 @@ class _YTFullState extends State<YTFull> {
   // Build video player - YouTube player always uses 16:9 aspect ratio
   Widget _buildVideoPlayer() {
     final player = YoutubePlayer(
-                controller: _controller,
-                showVideoProgressIndicator: true,
-                progressIndicatorColor: Colors.amber,
-                progressColors: const ProgressBarColors(
-                  playedColor: Colors.amber,
-                  handleColor: Colors.amberAccent,
-                ),
-                onReady: () {
-                  _controller.addListener(listener);
-                },
-                onEnded: (metaData) {
-                  int currentVideoIndex = _ids.indexOf(
-                    _controller.metadata.videoId,
-                  );
-                  if (currentVideoIndex + 1 < _ids.length) {
-                    currentVideoIndex++;
-                    _controller.load(_ids[currentVideoIndex]);
-                  }
-                },
+      controller: _controller,
+      showVideoProgressIndicator: true,
+      progressIndicatorColor: Colors.amber,
+      progressColors: const ProgressBarColors(
+        playedColor: Colors.amber,
+        handleColor: Colors.amberAccent,
+      ),
+      onReady: () {
+        _controller.addListener(listener);
+      },
+      onEnded: (metaData) {
+        int currentVideoIndex = _ids.indexOf(_controller.metadata.videoId);
+        if (currentVideoIndex + 1 < _ids.length) {
+          currentVideoIndex++;
+          _controller.load(_ids[currentVideoIndex]);
+        }
+      },
     );
 
     // YouTube player always uses 16:9 aspect ratio
     return Center(
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: player,
-      ),
+      child: AspectRatio(aspectRatio: 16 / 9, child: player),
     );
   }
 
@@ -919,18 +938,19 @@ class _YTFullState extends State<YTFull> {
                           },
                         ),
                         // Control buttons row
-              Positioned(
+                        Positioned(
                           top: 4,
                           left: 4,
                           right: 4,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                               // Full screen button
                               GestureDetector(
                                 onTap: () {
                                   // Store current position before exiting
-                                  final currentPosition = controller.value.position;
+                                  final currentPosition =
+                                      controller.value.position;
 
                                   // Remove PiP overlay but keep controller alive
                                   _pipOverlayEntry?.remove();
@@ -943,7 +963,7 @@ class _YTFullState extends State<YTFull> {
                                     () {
                                       // Mark PiP as exited after pushing new route
                                       _isInPiP = false;
-                                      
+
                                       navigatorKey.currentState?.push(
                                         MaterialPageRoute(
                                           builder: (context) => YTFull(
@@ -959,7 +979,7 @@ class _YTFullState extends State<YTFull> {
                                     },
                                   );
                                 },
-                child: Container(
+                                child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withValues(alpha: 0.7),
@@ -967,14 +987,14 @@ class _YTFullState extends State<YTFull> {
                                   ),
                                   child: const Icon(
                                     Icons.fullscreen,
-                    color: Colors.white,
+                                    color: Colors.white,
                                     size: 16,
                                   ),
                                 ),
                               ),
                               // Close button
                               GestureDetector(
-                onTap: () {
+                                onTap: () {
                                   controller.pause();
                                   _exitPiPMode();
                                 },
@@ -986,14 +1006,14 @@ class _YTFullState extends State<YTFull> {
                                   ),
                                   child: const Icon(
                                     Icons.close,
-                    color: Colors.white,
+                                    color: Colors.white,
                                     size: 16,
-                  ),
+                                  ),
                                 ),
-                ),
-            ],
-          ),
-              ),
+                              ),
+                            ],
+                          ),
+                        ),
                         // Play/Pause button overlay
                         ValueListenableBuilder<YoutubePlayerValue>(
                           valueListenable: controller,
@@ -1002,31 +1022,33 @@ class _YTFullState extends State<YTFull> {
                             if (!value.isPlaying) {
                               return Center(
                                 child: GestureDetector(
-                onTap: () {
+                                  onTap: () {
                                     controller.play();
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.7),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
                                       Icons.play_arrow,
-                      color: Colors.white,
+                                      color: Colors.white,
                                       size: 32,
                                     ),
                                   ),
-      ),
-    );
-  }
+                                ),
+                              );
+                            }
                             return const SizedBox.shrink();
                           },
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
               ),
             );
           },
@@ -1047,7 +1069,7 @@ class _YTFullState extends State<YTFull> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         body: Stack(
-        children: [
+          children: [
             if (_inAdBreak &&
                 _adController != null &&
                 _adController!.value.isInitialized)
@@ -1072,11 +1094,15 @@ class _YTFullState extends State<YTFull> {
                 },
                 onDoubleTap: (isRight) {
                   if (isRight) {
-                    final newPosition = _controller.value.position + const Duration(seconds: 10);
+                    final newPosition =
+                        _controller.value.position +
+                        const Duration(seconds: 10);
                     _controller.seekTo(newPosition);
                     _syncSeek(newPosition);
                   } else {
-                    final newPosition = _controller.value.position - const Duration(seconds: 10);
+                    final newPosition =
+                        _controller.value.position -
+                        const Duration(seconds: 10);
                     _controller.seekTo(newPosition);
                     _syncSeek(newPosition);
                   }
@@ -1142,13 +1168,15 @@ class _YTFullState extends State<YTFull> {
                         }
                       },
                       onSkipBackward: () {
-                        final newPosition = _controller.value.position -
+                        final newPosition =
+                            _controller.value.position -
                             const Duration(seconds: 10);
                         _controller.seekTo(newPosition);
                         _syncSeek(newPosition);
                       },
                       onSkipForward: () {
-                        final newPosition = _controller.value.position +
+                        final newPosition =
+                            _controller.value.position +
                             const Duration(seconds: 10);
                         _controller.seekTo(newPosition);
                         _syncSeek(newPosition);
@@ -1172,7 +1200,10 @@ class _YTFullState extends State<YTFull> {
                     currentVideoId: _controller.metadata.videoId,
                   ),
                 ),
-              if (_showControls && _showWatchParty && _watchPartyRoom != null && !_isLocked)
+              if (_showControls &&
+                  _showWatchParty &&
+                  _watchPartyRoom != null &&
+                  !_isLocked)
                 Positioned(
                   top: 0,
                   right: 0,
@@ -1191,16 +1222,18 @@ class _YTFullState extends State<YTFull> {
                   ),
                 ),
               // Show active reactions on video
-              ..._activeReactions.map((reaction) => WatchPartyReactionOverlay(
-                    reaction: reaction,
-                    onComplete: () {
-                      if (mounted) {
-                        setState(() {
-                          _activeReactions.remove(reaction);
-                        });
-                      }
-                    },
-                  )),
+              ..._activeReactions.map(
+                (reaction) => WatchPartyReactionOverlay(
+                  reaction: reaction,
+                  onComplete: () {
+                    if (mounted) {
+                      setState(() {
+                        _activeReactions.remove(reaction);
+                      });
+                    }
+                  },
+                ),
+              ),
               // Show chat notification overlay
               if (_latestChatMessage != null)
                 Positioned(
@@ -1209,11 +1242,11 @@ class _YTFullState extends State<YTFull> {
                   right: 0,
                   child: WatchPartyChatNotification(
                     message: _latestChatMessage!,
-                onTap: () {
-                  setState(() {
+                    onTap: () {
+                      setState(() {
                         _showWatchParty = true;
-                  });
-                },
+                      });
+                    },
                     onComplete: () {
                       if (mounted) {
                         setState(() {
@@ -1258,232 +1291,238 @@ class ControlBarState extends State<ControlBar> {
         final duration = value.metaData.duration;
 
         // Check if video is initialized and has valid duration
-        final bool isInitialized =
-            isReady && duration.inMilliseconds > 0;
+        final bool isInitialized = isReady && duration.inMilliseconds > 0;
 
-    // compute slider values
-    final maxMillis = duration.inMilliseconds.toDouble();
-    final currentMillis = _isDragging
-        ? _dragValue
-        : position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+        // compute slider values
+        final maxMillis = duration.inMilliseconds.toDouble();
+        final currentMillis = _isDragging
+            ? _dragValue
+            : position.inMilliseconds
+                  .clamp(0, duration.inMilliseconds)
+                  .toDouble();
 
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      child: Column(
-        children: [
-          // Progress + times
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                // current time
-                Text(
-                  isInitialized ? widget.formatTime(position) : '00:00:00',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(width: 5),
-
-                // slider progress bar with thumb
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 15,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 12,
-                      ),
-                      thumbColor: Colors.amber,
-                      activeTrackColor: Colors.amber,
-                      inactiveTrackColor: Colors.grey,
-                      overlayColor: Colors.amber.withValues(alpha: 0.2),
-                    ),
-                    child: Slider(
-                      min: 0,
-                      max: maxMillis > 0 ? maxMillis : 1,
-                      value: currentMillis,
-                      onChangeStart: (v) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragValue = v;
-                        });
-                      },
-                      onChanged: (v) {
-                        setState(() {
-                          _dragValue = v;
-                        });
-                      },
-                      onChangeEnd: (v) {
-                        final seekPosition = Duration(milliseconds: v.toInt());
-                        controller.seekTo(seekPosition);
-                        state._syncSeek(seekPosition);
-                        setState(() {
-                          _isDragging = false;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 5),
-                // total time
-                Text(
-                  isInitialized ? widget.formatTime(duration) : '00:00:00',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
-          Padding(
-            padding: const EdgeInsets.only(left: 18.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // speed menu...
-                PopupMenuButton<double>(
-                  color: Colors.black,
-                  initialValue: controller.value.playbackRate,
-                  onSelected: (s) => controller.setPlaybackRate(s),
-                  itemBuilder: (_) {
-                    const textStyle = TextStyle(
-                      fontSize: 15,
-                      color: Colors.white,
-                    );
-                    return const [
-                      PopupMenuItem(
-                        value: 0.5,
-                        child: Text("0.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.0,
-                        child: Text("1.0x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.5,
-                        child: Text("1.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 2.0,
-                        child: Text("2.0x", style: textStyle),
-                      ),
-                    ];
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.speed, color: Colors.white),
-                      const SizedBox(width: 5),
-                      const Text(
-                        "Speed ",
-                        style: TextStyle(color: Colors.white, fontSize: 15),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        "(${controller.value.playbackRate}x)",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // episode, settings, PiP, fullscreen...
-                Row(
+        return SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: Column(
+            children: [
+              // Progress + times
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
                   children: [
-                    TextButton.icon(
-                      icon: Icon(
-                        Icons.playlist_play,
-                        color: state._showEpisodeList
-                            ? Colors.amber
-                            : Colors.white,
+                    // current time
+                    Text(
+                      isInitialized ? widget.formatTime(position) : '00:00:00',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      label: Text(
-                        "List Content",
-                        style: TextStyle(
-                          color: state._showEpisodeList
-                              ? Colors.amber
-                              : Colors.white,
+                    ),
+                    const SizedBox(width: 5),
+
+                    // slider progress bar with thumb
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 15,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 12,
+                          ),
+                          thumbColor: Colors.amber,
+                          activeTrackColor: Colors.amber,
+                          inactiveTrackColor: Colors.grey,
+                          overlayColor: Colors.amber.withValues(alpha: 0.2),
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: maxMillis > 0 ? maxMillis : 1,
+                          value: currentMillis,
+                          onChangeStart: (v) {
+                            setState(() {
+                              _isDragging = true;
+                              _dragValue = v;
+                            });
+                          },
+                          onChanged: (v) {
+                            setState(() {
+                              _dragValue = v;
+                            });
+                          },
+                          onChangeEnd: (v) {
+                            final seekPosition = Duration(
+                              milliseconds: v.toInt(),
+                            );
+                            controller.seekTo(seekPosition);
+                            state._syncSeek(seekPosition);
+                            setState(() {
+                              _isDragging = false;
+                            });
+                          },
                         ),
                       ),
-                      onPressed: () =>
-                          state.setState(() => state._showEpisodeList = true),
                     ),
-                    TextButton.icon(
-                      icon: Icon(
-                        Icons.people,
-                        color: state._watchPartyRoom != null
-                            ? Colors.amber
-                            : Colors.white,
-                      ),
-                      label: Text(
-                        "Watch Party",
-                        style: TextStyle(
-                          color: state._watchPartyRoom != null
-                              ? Colors.amber
-                              : Colors.white,
-                        ),
-                      ),
-                      onPressed: () {
-                        if (state.mounted) {
-                          if (state._watchPartyRoom != null) {
-                            state.setState(() => state._showWatchParty = true);
-                          } else {
-                            state._showWatchPartyDialog();
-                          }
-                        }
-                      },
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        if (state._isInPiP) {
-                          state._exitPiPMode();
-                        } else {
-                          state._enterPiPMode();
-                        }
-                      },
-                      icon: Icon(
-                        state._isInPiP
-                            ? Icons.picture_in_picture_outlined
-                            : Icons.picture_in_picture_alt_rounded,
+
+                    const SizedBox(width: 5),
+                    // total time
+                    Text(
+                      isInitialized ? widget.formatTime(duration) : '00:00:00',
+                      style: const TextStyle(
                         color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      tooltip: state._isInPiP ? 'Exit PiP' : 'Enter PiP',
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.fullscreen_exit,
-                        color: Colors.white,
-                      ),
-                      onPressed: () {
-                        SystemChrome.setPreferredOrientations([
-                          DeviceOrientation.portraitUp,
-                        ]);
-                        SystemChrome.setEnabledSystemUIMode(
-                          SystemUiMode.leanBack,
-                        );
-                        Navigator.pop(context);
-                      },
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
+              Padding(
+                padding: const EdgeInsets.only(left: 18.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // speed menu...
+                    PopupMenuButton<double>(
+                      color: Colors.black,
+                      initialValue: controller.value.playbackRate,
+                      onSelected: (s) => controller.setPlaybackRate(s),
+                      itemBuilder: (_) {
+                        const textStyle = TextStyle(
+                          fontSize: 15,
+                          color: Colors.white,
+                        );
+                        return const [
+                          PopupMenuItem(
+                            value: 0.5,
+                            child: Text("0.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.0,
+                            child: Text("1.0x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.5,
+                            child: Text("1.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 2.0,
+                            child: Text("2.0x", style: textStyle),
+                          ),
+                        ];
+                      },
+                      child: Row(
+                        children: [
+                          Icon(Icons.speed, color: Colors.white),
+                          const SizedBox(width: 5),
+                          const Text(
+                            "Speed ",
+                            style: TextStyle(color: Colors.white, fontSize: 15),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "(${controller.value.playbackRate}x)",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // episode, settings, PiP, fullscreen...
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(
+                            Icons.playlist_play,
+                            color: state._showEpisodeList
+                                ? Colors.amber
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            "List Content",
+                            style: TextStyle(
+                              color: state._showEpisodeList
+                                  ? Colors.amber
+                                  : Colors.white,
+                            ),
+                          ),
+                          onPressed: () => state.setState(
+                            () => state._showEpisodeList = true,
+                          ),
+                        ),
+                        TextButton.icon(
+                          icon: Icon(
+                            Icons.people,
+                            color: state._watchPartyRoom != null
+                                ? Colors.amber
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            "Watch Party",
+                            style: TextStyle(
+                              color: state._watchPartyRoom != null
+                                  ? Colors.amber
+                                  : Colors.white,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (state.mounted) {
+                              if (state._watchPartyRoom != null) {
+                                state.setState(
+                                  () => state._showWatchParty = true,
+                                );
+                              } else {
+                                state._showWatchPartyDialog();
+                              }
+                            }
+                          },
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            if (state._isInPiP) {
+                              state._exitPiPMode();
+                            } else {
+                              state._enterPiPMode();
+                            }
+                          },
+                          icon: Icon(
+                            state._isInPiP
+                                ? Icons.picture_in_picture_outlined
+                                : Icons.picture_in_picture_alt_rounded,
+                            color: Colors.white,
+                          ),
+                          tooltip: state._isInPiP ? 'Exit PiP' : 'Enter PiP',
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.fullscreen_exit,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            SystemChrome.setPreferredOrientations([
+                              DeviceOrientation.portraitUp,
+                            ]);
+                            SystemChrome.setEnabledSystemUIMode(
+                              SystemUiMode.leanBack,
+                            );
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
       },
     );
   }
@@ -1684,7 +1723,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
     try {
       // Get all lists
       final allLists = await StorageService.getUserLists();
-      
+
       // Get list IDs for current video
       List<String> targetListIds = widget.listIds ?? [];
       if (targetListIds.isEmpty && widget.url != null) {
@@ -1698,14 +1737,14 @@ class _ListContentOverlayState extends State<ListContentOverlay>
           targetListIds = [StorageService.defaultListId];
         }
       }
-      
+
       if (targetListIds.isEmpty) {
         targetListIds = [StorageService.defaultListId];
       }
 
       // Show ALL lists, not just those containing this video
       _lists = allLists;
-      
+
       // Find the index of the first list that contains this video (for default selection)
       // Prioritize the primary list (first in targetListIds)
       int defaultTabIndex = 0;
@@ -1769,7 +1808,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
 
   void _playVideo(SavedLink link) {
     final state = context.findAncestorStateOfType<_YTFullState>()!;
-    
+
     if (link.type == LinkType.youtube) {
       final videoId = LinkParser.extractYouTubeVideoId(link.url);
       if (videoId != null) {
@@ -1777,7 +1816,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
         if (mounted) {
           setState(() => state._showEpisodeList = false);
         }
-        
+
         // Update watch party room state if host
         if (state._watchPartyService.isHost && state._watchPartyRoom != null) {
           state._watchPartyService.updateRoomState(
@@ -1792,9 +1831,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
       // For non-YouTube videos, navigate to detail page
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => VideoDetailScreen(link: link),
-        ),
+        MaterialPageRoute(builder: (context) => VideoDetailScreen(link: link)),
       );
     }
   }
@@ -1843,14 +1880,15 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () {
-                    final state = context.findAncestorStateOfType<_YTFullState>()!;
+                    final state = context
+                        .findAncestorStateOfType<_YTFullState>()!;
                     state.setState(() => state._showEpisodeList = false);
                   },
                 ),
               ],
             ),
           ),
-          
+
           // Tab Bar
           if (_tabController != null)
             TabBar(
@@ -1865,7 +1903,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                 final list = entry.value;
                 final isSelected = _selectedTabIndex == index;
                 return Tab(
-      child: Container(
+                  child: Container(
                     height: 40.0,
                     decoration: !isSelected
                         ? BoxDecoration(
@@ -1889,12 +1927,13 @@ class _ListContentOverlayState extends State<ListContentOverlay>
               }).toList(),
               indicator: const BoxDecoration(),
             ),
-          
+
           const SizedBox(height: 5),
-          
+
           // Videos List
           Expanded(
-            child: _listVideos.isEmpty || _selectedTabIndex >= _listVideos.length
+            child:
+                _listVideos.isEmpty || _selectedTabIndex >= _listVideos.length
                 ? const Center(
                     child: Text(
                       'No videos in this list',
@@ -1905,16 +1944,26 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                     itemCount: _listVideos[_selectedTabIndex].length,
                     itemBuilder: (context, index) {
                       final video = _listVideos[_selectedTabIndex][index];
-                      final isCurrentVideo = widget.currentVideoId != null &&
+                      final isCurrentVideo =
+                          widget.currentVideoId != null &&
                           video.type == LinkType.youtube &&
-                          LinkParser.extractYouTubeVideoId(video.url) == widget.currentVideoId;
-                      
+                          LinkParser.extractYouTubeVideoId(video.url) ==
+                              widget.currentVideoId;
+
                       return GestureDetector(
                         onTap: () => _playVideo(video),
                         child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
-                          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
-                          color: isCurrentVideo ? Colors.amber.withOpacity(0.2) : Colors.transparent,
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 0,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 12,
+                          ),
+                          color: isCurrentVideo
+                              ? Colors.amber.withOpacity(0.2)
+                              : Colors.transparent,
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1949,7 +1998,8 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                 child: Padding(
                                   padding: const EdgeInsets.only(left: 8.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: [
                                       Text(
@@ -1964,7 +2014,8 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      if (video.description != null && video.description!.isNotEmpty) ...[
+                                      if (video.description != null &&
+                                          video.description!.isNotEmpty) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           video.description!,
