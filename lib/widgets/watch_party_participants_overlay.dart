@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:elysian/models/watch_party_models.dart';
-import 'package:elysian/services/watch_party_service.dart';
 import 'package:elysian/widgets/watch_party_chat_overlay.dart';
 import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
 import 'package:elysian/providers/providers.dart';
@@ -25,49 +24,9 @@ class WatchPartyParticipantsOverlay extends StatefulWidget {
 
 class _WatchPartyParticipantsOverlayState
     extends State<WatchPartyParticipantsOverlay> {
-  final _watchPartyService = WatchPartyService();
   bool _showChat = false;
   final List<Reaction> _activeReactions = [];
-
-  @override
-  void initState() {
-    super.initState();
-    // Store existing callbacks and chain them
-    final existingReactionCallback = _watchPartyService.onReaction;
-    final existingChatCallback = _watchPartyService.onChatMessage;
-    
-    _watchPartyService.onReaction = (reaction) {
-      // Call existing callback first (from video player)
-      existingReactionCallback?.call(reaction);
-      // Then handle in this overlay
-      if (mounted) {
-        setState(() {
-          _activeReactions.add(reaction);
-        });
-        // Remove reaction after animation
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _activeReactions.remove(reaction);
-            });
-          }
-        });
-      }
-    };
-    
-    // Chain chat callback to ensure global manager also receives it
-    _watchPartyService.onChatMessage = (message) {
-      // Call existing callback first (from global manager/video player)
-      existingChatCallback?.call(message);
-      // Chat overlay will handle it via its own callback
-    };
-  }
-
-  @override
-  void dispose() {
-    _watchPartyService.onReaction = null;
-    super.dispose();
-  }
+  final Map<String, Future<void>> _pendingReactionRemovals = {};
 
   @override
   Widget build(BuildContext context) {
@@ -82,20 +41,76 @@ class _WatchPartyParticipantsOverlayState
       );
     }
 
-    return Stack(
-      children: [
-        _buildParticipantsView(),
-        // Show active reactions
-        ..._activeReactions.map((reaction) => WatchPartyReactionOverlay(
-              reaction: reaction,
-              onComplete: () {
-                setState(() {
-                  _activeReactions.remove(reaction);
-                });
+    return Consumer<WatchPartyProvider>(
+      builder: (context, provider, child) {
+        // Sync reactions from provider - only show reactions from last 3 seconds
+        final now = DateTime.now();
+        final recentReactions = provider.recentReactions.where((reaction) {
+          final age = now.difference(reaction.timestamp);
+          return age.inSeconds < 3; // Only show reactions less than 3 seconds old
+        }).toList();
+        
+        // Add new reactions that aren't already active
+        for (final reaction in recentReactions) {
+          if (!_activeReactions.any((r) => r.id == reaction.id)) {
+            _activeReactions.add(reaction);
+            // Remove reaction after animation (3 seconds from now)
+            final removalFuture = Future.delayed(
+              const Duration(seconds: 3),
+              () {
+                if (mounted) {
+                  setState(() {
+                    _activeReactions.remove(reaction);
+                    _pendingReactionRemovals.remove(reaction.id);
+                  });
+                }
               },
-            )),
-      ],
+            );
+            _pendingReactionRemovals[reaction.id] = removalFuture;
+          }
+        }
+        
+        // Remove reactions that are too old or no longer in recent reactions
+        _activeReactions.removeWhere((reaction) {
+          final age = now.difference(reaction.timestamp);
+          final isOld = age.inSeconds >= 3;
+          final notInRecent = !recentReactions.any((r) => r.id == reaction.id);
+          if (isOld || notInRecent) {
+            _pendingReactionRemovals.remove(reaction.id);
+            return true;
+          }
+          return false;
+        });
+
+        return Stack(
+          children: [
+            _buildParticipantsView(),
+            // Show active reactions
+            ..._activeReactions.map(
+              (reaction) => WatchPartyReactionOverlay(
+                reaction: reaction,
+                onComplete: () {
+                  if (mounted) {
+                    setState(() {
+                      _activeReactions.remove(reaction);
+                      _pendingReactionRemovals.remove(reaction.id);
+                    });
+                  }
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  @override
+  void dispose() {
+    // Clear all pending reaction removals
+    _pendingReactionRemovals.clear();
+    _activeReactions.clear();
+    super.dispose();
   }
 
   Widget _buildParticipantsView() {
@@ -144,16 +159,11 @@ class _WatchPartyParticipantsOverlayState
                         ),
                       ),
                     ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: widget.onClose,
-                  ),
                 ],
               ),
             ),
             const Divider(color: Colors.grey),
-            
+
             // Room Info
             Padding(
               padding: const EdgeInsets.all(16),
@@ -215,7 +225,7 @@ class _WatchPartyParticipantsOverlayState
               ),
             ),
             const Divider(color: Colors.grey),
-            
+
             // Action buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -239,9 +249,13 @@ class _WatchPartyParticipantsOverlayState
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ReactionPicker(
-                      onReactionSelected: (type) {
-                        _watchPartyService.sendReaction(type);
+                    child: Consumer<WatchPartyProvider>(
+                      builder: (context, provider, child) {
+                        return ReactionPicker(
+                          onReactionSelected: (type) {
+                            provider.sendReaction(type);
+                          },
+                        );
                       },
                     ),
                   ),
@@ -249,7 +263,7 @@ class _WatchPartyParticipantsOverlayState
               ),
             ),
             const Divider(color: Colors.grey),
-            
+
             // Exit Watch Party Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -296,21 +310,21 @@ class _WatchPartyParticipantsOverlayState
                         if (context.mounted) {
                           Navigator.of(context).pop();
                         }
-                        
+
                         // Leave the room (this will clean up state)
                         await provider.leaveRoom();
-                        
+
                         // Small delay to ensure state is cleaned up
                         await Future.delayed(const Duration(milliseconds: 100));
-                        
+
                         // Call onClose callback if provided (this closes the watch party dialog)
                         if (widget.onClose != null && context.mounted) {
                           widget.onClose!();
                         }
-                        
+
                         // Additional delay to ensure dialogs are closed
                         await Future.delayed(const Duration(milliseconds: 100));
-                        
+
                         // Ensure we're back to home screen - but only if still mounted
                         if (context.mounted) {
                           final navigator = Navigator.of(context);
@@ -340,7 +354,7 @@ class _WatchPartyParticipantsOverlayState
               ),
             ),
             const Divider(color: Colors.grey),
-            
+
             // Participants List
             Expanded(
               child: ListView.builder(
@@ -441,10 +455,13 @@ class _WatchPartyParticipantsOverlayState
 
   Widget _buildConnectionStatus() {
     // Use provider to get connection status (works for both Firebase and local)
-    final watchPartyProvider = Provider.of<WatchPartyProvider>(context, listen: true);
+    final watchPartyProvider = Provider.of<WatchPartyProvider>(
+      context,
+      listen: true,
+    );
     final isConnected = watchPartyProvider.isConnected;
     final error = watchPartyProvider.connectionError;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -485,7 +502,7 @@ class _WatchPartyParticipantsOverlayState
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
-    
+
     if (difference.inMinutes < 1) {
       return 'just now';
     } else if (difference.inMinutes < 60) {
@@ -497,4 +514,3 @@ class _WatchPartyParticipantsOverlayState
     }
   }
 }
-

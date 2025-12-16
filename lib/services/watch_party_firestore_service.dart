@@ -194,6 +194,46 @@ class WatchPartyFirestoreService {
     }
   }
 
+  /// Delete all chat messages and reactions for a room (when party ends)
+  Future<void> deleteRoomData(String roomId) async {
+    try {
+      final roomRef = _firestore
+          .collection('watch_party_rooms')
+          .doc(roomId);
+
+      // Get all messages and delete them in batch
+      final messagesSnapshot = await roomRef
+          .collection('messages')
+          .get();
+      
+      if (messagesSnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in messagesSnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      // Get all reactions and delete them in batch
+      final reactionsSnapshot = await roomRef
+          .collection('reactions')
+          .get();
+      
+      if (reactionsSnapshot.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in reactionsSnapshot.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      debugPrint('Deleted all chat messages and reactions for room $roomId');
+    } catch (e) {
+      debugPrint('Error deleting room data from Firestore: $e');
+      // Don't rethrow - cleanup should be best effort
+    }
+  }
+
   /// Clean up resources
   void dispose() {
     _messagesSubscription?.cancel();

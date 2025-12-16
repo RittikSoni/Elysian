@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:elysian/models/watch_party_models.dart';
 
-class WatchPartyReactionOverlay extends StatelessWidget {
+class WatchPartyReactionOverlay extends StatefulWidget {
   final Reaction reaction;
   final VoidCallback? onComplete;
 
@@ -13,11 +13,32 @@ class WatchPartyReactionOverlay extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<WatchPartyReactionOverlay> createState() =>
+      _WatchPartyReactionOverlayState();
+}
+
+class _WatchPartyReactionOverlayState extends State<WatchPartyReactionOverlay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
     // Auto-remove after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      onComplete?.call();
+    _timer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        widget.onComplete?.call();
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
 
     return Positioned.fill(
       child: IgnorePointer(
@@ -41,7 +62,7 @@ class WatchPartyReactionOverlay extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Text(
-                          reaction.type.emoji,
+                          widget.reaction.type.emoji,
                           style: const TextStyle(fontSize: 64),
                         ),
                       ),
@@ -67,7 +88,7 @@ class WatchPartyReactionOverlay extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        '${reaction.participantName} ${reaction.type.emoji}',
+                        '${widget.reaction.participantName} ${widget.reaction.type.emoji}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -98,7 +119,7 @@ class ReactionPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(24),
@@ -106,21 +127,22 @@ class ReactionPicker extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: ReactionType.values.map((type) {
             return GestureDetector(
               onTap: () => onReactionSelected(type),
               child: Container(
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   type.emoji,
-                  style: const TextStyle(fontSize: 24),
+                  style: const TextStyle(fontSize: 20),
                 ),
               ),
             );

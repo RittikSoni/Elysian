@@ -34,6 +34,7 @@ class WatchPartyProvider with ChangeNotifier {
   List<Reaction> _recentReactions = [];
   ChatMessage? _latestChatNotification;
   Reaction? _latestReactionNotification;
+  String? _roomEndedMessage; // Message when host ends party
   
   // Global overlay for notifications
   OverlayEntry? _notificationOverlay;
@@ -47,10 +48,14 @@ class WatchPartyProvider with ChangeNotifier {
       : _watchPartyService.isHost;
   bool get isConnected => _isConnected;
   String? get connectionError => _connectionError;
+  String? get currentParticipantId => _useFirebase
+      ? _firebaseService.currentParticipantId
+      : _watchPartyService.currentParticipantId;
   List<ChatMessage> get recentMessages => List.unmodifiable(_recentMessages);
   List<Reaction> get recentReactions => List.unmodifiable(_recentReactions);
   ChatMessage? get latestChatNotification => _latestChatNotification;
   Reaction? get latestReactionNotification => _latestReactionNotification;
+  String? get roomEndedMessage => _roomEndedMessage;
   
   static const int _maxMessages = 100;
   static const int _maxReactions = 50;
@@ -133,6 +138,121 @@ class WatchPartyProvider with ChangeNotifier {
         _handleReaction(reaction);
       }
     };
+    
+    _firebaseService.onRoomEnded = (reason) {
+      if (_useFirebase) {
+        _handleRoomEnded(reason);
+      }
+    };
+  }
+  
+  /// Handle room ended (host ended party)
+  void _handleRoomEnded(String reason) {
+    _roomEndedMessage = reason;
+    _currentRoom = null;
+    _isConnected = false;
+    _connectionError = reason;
+    _recentMessages.clear();
+    _recentReactions.clear();
+    _latestChatNotification = null;
+    _latestReactionNotification = null;
+    _removeGlobalNotification();
+    _hideIndicatorOverlay();
+    notifyListeners();
+    
+    // Show notification dialog after a short delay to ensure UI is ready
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _showRoomEndedDialog(reason);
+    });
+  }
+  
+  /// Show dialog when room ends
+  void _showRoomEndedDialog(String reason) {
+    // Use a delayed check to ensure context is available
+    Future.delayed(const Duration(milliseconds: 100), () {
+      final context = navigatorKey.currentContext;
+      if (context == null) {
+        debugPrint('WatchPartyProvider: Context not available for room ended dialog');
+        return;
+      }
+      
+      // Check if dialog is already showing
+      if (!context.mounted) return;
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.amber.withOpacity(0.5), width: 2),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.amber, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Watch Party Ended',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              reason,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Have a great time soon again! 🎬',
+              style: TextStyle(
+                color: Colors.amber,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _roomEndedMessage = null;
+              notifyListeners();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+        ),
+      );
+    });
   }
   
   /// Handle room update
@@ -723,11 +843,14 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Leave room
   Future<void> leaveRoom() async {
+    final wasHost = isHost;
+    
     if (_useFirebase) {
       await _firebaseService.leaveRoom();
     } else {
       await _watchPartyService.leaveRoom();
     }
+    
     _currentRoom = null;
     _isConnected = false;
     _connectionError = null;
@@ -735,9 +858,15 @@ class WatchPartyProvider with ChangeNotifier {
     _recentReactions.clear();
     _latestChatNotification = null;
     _latestReactionNotification = null;
+    _roomEndedMessage = null;
     _removeGlobalNotification();
     _hideIndicatorOverlay();
     notifyListeners();
+    
+    // If host left, show confirmation
+    if (wasHost && _useFirebase) {
+      debugPrint('Host left watch party - all participants will be notified');
+    }
   }
   
   /// Send chat message

@@ -46,6 +46,7 @@ class WatchPartyFirebaseService {
   Function(ChatMessage)? onChatMessage;
   Function(Reaction)? onReaction;
   Function(String videoUrl, String videoTitle)? onVideoChange;
+  Function(String reason)? onRoomEnded; // Called when host ends party or room is deleted
 
   // Getters
   bool get isConnected => _isConnected;
@@ -299,9 +300,13 @@ class WatchPartyFirebaseService {
     _roomSubscription?.cancel();
     _roomSubscription = _roomRef!.onValue.listen((event) {
       if (event.snapshot.value == null) {
-        // Room was deleted
+        // Room was deleted (host ended party)
         _isConnected = false;
         _connectionError = 'Room was closed';
+        // Notify that room ended
+        if (!_isHost) {
+          onRoomEnded?.call('Host ended the watch party');
+        }
         // Don't clear onRoomUpdate callback, let provider handle it
         return;
       }
@@ -309,9 +314,13 @@ class WatchPartyFirebaseService {
       try {
         final rawData = event.snapshot.value;
         if (rawData == null) {
-          // Room was deleted
+          // Room was deleted (host ended party)
           _isConnected = false;
           _connectionError = 'Room was closed';
+          // Notify that room ended
+          if (!_isHost) {
+            onRoomEnded?.call('Host ended the watch party');
+          }
           return;
         }
 
@@ -672,10 +681,16 @@ class WatchPartyFirebaseService {
       }
     }
 
-    // If host, delete the room
-    if (_isHost && _roomRef != null) {
+    // If host, delete the room and all chat/reactions
+    if (_isHost && _roomRef != null && _currentRoomId != null) {
       try {
+        // Delete all Firestore chat messages and reactions first
+        await _firestoreService.deleteRoomData(_currentRoomId!);
+        
+        // Then delete the room from Realtime DB (this will trigger onRoomEnded for participants)
         await _roomRef!.remove();
+        
+        debugPrint('Host ended watch party - deleted room and all chat/reactions');
       } catch (e) {
         debugPrint('Error deleting room: $e');
       }
