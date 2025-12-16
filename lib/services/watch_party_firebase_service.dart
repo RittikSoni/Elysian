@@ -3,6 +3,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/services/watch_party_firestore_service.dart';
+import 'package:elysian/services/video_streaming_service.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
 /// Firebase Realtime Database service for watch party
@@ -107,11 +109,30 @@ class WatchPartyFirebaseService {
 
       final roomCode = _generateRoomCode();
 
+      // Check if video is a local file and start streaming if needed
+      String finalVideoUrl = videoUrl;
+      if (VideoStreamingService.isLocalFile(videoUrl)) {
+        final networkInfo = NetworkInfo();
+        final localIp = await networkInfo.getWifiIP();
+        if (localIp != null) {
+          final streamingUrl = await VideoStreamingService().startStreaming(
+            videoPath: videoUrl,
+            hostIp: localIp,
+          );
+          if (streamingUrl != null) {
+            finalVideoUrl = streamingUrl;
+            debugPrint('Local video streaming started: $streamingUrl');
+          } else {
+            debugPrint('Failed to start video streaming, using original path');
+          }
+        }
+      }
+
       final room = WatchPartyRoom(
         roomId: roomId,
         hostId: hostId,
         hostName: hostName,
-        videoUrl: videoUrl,
+        videoUrl: finalVideoUrl,
         videoTitle: videoTitle,
         currentPosition: initialPosition,
         isPlaying: initialPlaying,
@@ -652,6 +673,11 @@ class WatchPartyFirebaseService {
 
     // Dispose Firestore service (chat/reactions)
     _firestoreService.dispose();
+
+    // Stop video streaming if host is leaving
+    if (_isHost) {
+      await VideoStreamingService().stopStreaming();
+    }
 
     // Remove participant from room if not host
     if (!_isHost && _roomRef != null && _currentParticipantId != null) {

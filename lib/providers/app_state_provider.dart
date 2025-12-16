@@ -11,17 +11,24 @@ class AppStateProvider with ChangeNotifier {
   List<String> _recentSearches = [];
   bool _isLoadingRecentSearches = false;
 
+  // Theme preference
+  bool? _isDarkMode;
+  bool _isLoadingTheme = false;
+
   // Getters
   bool get isInbuiltPlayer => _isInbuiltPlayer ?? true;
   bool get isLoadingPlayerPreference => _isLoadingPlayerPreference;
   List<String> get recentSearches => List.unmodifiable(_recentSearches);
   bool get isLoadingRecentSearches => _isLoadingRecentSearches;
+  bool get isDarkMode => _isDarkMode ?? true; // Default to dark mode
+  bool get isLoadingTheme => _isLoadingTheme;
 
   /// Initialize app state
   Future<void> initialize() async {
     await Future.wait([
       _loadPlayerPreference(),
       _loadRecentSearches(),
+      _loadThemePreference(),
     ]);
   }
 
@@ -92,6 +99,35 @@ class AppStateProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error clearing recent searches: $e');
+      rethrow;
+    }
+  }
+
+  /// Load theme preference
+  Future<void> _loadThemePreference() async {
+    if (_isLoadingTheme) return;
+    
+    _isLoadingTheme = true;
+    notifyListeners();
+
+    try {
+      _isDarkMode = await StorageService.isDarkMode();
+    } catch (e) {
+      debugPrint('Error loading theme preference: $e');
+    } finally {
+      _isLoadingTheme = false;
+      notifyListeners();
+    }
+  }
+
+  /// Set theme preference
+  Future<void> setThemePreference(bool isDark) async {
+    try {
+      await StorageService.setThemePreference(isDark);
+      _isDarkMode = isDark;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error setting theme preference: $e');
       rethrow;
     }
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:elysian/models/watch_party_models.dart';
+import 'package:elysian/services/video_streaming_service.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
@@ -61,14 +62,58 @@ class WatchPartyService {
   }
 
   /// Get local IP address
+  /// Handles Android emulator IPs (10.0.2.x) by detecting them and providing alternatives
   Future<String?> getLocalIp() async {
     try {
       final wifiIP = await _networkInfo.getWifiIP();
+      
+      // Check if we're on an Android emulator (10.0.2.x range)
+      if (wifiIP != null && wifiIP.startsWith('10.0.2.')) {
+        debugPrint('WatchParty: Detected Android emulator IP: $wifiIP');
+        debugPrint('WatchParty: Emulator IPs are not accessible from other devices');
+        debugPrint('WatchParty: For emulator-to-emulator: use 10.0.2.2');
+        debugPrint('WatchParty: For device-to-emulator: use host machine IP with port forwarding');
+        
+        // Try to get the actual network IP of the host machine
+        // This works by trying to connect to a public DNS server and checking the local IP
+        try {
+          final interfaces = await NetworkInterface.list(
+            includeLinkLocal: false,
+            type: InternetAddressType.IPv4,
+          );
+          
+          // Find a non-loopback, non-emulator IP
+          for (final interface in interfaces) {
+            for (final addr in interface.addresses) {
+              final ip = addr.address;
+              // Skip loopback and emulator IPs
+              if (!ip.startsWith('127.') && 
+                  !ip.startsWith('10.0.2.') && 
+                  !ip.startsWith('169.254.')) {
+                debugPrint('WatchParty: Found host machine IP: $ip');
+                return ip;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('WatchParty: Could not get host machine IP: $e');
+        }
+        
+        // Fallback: return 10.0.2.2 for emulator-to-emulator connections
+        // Note: This only works for emulator-to-emulator, not device-to-emulator
+        return '10.0.2.2';
+      }
+      
       return wifiIP;
     } catch (e) {
       debugPrint('Error getting local IP: $e');
       return null;
     }
+  }
+  
+  /// Check if an IP address is an emulator IP
+  bool isEmulatorIp(String? ip) {
+    return ip != null && (ip.startsWith('10.0.2.') || ip == '10.0.2.2');
   }
 
   /// Create a new watch party room (host)
@@ -86,11 +131,29 @@ class WatchPartyService {
 
     final roomCode = _generateRoomCode();
 
+    // Check if video is a local file and start streaming if needed
+    String finalVideoUrl = videoUrl;
+    if (VideoStreamingService.isLocalFile(videoUrl)) {
+      final localIp = await getLocalIp();
+      if (localIp != null) {
+        final streamingUrl = await VideoStreamingService().startStreaming(
+          videoPath: videoUrl,
+          hostIp: localIp,
+        );
+        if (streamingUrl != null) {
+          finalVideoUrl = streamingUrl;
+          debugPrint('Local video streaming started: $streamingUrl');
+        } else {
+          debugPrint('Failed to start video streaming, using original path');
+        }
+      }
+    }
+
     final room = WatchPartyRoom(
       roomId: roomId,
       hostId: hostId,
       hostName: hostName,
-      videoUrl: videoUrl,
+      videoUrl: finalVideoUrl,
       videoTitle: videoTitle,
       currentPosition: initialPosition,
       isPlaying: initialPlaying,
@@ -115,6 +178,14 @@ class WatchPartyService {
     if (_server != null) {
       _isConnected = true;
       _connectionError = null;
+      // Ensure _hostPort is set even if it wasn't set in _startServer
+      if (_hostPort == null) {
+        _hostPort = _server!.port;
+        debugPrint('WatchParty: _hostPort was null, set to ${_server!.port}');
+      }
+      debugPrint('WatchParty: Server confirmed running, port: ${_server!.port}, _hostPort: $_hostPort');
+    } else {
+      debugPrint('WatchParty: WARNING - Server is null after _startServer()');
     }
 
     return room;
@@ -122,18 +193,27 @@ class WatchPartyService {
 
   /// Start HTTP server for receiving sync messages
   Future<void> _startServer() async {
-    if (_server != null) return;
+    if (_server != null) {
+      debugPrint('WatchParty: Server already running on port ${_server!.port}');
+      return;
+    }
 
     try {
+      debugPrint('WatchParty: Starting server...');
       _server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
       final port = _server!.port;
-      debugPrint('WatchParty server started on port $port');
+      _hostPort = port; // Store the port
+      debugPrint('WatchParty: Server started successfully on port $port');
+      debugPrint('WatchParty: _hostPort set to $_hostPort');
 
       _server!.listen((HttpRequest request) async {
         await _handleRequest(request);
       });
-    } catch (e) {
-      debugPrint('Error starting server: $e');
+    } catch (e, stackTrace) {
+      debugPrint('WatchParty: Error starting server: $e');
+      debugPrint('WatchParty: Stack trace: $stackTrace');
+      _hostPort = null;
+      _server = null;
     }
   }
 
@@ -688,6 +768,11 @@ class WatchPartyService {
       _server = null;
     }
 
+    // Stop video streaming if host is leaving
+    if (_isHost) {
+      await VideoStreamingService().stopStreaming();
+    }
+
     _currentRoom = null;
     _currentParticipantId = null;
     _isHost = false;
@@ -702,7 +787,16 @@ class WatchPartyService {
 
   /// Get server port (for sharing with guests)
   int? getServerPort() {
-    return _server?.port;
+    // Return stored port or server port
+    // Try multiple sources to ensure we get the port
+    int? port = _hostPort;
+    if (port == null && _server != null) {
+      port = _server!.port;
+      // Update _hostPort if we got it from server
+      _hostPort = port;
+    }
+    debugPrint('WatchParty: getServerPort() called - _hostPort: $_hostPort, _server?.port: ${_server?.port}, _server is null: ${_server == null}, returning: $port');
+    return port;
   }
 
   /// Dispose resources

@@ -723,18 +723,24 @@ class WatchPartyProvider with ChangeNotifier {
   Future<WatchPartyRoom?> createRoom(
     String participantName, {
     bool useOnline = false,
+    String? videoUrl,
+    String? videoTitle,
+    Duration? initialPosition,
+    bool? initialPlaying,
   }) async {
-    // Use Firebase if explicitly requested or if auto-detected
-    final shouldUseFirebase = useOnline || _useFirebase;
+    // Use Firebase only if explicitly requested (useOnline=true)
+    // If useOnline=false, always use local network regardless of Firebase availability
+    // If useOnline is not specified (default false), use Firebase if available, otherwise local
+    final shouldUseFirebase = useOnline;
     
     try {
       if (shouldUseFirebase) {
         final room = await _firebaseService.createRoom(
           hostName: participantName,
-          videoUrl: '',
-          videoTitle: 'Watch Party',
-          initialPosition: Duration.zero,
-          initialPlaying: false,
+          videoUrl: videoUrl ?? '',
+          videoTitle: videoTitle ?? 'Watch Party',
+          initialPosition: initialPosition ?? Duration.zero,
+          initialPlaying: initialPlaying ?? false,
         );
         _currentRoom = room;
         // Force update to use Firebase service
@@ -754,26 +760,39 @@ class WatchPartyProvider with ChangeNotifier {
         return room;
       } else {
         // Fall back to local network
+        debugPrint('WatchPartyProvider: Creating local network room');
         final room = await _watchPartyService.createRoom(
           hostName: participantName,
-          videoUrl: '',
-          videoTitle: 'Watch Party',
-          initialPosition: Duration.zero,
-          initialPlaying: false,
+          videoUrl: videoUrl ?? '',
+          videoTitle: videoTitle ?? 'Watch Party',
+          initialPosition: initialPosition ?? Duration.zero,
+          initialPlaying: initialPlaying ?? false,
         );
         _currentRoom = room;
         _isConnected = _watchPartyService.isConnected;
         _connectionError = _watchPartyService.connectionError;
+        
+        // Verify server port after room creation
+        final port = _watchPartyService.getServerPort();
+        debugPrint('WatchPartyProvider: Room created, server port: $port');
+        
         _updateIndicatorOverlay();
         notifyListeners();
         return room;
       }
     } catch (e) {
       debugPrint('Error creating room: $e');
-      // If Firebase fails and not explicitly requested, try local as fallback
-      if (shouldUseFirebase && !useOnline) {
-        _useFirebase = false;
-        return createRoom(participantName, useOnline: false);
+      // If Firebase fails and it was explicitly requested, try local as fallback
+      if (shouldUseFirebase && useOnline) {
+        debugPrint('WatchParty: Firebase failed, falling back to local network');
+        return createRoom(
+          participantName,
+          useOnline: false,
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+          initialPosition: initialPosition,
+          initialPlaying: initialPlaying,
+        );
       }
       return null;
     }

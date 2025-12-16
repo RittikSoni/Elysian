@@ -8,6 +8,7 @@ class StorageService {
   static const String _defaultListId = 'my_list';
   static const String _playerPreferenceKey = 'player_preference'; // 'inbuilt' or 'external'
   static const String _recentSearchesKey = 'recent_searches';
+  static const String _themePreferenceKey = 'theme_preference'; // 'dark' or 'light'
   static const int _maxRecentSearches = 10;
 
   // Saved Links
@@ -216,6 +217,17 @@ class StorageService {
   static Future<void> setPlayerPreference(bool useInbuilt) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_playerPreferenceKey, useInbuilt);
+  }
+
+  // Theme Preference
+  static Future<bool> isDarkMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_themePreferenceKey) ?? true; // Default to dark mode
+  }
+
+  static Future<void> setThemePreference(bool isDark) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_themePreferenceKey, isDark);
   }
 
   static String get defaultListId => _defaultListId;

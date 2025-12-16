@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:elysian/utils/kroute.dart';
+import 'package:elysian/utils/app_info.dart';
+import 'package:elysian/utils/app_themes.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/watch_party_global_manager.dart';
@@ -13,6 +15,9 @@ import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize App Info
+  await AppInfo.initialize();
 
   // Initialize Firebase
   try {
@@ -160,17 +165,19 @@ class _ElysianState extends State<Elysian> {
         ChangeNotifierProvider(create: (_) => AppStateProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => WatchPartyProvider()),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          scaffoldBackgroundColor: Colors.black,
-          primarySwatch: Colors.blue,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        title: 'Elysian',
-        navigatorKey: navigatorKey,
-        navigatorObservers: [routeObserver],
-        home: const BottomNav(),
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.lightTheme,
+            darkTheme: AppThemes.darkTheme,
+            themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            title: 'Elysian',
+            navigatorKey: navigatorKey,
+            navigatorObservers: [routeObserver],
+            home: const BottomNav(),
+          );
+        },
       ),
     );
   }

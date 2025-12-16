@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   flutter_inappwebview_windows
   flutter_volume_controller
+  permission_handler_windows
   screen_brightness_windows
   share_plus
   url_launcher_windows

@@ -205,6 +205,30 @@ class HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          // Tagline
+          SliverToBoxAdapter(
+            child: Builder(
+              builder: (context) {
+                final theme = Theme.of(context);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20.0),
+                  child: Center(
+                    child: Text(
+                      'Made with ❤️ in India',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: 20.0),
+          ),
         ],
       ),
     );

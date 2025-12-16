@@ -32,6 +32,7 @@ class YTFull extends StatefulWidget {
   final String? url; // Full URL to find the link in storage
   final List<String>? listIds; // List IDs this video belongs to
   final bool autoEnterPiP; // Auto-enter PiP mode after initialization
+  final bool adsEnabled; // Enable ads for YouTube videos
 
   const YTFull({
     super.key,
@@ -43,6 +44,7 @@ class YTFull extends StatefulWidget {
     this.url,
     this.listIds,
     this.autoEnterPiP = false,
+    this.adsEnabled = false,
   });
 
   @override
@@ -145,7 +147,10 @@ class _YTFullState extends State<YTFull> {
 
     _initVolumeAndBrightness();
     // Use provided videoId or fallback to first ID in list
-    final initialVideoId = widget.videoId ?? _ids.first;
+    final initialVideoId =
+        widget.videoId ??
+        LinkParser.extractYouTubeVideoId(widget.url ?? '') ??
+        _ids.first;
     _controller = YoutubePlayerController(
       initialVideoId: initialVideoId,
       flags: const YoutubePlayerFlags(
@@ -702,6 +707,7 @@ class _YTFullState extends State<YTFull> {
   }
 
   void _onMainVideoUpdate() {
+    if (!widget.adsEnabled) return;
     if (!_inAdBreak &&
         _nextAdIndex < _adPositions.length &&
         _controller.value.position >= _adPositions[_nextAdIndex]) {

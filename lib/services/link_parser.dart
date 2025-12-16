@@ -4,6 +4,11 @@ import 'package:http/http.dart' as http;
 
 class LinkParser {
   static LinkType? parseLinkType(String url) {
+    // Check if it's a local file path
+    if (_isLocalFilePath(url)) {
+      return LinkType.directVideo;
+    }
+    
     final uri = Uri.tryParse(url);
     if (uri == null) return null;
 
@@ -42,6 +47,35 @@ class LinkParser {
     }
     
     return null;
+  }
+
+  /// Check if URL is a local file path
+  static bool _isLocalFilePath(String url) {
+    // Check for common local file path patterns
+    if (url.startsWith('/') || 
+        url.startsWith('file://') ||
+        url.contains('/storage/') ||
+        url.contains('/data/') ||
+        url.contains('/Android/') ||
+        (url.contains('.') && !url.contains('://') && !url.startsWith('http'))) {
+      // Check if it has a video extension
+      final lowerUrl = url.toLowerCase();
+      const videoExtensions = [
+        '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm',
+        '.m4v', '.3gp', '.ts', '.mts', '.m2ts', '.vob'
+      ];
+      for (final ext in videoExtensions) {
+        if (lowerUrl.endsWith(ext)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Check if URL is a local file (for watch party compatibility)
+  static bool isLocalFile(String url) {
+    return _isLocalFilePath(url);
   }
 
   /// Checks if URL is a direct video file

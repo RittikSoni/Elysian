@@ -1,7 +1,7 @@
 import 'package:elysian/screens/home_screen.dart';
 import 'package:elysian/screens/search_screen.dart';
 import 'package:elysian/screens/coming_soon_screen.dart';
-import 'package:elysian/screens/downloads_screen.dart';
+import 'package:elysian/screens/local_videos_screen.dart';
 import 'package:elysian/screens/more_screen.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
@@ -42,10 +42,10 @@ class BottomNavState extends State<BottomNav> {
       ),
       ComingSoonScreen(
         key: PageStorageKey('comingSoonScreen'),
-        onNavigateToTab: _changeTab,
+        title: 'Coming Soon',
       ),
-      DownloadsScreen(
-        key: PageStorageKey('downloadsScreen'),
+      LocalVideosScreen(
+        key: PageStorageKey('localVideosScreen'),
         onNavigateToTab: _changeTab,
       ),
       MoreScreen(
@@ -58,7 +58,7 @@ class BottomNavState extends State<BottomNav> {
       'Home': Icons.home,
       'Search': Icons.search,
       'Coming Soon': Icons.queue_play_next,
-      'Downloads': Icons.download,
+      'Local Videos': Icons.video_library,
       'More': Icons.menu,
     };
 

@@ -1,114 +1,77 @@
-import 'package:elysian/data/data.dart';
 import 'package:flutter/material.dart';
-import 'package:elysian/widgets/widgets.dart';
 
-class ComingSoonScreen extends StatefulWidget {
-  final Function(int)? onNavigateToTab;
-
-  const ComingSoonScreen({super.key, this.onNavigateToTab});
-
-  @override
-  ComingSoonScreenState createState() => ComingSoonScreenState();
-}
-
-class ComingSoonScreenState extends State<ComingSoonScreen> {
-  late ScrollController _scrollController;
-  double _scrollOffset = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController()
-      ..addListener(() {
-        setState(() {
-          _scrollOffset = _scrollController.offset;
-        });
-      });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
+class ComingSoonScreen extends StatelessWidget {
+  final String title;
+  
+  const ComingSoonScreen({
+    super.key,
+    required this.title,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: Size(MediaQuery.of(context).size.width, 50),
-        child: CustomAppBar(
-          scrollOffset: _scrollOffset,
-          onNavigateToTab: widget.onNavigateToTab,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                top: 100.0,
-                left: 20.0,
-                right: 20.0,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.amber.withOpacity(0.2), Colors.amber.withOpacity(0.1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Coming Soon',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    'New releases coming to Elysian',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 16.0),
-                  ),
-                ],
+              child: const Icon(
+                Icons.construction,
+                size: 80,
+                color: Colors.amber,
               ),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.only(top: 20.0),
-            sliver: SliverToBoxAdapter(
-              child: ContentList(
-                title: 'This Week',
-                contentList: originals,
-                isOriginals: false,
+            const SizedBox(height: 32),
+            Text(
+              'Coming Soon',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: ContentList(
-              title: 'Next Week',
-              contentList: trending,
-              isOriginals: false,
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: ContentList(
-              title: 'Later This Month',
-              contentList: myList,
-              isOriginals: false,
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: 20.0),
-            sliver: SliverToBoxAdapter(
-              child: ContentList(
-                title: 'Coming Next Month',
-                contentList: previews,
-                isOriginals: false,
+            const SizedBox(height: 12),
+            Text(
+              'This feature is under development.\nWe\'re working hard to bring it to you soon!',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                fontSize: 16,
               ),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
+
