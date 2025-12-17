@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/widgets/watch_party_chat_overlay.dart';
 import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
@@ -34,9 +35,11 @@ class _WatchPartyParticipantsOverlayState
       return WatchPartyChatOverlay(
         room: widget.room,
         onClose: () {
-          setState(() {
-            _showChat = false;
-          });
+          if (mounted) {
+            setState(() {
+              _showChat = false;
+            });
+          }
         },
       );
     }
@@ -120,7 +123,7 @@ class _WatchPartyParticipantsOverlayState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // Header with close button always visible
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -159,6 +162,21 @@ class _WatchPartyParticipantsOverlayState
                         ),
                       ),
                     ),
+                  const SizedBox(width: 8),
+                  // Close button - always visible
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      debugPrint('WatchParty: Close button pressed in participants overlay');
+                      if (widget.onClose != null) {
+                        debugPrint('WatchParty: Calling onClose callback');
+                        widget.onClose!();
+                      } else {
+                        debugPrint('WatchParty: onClose callback is null!');
+                      }
+                    },
+                    tooltip: 'Close',
+                  ),
                 ],
               ),
             ),
@@ -271,10 +289,14 @@ class _WatchPartyParticipantsOverlayState
                 builder: (context, provider, child) {
                   return ElevatedButton.icon(
                     onPressed: () async {
+                      debugPrint('WatchParty: Leave button pressed');
+                      debugPrint('WatchParty: Is in room: ${provider.isInRoom}');
+                      
                       // Show confirmation dialog
                       final shouldExit = await showDialog<bool>(
                         context: context,
-                        builder: (context) => AlertDialog(
+                        barrierDismissible: true,
+                        builder: (dialogContext) => AlertDialog(
                           backgroundColor: Colors.grey[900],
                           title: const Text(
                             'Exit Watch Party?',
@@ -288,14 +310,20 @@ class _WatchPartyParticipantsOverlayState
                           ),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.pop(context, false),
+                              onPressed: () {
+                                debugPrint('WatchParty: Leave cancelled');
+                                Navigator.of(dialogContext).pop(false);
+                              },
                               child: const Text(
                                 'Cancel',
                                 style: TextStyle(color: Colors.white70),
                               ),
                             ),
                             TextButton(
-                              onPressed: () => Navigator.pop(context, true),
+                              onPressed: () {
+                                debugPrint('WatchParty: Leave confirmed');
+                                Navigator.of(dialogContext).pop(true);
+                              },
                               child: const Text(
                                 'Exit',
                                 style: TextStyle(color: Colors.red),
@@ -305,39 +333,41 @@ class _WatchPartyParticipantsOverlayState
                         ),
                       );
 
+                      debugPrint('WatchParty: Confirmation result: $shouldExit');
+                      
                       if (shouldExit == true) {
-                        // Close confirmation dialog first
-                        if (context.mounted) {
-                          Navigator.of(context).pop();
-                        }
+                        debugPrint('WatchParty: Starting leave process');
+                        try {
+                          // Close the main watch party dialog BEFORE leaving room
+                          // This prevents black screen by ensuring dialog is closed first
+                          if (widget.onClose != null) {
+                            debugPrint('WatchParty: Closing main dialog');
+                            widget.onClose!();
+                          }
 
-                        // Leave the room (this will clean up state)
-                        await provider.leaveRoom();
+                          // Wait for dialog to fully close before leaving room
+                          await Future.delayed(const Duration(milliseconds: 200));
 
-                        // Small delay to ensure state is cleaned up
-                        await Future.delayed(const Duration(milliseconds: 100));
-
-                        // Call onClose callback if provided (this closes the watch party dialog)
-                        if (widget.onClose != null && context.mounted) {
-                          widget.onClose!();
-                        }
-
-                        // Additional delay to ensure dialogs are closed
-                        await Future.delayed(const Duration(milliseconds: 100));
-
-                        // Ensure we're back to home screen - but only if still mounted
-                        if (context.mounted) {
-                          final navigator = Navigator.of(context);
-                          // Check if we can still pop
-                          if (navigator.canPop()) {
-                            // Pop until we're back to the first route (home screen)
-                            // But don't pop if we're already at the first route
-                            final currentRoute = ModalRoute.of(context);
-                            if (currentRoute != null && !currentRoute.isFirst) {
-                              navigator.popUntil((route) => route.isFirst);
-                            }
+                          // Leave the room (this will clean up state)
+                          // This is done after dialog is closed to prevent UI issues
+                          debugPrint('WatchParty: Calling provider.leaveRoom()');
+                          await provider.leaveRoom();
+                          debugPrint('WatchParty: Successfully left room');
+                        } catch (e, stackTrace) {
+                          debugPrint('WatchParty: Error during leave process: $e');
+                          debugPrint('WatchParty: Stack trace: $stackTrace');
+                          // Show error to user
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error leaving watch party: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
                           }
                         }
+                      } else {
+                        debugPrint('WatchParty: Leave cancelled by user');
                       }
                     },
                     icon: const Icon(Icons.exit_to_app),

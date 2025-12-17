@@ -485,36 +485,22 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
       );
     }
 
-    // Adaptive sync frequency: faster when playing, slower when paused
-    // This reduces Firebase writes and battery usage when paused
-    void syncUpdate() {
-      if (_isDisposed || !_controller.value.isInitialized) return;
+    // No longer using continuous sync - sync is now button-based
+    // Auto-sync only happens on video start or when late joiners join
+  }
 
-      final isPlaying = _controller.value.isPlaying;
+  /// Manual sync button handler (host only)
+  void _manualSync() {
+    if (!_watchPartyService.isHost || !_watchPartyService.isInRoom) return;
+    if (!_controller.value.isInitialized) return;
 
-      provider.updateRoomState(
-        position: _controller.value.position,
-        isPlaying: isPlaying,
-        videoUrl: widget.url,
-        videoTitle: _videoTitle ?? widget.title,
-      );
-
-      // Schedule next update with adaptive frequency
-      _watchPartySyncTimer?.cancel();
-      final interval = isPlaying
-          ? const Duration(milliseconds: 250) // Fast when playing
-          : const Duration(seconds: 2); // Slow when paused
-
-      _watchPartySyncTimer = Timer(interval, syncUpdate);
-    }
-
-    // Start with initial interval based on current playing state
-    final initialInterval =
-        _controller.value.isInitialized && _controller.value.isPlaying
-        ? const Duration(milliseconds: 250)
-        : const Duration(seconds: 2);
-
-    _watchPartySyncTimer = Timer(initialInterval, syncUpdate);
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    provider.updateRoomState(
+      position: _controller.value.position,
+      isPlaying: _controller.value.isPlaying,
+      videoUrl: widget.url,
+      videoTitle: _videoTitle ?? widget.title,
+    );
   }
 
   void _syncPlayPause(bool isPlaying) {
@@ -572,14 +558,16 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _isVideoInitializing = true;
     _lastSeekTime = null;
 
-    // Stop and dispose current controller
+    // Stop and dispose current controller - ensure audio is stopped
     _controller.pause();
+    await Future.delayed(const Duration(milliseconds: 100)); // Give time for audio to stop
     _controller.removeListener(_videoPlayerListener);
     await _controller.dispose();
+    await Future.delayed(const Duration(milliseconds: 100)); // Additional delay to ensure cleanup
 
     // Clear ad state
     _adController?.pause();
-    _adController?.dispose();
+    await _adController?.dispose();
     _adController = null;
     _adCountdownTimer?.cancel();
     _adPositions.clear();
@@ -673,7 +661,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                   // Host: mark as initialized immediately
                   _isVideoInitializing = false;
                 } else if (!provider.isHost && provider.isInRoom) {
-                  // Guest: immediately sync to host's position for late joiners
+                  // Guest: auto-sync to host's position for late joiners when video initializes
                   Future.delayed(const Duration(milliseconds: 800), () {
                     if (!_isDisposed && mounted) {
                       _isVideoInitializing = false;
@@ -722,6 +710,16 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                       }
                     }
                   });
+                }
+                
+                // Auto-sync on first video start (host only)
+                if (provider.isHost && provider.isInRoom && widget.url != null) {
+                  provider.updateRoomState(
+                    videoUrl: widget.url!,
+                    videoTitle: _videoTitle ?? widget.title ?? 'Video',
+                    position: _controller.value.position,
+                    isPlaying: _controller.value.isPlaying,
+                  );
                 }
 
                 // Auto-enter PiP if requested
@@ -1416,7 +1414,12 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 if (_showControls && !_isLocked)
                   Positioned(
                     bottom: 0,
-                    child: ControlBar(formatTime: _formatTime),
+                    child: ControlBar(
+                      formatTime: _formatTime,
+                      onSync: _watchPartyService.isHost && _watchPartyService.isInRoom
+                          ? _manualSync
+                          : null,
+                    ),
                   ),
                 if (_showControls && _showEpisodeList && !_isLocked)
                   Positioned(
@@ -1443,11 +1446,14 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                           room: provider.currentRoom!,
                           isHost: provider.isHost,
                           onClose: () {
+                            debugPrint('WatchParty: Video player overlay onClose called');
                             if (mounted) {
                               setState(() {
                                 _showWatchParty = false;
                               });
                             }
+                            // Don't hide the indicator - just close the overlay
+                            // The indicator should remain visible as long as we're in a room
                           },
                         ),
                       );
@@ -1501,8 +1507,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
 class ControlBar extends StatefulWidget {
   final String Function(Duration) formatTime;
+  final VoidCallback? onSync;
 
-  const ControlBar({super.key, required this.formatTime});
+  const ControlBar({super.key, required this.formatTime, this.onSync});
 
   @override
   ControlBarState createState() => ControlBarState();
@@ -1620,6 +1627,13 @@ class ControlBarState extends State<ControlBar> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // Sync button (host only in watch party)
+                    if (widget.onSync != null)
+                      IconButton(
+                        onPressed: widget.onSync,
+                        icon: const Icon(Icons.sync, color: Colors.amber),
+                        tooltip: 'Sync time for all participants',
+                      ),
                     // speed menu...
                     PopupMenuButton<double>(
                       color: Colors.black,

@@ -257,6 +257,21 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Handle room update
   void _handleRoomUpdate(WatchPartyRoom room) {
+    // Don't process room updates if we've already left the room
+    // This prevents the indicator from showing again after leaving
+    // Check if this is a different room (we left) or if currentRoom is null
+    if (_currentRoom == null) {
+      // We've left the room, ignore any delayed updates
+      _hideIndicatorOverlay();
+      return;
+    }
+    
+    // If room IDs don't match, we might have left and this is a stale update
+    if (_currentRoom!.roomId != room.roomId) {
+      _hideIndicatorOverlay();
+      return;
+    }
+    
     final videoChanged = _currentRoom?.videoUrl != room.videoUrl || 
                         _currentRoom?.videoTitle != room.videoTitle;
     
@@ -277,8 +292,12 @@ class WatchPartyProvider with ChangeNotifier {
       _watchPartyService.onRoomUpdate!(room);
     }
     
-    // Update indicator overlay
-    _updateIndicatorOverlay();
+    // Update indicator overlay only if room is still valid
+    if (_currentRoom != null) {
+      _updateIndicatorOverlay();
+    } else {
+      _hideIndicatorOverlay();
+    }
     
     notifyListeners();
     
@@ -690,21 +709,27 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Update indicator overlay
   void _updateIndicatorOverlay() {
+    // Always check current room state before updating
+    if (_currentRoom == null) {
+      _hideIndicatorOverlay();
+      return;
+    }
+    
     final context = navigatorKey.currentContext;
     if (context == null) return;
     
-    if (_currentRoom != null) {
-      // Show or update indicator
-      Future.delayed(const Duration(milliseconds: 100), () {
-        final ctx = navigatorKey.currentContext;
-        if (ctx != null && _currentRoom != null) {
-          WatchPartyIndicatorOverlay.show(ctx, _currentRoom!, isHost);
-        }
-      });
-    } else {
-      // Hide indicator
-      _hideIndicatorOverlay();
-    }
+    // Show or update indicator
+    Future.delayed(const Duration(milliseconds: 100), () {
+      // Double-check room is still valid after delay
+      if (_currentRoom == null) {
+        _hideIndicatorOverlay();
+        return;
+      }
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null && _currentRoom != null) {
+        WatchPartyIndicatorOverlay.show(ctx, _currentRoom!, isHost);
+      }
+    });
   }
   
   /// Hide indicator overlay
@@ -761,6 +786,8 @@ class WatchPartyProvider with ChangeNotifier {
       } else {
         // Fall back to local network
         debugPrint('WatchPartyProvider: Creating local network room');
+        // IMPORTANT: Force use of local service, not Firebase
+        _useFirebase = false;
         final room = await _watchPartyService.createRoom(
           hostName: participantName,
           videoUrl: videoUrl ?? '',
@@ -775,6 +802,7 @@ class WatchPartyProvider with ChangeNotifier {
         // Verify server port after room creation
         final port = _watchPartyService.getServerPort();
         debugPrint('WatchPartyProvider: Room created, server port: $port');
+        debugPrint('WatchPartyProvider: _useFirebase set to false for local mode');
         
         _updateIndicatorOverlay();
         notifyListeners();
@@ -806,6 +834,9 @@ class WatchPartyProvider with ChangeNotifier {
     String roomCode,
   ) async {
     try {
+      // IMPORTANT: Force use of local service, not Firebase
+      _useFirebase = false;
+      debugPrint('WatchPartyProvider: Joining local network room, _useFirebase set to false');
       final room = await _watchPartyService.joinRoom(
         hostIp: hostIp,
         hostPort: hostPort,
@@ -862,14 +893,29 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Leave room
   Future<void> leaveRoom() async {
+    debugPrint('WatchPartyProvider: leaveRoom() called, useFirebase: $_useFirebase');
     final wasHost = isHost;
     
-    if (_useFirebase) {
-      await _firebaseService.leaveRoom();
-    } else {
-      await _watchPartyService.leaveRoom();
+    // Hide indicator immediately before leaving to prevent it from showing again
+    _hideIndicatorOverlay();
+    
+    try {
+      if (_useFirebase) {
+        debugPrint('WatchPartyProvider: Leaving Firebase room');
+        await _firebaseService.leaveRoom();
+      } else {
+        debugPrint('WatchPartyProvider: Leaving local room');
+        await _watchPartyService.leaveRoom();
+        debugPrint('WatchPartyProvider: Local service leaveRoom() completed');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('WatchPartyProvider: Error in leaveRoom(): $e');
+      debugPrint('WatchPartyProvider: Stack trace: $stackTrace');
+      // Continue with cleanup even if service call fails
     }
     
+    // Clear all state
+    debugPrint('WatchPartyProvider: Clearing state');
     _currentRoom = null;
     _isConnected = false;
     _connectionError = null;
@@ -879,29 +925,49 @@ class WatchPartyProvider with ChangeNotifier {
     _latestReactionNotification = null;
     _roomEndedMessage = null;
     _removeGlobalNotification();
+    
+    // Ensure indicator is hidden (call again to be safe)
     _hideIndicatorOverlay();
+    
+    // Notify listeners after state is cleared
+    debugPrint('WatchPartyProvider: Notifying listeners');
     notifyListeners();
+    
+    // Final check to hide indicator after a delay (in case any delayed updates try to show it)
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (_currentRoom == null) {
+        _hideIndicatorOverlay();
+      }
+    });
     
     // If host left, show confirmation
     if (wasHost && _useFirebase) {
       debugPrint('Host left watch party - all participants will be notified');
     }
+    
+    debugPrint('WatchPartyProvider: leaveRoom() completed');
   }
   
   /// Send chat message
   Future<void> sendChatMessage(String message) async {
+    debugPrint('WatchPartyProvider: sendChatMessage called, useFirebase: $_useFirebase');
+    debugPrint('WatchPartyProvider: isInRoom: $isInRoom, currentRoom: ${_currentRoom != null}');
     if (_useFirebase) {
       await _firebaseService.sendChatMessage(message);
     } else {
+      debugPrint('WatchPartyProvider: Calling local service sendChatMessage');
       await _watchPartyService.sendChatMessage(message);
     }
   }
   
   /// Send reaction
   Future<void> sendReaction(ReactionType type) async {
+    debugPrint('WatchPartyProvider: sendReaction called with $type, useFirebase: $_useFirebase');
+    debugPrint('WatchPartyProvider: isInRoom: $isInRoom, currentRoom: ${_currentRoom != null}');
     if (_useFirebase) {
       await _firebaseService.sendReaction(type);
     } else {
+      debugPrint('WatchPartyProvider: Calling local service sendReaction');
       await _watchPartyService.sendReaction(type);
     }
   }

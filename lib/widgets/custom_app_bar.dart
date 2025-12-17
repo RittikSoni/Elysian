@@ -186,117 +186,167 @@ void _showWatchPartyDialog(BuildContext context) async {
   if (watchPartyProvider.isInRoom) {
     final room = watchPartyProvider.currentRoom;
     if (room != null) {
+      debugPrint(
+        'WatchParty: Showing dialog for room ${room.roomId}, videoUrl: ${room.videoUrl}, isHost: ${watchPartyProvider.isHost}',
+      );
       // Show watch party screen (participants, chat, etc.)
       showDialog(
         context: context,
         barrierColor: Colors.black87,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.zero,
-          child: Container(
-            width: MediaQuery.of(context).size.width,
-            height: MediaQuery.of(context).size.height,
-            color: Colors.black,
-            child: Stack(
-              children: [
-                // Watch party participants overlay
-                WatchPartyParticipantsOverlay(
-                  room: room,
-                  isHost: watchPartyProvider.isHost,
-                  onClose: () {
-                    // Close dialog
-                    Navigator.of(context).pop();
-                  },
-                ),
-                // Close button
-                Positioned(
-                  top: 40,
-                  right: 16,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                // Option to navigate to video if playing
-                if (room.videoUrl.isNotEmpty)
-                  Positioned(
-                    bottom: 20,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(context); // Close watch party screen
-                          // Navigate to video player
-                          final allLinks = await StorageService.getSavedLinks();
-                          try {
-                            final link = allLinks.firstWhere(
-                              (l) => l.url == room.videoUrl,
-                              orElse: () => SavedLink(
-                                id: '',
-                                url: room.videoUrl,
-                                title: room.videoTitle,
-                                type:
-                                    LinkParser.parseLinkType(room.videoUrl) ??
-                                    LinkType.unknown,
-                                listIds: [],
-                                savedAt: DateTime.now(),
-                              ),
-                            );
+        barrierDismissible: true,
+        builder: (dialogContext) => Consumer<WatchPartyProvider>(
+          builder: (context, provider, child) {
+            // Get the latest room state
+            final currentRoom = provider.currentRoom;
+            if (currentRoom == null) {
+              // Room was closed, close dialog
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext, rootNavigator: true).pop();
+                }
+              });
+              return const SizedBox.shrink();
+            }
 
-                            if (link.type == LinkType.youtube) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => YTFull(
-                                    url: link.url,
-                                    title: link.title.isNotEmpty
-                                        ? link.title
-                                        : room.videoTitle,
-                                    listIds: link.listIds,
-                                  ),
-                                ),
-                              );
-                            } else if (link.type.canPlayInbuilt) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => RSNewVideoPlayerScreen(
-                                    url: link.url,
-                                    title: link.title.isNotEmpty
-                                        ? link.title
-                                        : room.videoTitle,
-                                    listIds: link.listIds,
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            debugPrint(
-                              'Error navigating to watch party video: $e',
-                            );
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: EdgeInsets.zero,
+              child: Container(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height,
+                color: Colors.black,
+                child: Stack(
+                  children: [
+                    // Watch party participants overlay
+                    WatchPartyParticipantsOverlay(
+                      room: currentRoom,
+                      isHost: provider.isHost,
+                      onClose: () {
+                        // Close dialog using the dialog context
+                        if (dialogContext.mounted) {
+                          Navigator.of(
+                            dialogContext,
+                            rootNavigator: true,
+                          ).pop();
+                        }
+                      },
+                    ),
+                    // Close button
+                    Positioned(
+                      top: 40,
+                      right: 16,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: () {
+                          if (dialogContext.mounted) {
+                            Navigator.of(
+                              dialogContext,
+                              rootNavigator: true,
+                            ).pop();
                           }
                         },
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Go to Video'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
+                      ),
+                    ),
+                    // Option to navigate to video if playing
+                    if (currentRoom.videoUrl.isNotEmpty)
+                      Positioned(
+                        bottom: 20,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              // Close watch party screen using dialog context
+                              if (dialogContext.mounted) {
+                                Navigator.of(
+                                  dialogContext,
+                                  rootNavigator: true,
+                                ).pop();
+                              }
+                              // Small delay to ensure dialog is closed
+                              await Future.delayed(
+                                const Duration(milliseconds: 100),
+                              );
+                              // Navigate to video player using original context (not dialog context)
+                              if (!context.mounted) return;
+                              final allLinks =
+                                  await StorageService.getSavedLinks();
+                              try {
+                                final link = allLinks.firstWhere(
+                                  (l) => l.url == currentRoom.videoUrl,
+                                  orElse: () => SavedLink(
+                                    id: '',
+                                    url: currentRoom.videoUrl,
+                                    title: currentRoom.videoTitle,
+                                    type:
+                                        LinkParser.parseLinkType(
+                                          currentRoom.videoUrl,
+                                        ) ??
+                                        LinkType.unknown,
+                                    listIds: [],
+                                    savedAt: DateTime.now(),
+                                  ),
+                                );
+
+                                // Use root navigator for video navigation
+                                final rootNavigator = Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                );
+                                if (link.type == LinkType.youtube) {
+                                  rootNavigator.push(
+                                    MaterialPageRoute(
+                                      builder: (context) => YTFull(
+                                        url: link.url,
+                                        title: link.title.isNotEmpty
+                                            ? link.title
+                                            : currentRoom.videoTitle,
+                                        listIds: link.listIds,
+                                      ),
+                                    ),
+                                  );
+                                } else if (link.type.canPlayInbuilt) {
+                                  rootNavigator.push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          RSNewVideoPlayerScreen(
+                                            url: link.url,
+                                            title: link.title.isNotEmpty
+                                                ? link.title
+                                                : currentRoom.videoTitle,
+                                            listIds: link.listIds,
+                                          ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint(
+                                  'Error navigating to watch party video: $e',
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Go to Video'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       );
     }

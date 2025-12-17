@@ -114,6 +114,12 @@ class WatchPartyIndicatorOverlay {
   static bool _currentIsHost = false;
 
   static void show(BuildContext context, WatchPartyRoom room, bool isHost) {
+    // Don't show if room is null or invalid
+    if (room.roomId.isEmpty) {
+      hide();
+      return;
+    }
+    
     final overlay = Navigator.of(context).overlay;
     if (overlay == null) return;
 
@@ -122,8 +128,14 @@ class WatchPartyIndicatorOverlay {
     _currentIsHost = isHost;
 
     if (_isShowing && _overlayEntry != null) {
-      // Update existing overlay
-      _overlayEntry!.markNeedsBuild();
+      // Update existing overlay only if room is still valid
+      if (_currentRoom != null && _currentRoom!.roomId == room.roomId) {
+        _overlayEntry!.markNeedsBuild();
+      } else {
+        // Room changed or invalid, hide and recreate
+        hide();
+        show(context, room, isHost);
+      }
     } else {
       // Create new overlay
       if (_overlayEntry != null) {
@@ -131,22 +143,31 @@ class WatchPartyIndicatorOverlay {
       }
 
       _overlayEntry = OverlayEntry(
-        builder: (context) => Positioned(
-          bottom: 0,
-          right: 0,
-          child: WatchPartyIndicator(
-            room: _currentRoom!,
-            isHost: _currentIsHost,
-            onTap: () {
-              // Open watch party dialog
-              final watchPartyProvider = Provider.of<WatchPartyProvider>(
-                context,
-                listen: false,
-              );
-              _showWatchPartyDialog(context, watchPartyProvider);
-            },
-          ),
-        ),
+        builder: (context) {
+          // Check if room is still valid when building
+          if (_currentRoom == null || _currentRoom!.roomId != room.roomId) {
+            return const SizedBox.shrink();
+          }
+          return Positioned(
+            bottom: 0,
+            right: 0,
+            child: WatchPartyIndicator(
+              room: _currentRoom!,
+              isHost: _currentIsHost,
+              onTap: () {
+                // Open watch party dialog
+                final watchPartyProvider = Provider.of<WatchPartyProvider>(
+                  context,
+                  listen: false,
+                );
+                // Only show dialog if still in room
+                if (watchPartyProvider.isInRoom && watchPartyProvider.currentRoom != null) {
+                  _showWatchPartyDialog(context, watchPartyProvider);
+                }
+              },
+            ),
+          );
+        },
       );
 
       overlay.insert(_overlayEntry!);
@@ -158,6 +179,8 @@ class WatchPartyIndicatorOverlay {
     _overlayEntry?.remove();
     _overlayEntry = null;
     _isShowing = false;
+    _currentRoom = null;
+    _currentIsHost = false;
   }
 
   static void _showWatchPartyDialog(
@@ -170,7 +193,8 @@ class WatchPartyIndicatorOverlay {
     showDialog(
       context: context,
       barrierColor: Colors.black87,
-      builder: (context) => Dialog(
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
         child: Container(
@@ -183,7 +207,12 @@ class WatchPartyIndicatorOverlay {
               WatchPartyParticipantsOverlay(
                 room: room,
                 isHost: provider.isHost,
-                onClose: () => Navigator.pop(context),
+                onClose: () {
+                  // Use the dialog context to close
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext, rootNavigator: true).pop();
+                  }
+                },
               ),
               // Close button
               Positioned(
@@ -195,7 +224,11 @@ class WatchPartyIndicatorOverlay {
                     color: Colors.white,
                     size: 28,
                   ),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext, rootNavigator: true).pop();
+                    }
+                  },
                 ),
               ),
             ],
@@ -203,6 +236,7 @@ class WatchPartyIndicatorOverlay {
         ),
       ),
     );
+    // Don't hide indicator when dialog closes - only hide when actually leaving room
   }
 }
 

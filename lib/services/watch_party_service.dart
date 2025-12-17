@@ -30,12 +30,12 @@ class WatchPartyService {
   Function(ChatMessage)? onChatMessage;
   Function(Reaction)? onReaction;
   Function(String videoUrl, String videoTitle)?
-      onVideoChange; // Called when host changes video
+  onVideoChange; // Called when host changes video
 
   // Message persistence for session (last 100 messages)
   static const int _maxSessionMessages = 100;
   final List<ChatMessage> _sessionMessages = [];
-  
+
   // Recent reactions (last 50, transient)
   static const int _maxRecentReactions = 50;
   final List<Reaction> _recentReactions = [];
@@ -66,14 +66,18 @@ class WatchPartyService {
   Future<String?> getLocalIp() async {
     try {
       final wifiIP = await _networkInfo.getWifiIP();
-      
+
       // Check if we're on an Android emulator (10.0.2.x range)
       if (wifiIP != null && wifiIP.startsWith('10.0.2.')) {
         debugPrint('WatchParty: Detected Android emulator IP: $wifiIP');
-        debugPrint('WatchParty: Emulator IPs are not accessible from other devices');
+        debugPrint(
+          'WatchParty: Emulator IPs are not accessible from other devices',
+        );
         debugPrint('WatchParty: For emulator-to-emulator: use 10.0.2.2');
-        debugPrint('WatchParty: For device-to-emulator: use host machine IP with port forwarding');
-        
+        debugPrint(
+          'WatchParty: For device-to-emulator: use host machine IP with port forwarding',
+        );
+
         // Try to get the actual network IP of the host machine
         // This works by trying to connect to a public DNS server and checking the local IP
         try {
@@ -81,14 +85,14 @@ class WatchPartyService {
             includeLinkLocal: false,
             type: InternetAddressType.IPv4,
           );
-          
+
           // Find a non-loopback, non-emulator IP
           for (final interface in interfaces) {
             for (final addr in interface.addresses) {
               final ip = addr.address;
               // Skip loopback and emulator IPs
-              if (!ip.startsWith('127.') && 
-                  !ip.startsWith('10.0.2.') && 
+              if (!ip.startsWith('127.') &&
+                  !ip.startsWith('10.0.2.') &&
                   !ip.startsWith('169.254.')) {
                 debugPrint('WatchParty: Found host machine IP: $ip');
                 return ip;
@@ -98,19 +102,19 @@ class WatchPartyService {
         } catch (e) {
           debugPrint('WatchParty: Could not get host machine IP: $e');
         }
-        
+
         // Fallback: return 10.0.2.2 for emulator-to-emulator connections
         // Note: This only works for emulator-to-emulator, not device-to-emulator
         return '10.0.2.2';
       }
-      
+
       return wifiIP;
     } catch (e) {
       debugPrint('Error getting local IP: $e');
       return null;
     }
   }
-  
+
   /// Check if an IP address is an emulator IP
   bool isEmulatorIp(String? ip) {
     return ip != null && (ip.startsWith('10.0.2.') || ip == '10.0.2.2');
@@ -183,7 +187,9 @@ class WatchPartyService {
         _hostPort = _server!.port;
         debugPrint('WatchParty: _hostPort was null, set to ${_server!.port}');
       }
-      debugPrint('WatchParty: Server confirmed running, port: ${_server!.port}, _hostPort: $_hostPort');
+      debugPrint(
+        'WatchParty: Server confirmed running, port: ${_server!.port}, _hostPort: $_hostPort',
+      );
     } else {
       debugPrint('WatchParty: WARNING - Server is null after _startServer()');
     }
@@ -272,6 +278,41 @@ class WatchPartyService {
     if (!_isHost || _currentRoom == null) return;
 
     switch (message.type) {
+      case SyncMessageType.join:
+        // Guest is joining - add them to participants if not already present
+        if (message.participantId != null && message.participantName != null) {
+          final participantExists = _currentRoom!.participants.any(
+            (p) => p.id == message.participantId,
+          );
+          if (!participantExists) {
+            final updatedParticipants = [
+              ..._currentRoom!.participants,
+              WatchPartyParticipant(
+                id: message.participantId!,
+                name: message.participantName!,
+                isHost: false,
+                joinedAt: DateTime.now(),
+              ),
+            ];
+            _currentRoom = _currentRoom!.copyWith(
+              participants: updatedParticipants,
+            );
+            onRoomUpdate?.call(_currentRoom!);
+          }
+        }
+        break;
+      case SyncMessageType.leave:
+        // Guest is leaving - remove them from participants
+        if (message.participantId != null) {
+          final updatedParticipants = _currentRoom!.participants
+              .where((p) => p.id != message.participantId)
+              .toList();
+          _currentRoom = _currentRoom!.copyWith(
+            participants: updatedParticipants,
+          );
+          onRoomUpdate?.call(_currentRoom!);
+        }
+        break;
       case SyncMessageType.play:
         if (message.position != null) {
           _currentRoom = _currentRoom!.copyWith(
@@ -305,23 +346,40 @@ class WatchPartyService {
         break;
       case SyncMessageType.chat:
         if (message.chatMessage != null) {
+          debugPrint(
+            'WatchPartyService: Host received chat message from ${message.chatMessage!.participantName}',
+          );
           // Store message for session persistence
           _sessionMessages.add(message.chatMessage!);
           if (_sessionMessages.length > _maxSessionMessages) {
             _sessionMessages.removeAt(0);
           }
-          // Broadcast to all participants (including host)
-          _broadcastSync(message);
-          // Also trigger chat message callback directly for host
+          // Also trigger chat message callback directly for host (immediate UI update)
           onChatMessage?.call(message.chatMessage!);
+          // Broadcast to all participants (including host) via sync message
+          // This ensures guests receive it through polling
+          _broadcastSync(message);
+          // Trigger room update to ensure UI refreshes
+          onRoomUpdate?.call(_currentRoom!);
         }
         break;
       case SyncMessageType.reaction:
         if (message.reaction != null) {
-          // Broadcast to all participants (including host)
-          _broadcastSync(message);
-          // Also trigger reaction callback directly for host
+          debugPrint(
+            'WatchPartyService: Host received reaction ${message.reaction!.type} from ${message.reaction!.participantId}',
+          );
+          // Store reaction
+          _recentReactions.add(message.reaction!);
+          if (_recentReactions.length > _maxRecentReactions) {
+            _recentReactions.removeAt(0);
+          }
+          // Also trigger reaction callback directly for host (immediate UI update)
           onReaction?.call(message.reaction!);
+          // Broadcast to all participants (including host) via sync message
+          // This ensures guests receive it through polling
+          _broadcastSync(message);
+          // Trigger room update to ensure UI refreshes
+          onRoomUpdate?.call(_currentRoom!);
         }
         break;
       default:
@@ -369,12 +427,14 @@ class WatchPartyService {
       if (response.statusCode == 200) {
         final body = await response.transform(utf8.decoder).join();
         final responseData = jsonDecode(body) as Map<String, dynamic>;
-        
+
         // Handle both old format (just room) and new format (room + messages + reactions)
         WatchPartyRoom room;
         if (responseData.containsKey('room')) {
           // New format with messages and reactions
-          room = WatchPartyRoom.fromJson(responseData['room'] as Map<String, dynamic>);
+          room = WatchPartyRoom.fromJson(
+            responseData['room'] as Map<String, dynamic>,
+          );
         } else {
           // Old format (backward compatibility)
           room = WatchPartyRoom.fromJson(responseData);
@@ -385,26 +445,52 @@ class WatchPartyService {
           return null;
         }
 
-        // Add participant
+        // Add participant - send join message to host
         final participantId = _uuid.v4();
         _currentParticipantId = participantId;
         _isHost = false;
 
-        final updatedParticipants = [
-          ...room.participants,
-          WatchPartyParticipant(
-            id: participantId,
-            name: participantName,
+        // Check if participant already exists (avoid duplicates)
+        final existingParticipant = room.participants.firstWhere(
+          (p) => p.id == participantId,
+          orElse: () => WatchPartyParticipant(
+            id: '',
+            name: '',
             isHost: false,
             joinedAt: DateTime.now(),
           ),
-        ];
+        );
+
+        final updatedParticipants = existingParticipant.id.isEmpty
+            ? [
+                ...room.participants,
+                WatchPartyParticipant(
+                  id: participantId,
+                  name: participantName,
+                  isHost: false,
+                  joinedAt: DateTime.now(),
+                ),
+              ]
+            : room.participants;
 
         _currentRoom = room.copyWith(participants: updatedParticipants);
         _hostIp = hostIp;
         _hostPort = hostPort;
         _isConnected = true;
         _connectionError = null;
+
+        // Notify host about new participant by sending a join message
+        try {
+          await sendSyncCommand(
+            hostIp: hostIp,
+            hostPort: hostPort,
+            type: SyncMessageType.join,
+            position: room.currentPosition,
+            isPlaying: room.isPlaying,
+          );
+        } catch (e) {
+          debugPrint('Error sending join message: $e');
+        }
 
         // Start polling for updates
         _startPolling(hostIp, hostPort);
@@ -451,21 +537,29 @@ class WatchPartyService {
           if (response.statusCode == 200) {
             final body = await response.transform(utf8.decoder).join();
             final responseData = jsonDecode(body) as Map<String, dynamic>;
-            
+
             // Handle both old format (just room) and new format (room + messages + reactions)
             WatchPartyRoom updatedRoom;
             List<ChatMessage> recentMessages = [];
             List<Reaction> recentReactions = [];
-            
+
             if (responseData.containsKey('room')) {
               // New format with messages and reactions
-              updatedRoom = WatchPartyRoom.fromJson(responseData['room'] as Map<String, dynamic>);
-              recentMessages = (responseData['recentMessages'] as List<dynamic>?)
-                  ?.map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
-                  .toList() ?? [];
-              recentReactions = (responseData['recentReactions'] as List<dynamic>?)
-                  ?.map((r) => Reaction.fromJson(r as Map<String, dynamic>))
-                  .toList() ?? [];
+              updatedRoom = WatchPartyRoom.fromJson(
+                responseData['room'] as Map<String, dynamic>,
+              );
+              recentMessages =
+                  (responseData['recentMessages'] as List<dynamic>?)
+                      ?.map(
+                        (m) => ChatMessage.fromJson(m as Map<String, dynamic>),
+                      )
+                      .toList() ??
+                  [];
+              recentReactions =
+                  (responseData['recentReactions'] as List<dynamic>?)
+                      ?.map((r) => Reaction.fromJson(r as Map<String, dynamic>))
+                      .toList() ??
+                  [];
             } else {
               // Old format (backward compatibility)
               updatedRoom = WatchPartyRoom.fromJson(responseData);
@@ -474,11 +568,34 @@ class WatchPartyService {
             _isConnected = true;
             _connectionError = null;
 
-            // Always update room state and notify
-            _currentRoom = updatedRoom;
+            // Update room state - merge participants to ensure we don't lose our own participant
+            // Keep our participant if it exists, otherwise use host's participant list
+            final ourParticipant = _currentRoom?.participants.firstWhere(
+              (p) => p.id == _currentParticipantId,
+              orElse: () => WatchPartyParticipant(
+                id: '',
+                name: '',
+                isHost: false,
+                joinedAt: DateTime.now(),
+              ),
+            );
+
+            final mergedParticipants =
+                ourParticipant?.id == _currentParticipantId
+                ? [
+                    ...updatedRoom.participants.where(
+                      (p) => p.id != _currentParticipantId,
+                    ),
+                    ourParticipant!,
+                  ]
+                : updatedRoom.participants;
+
+            _currentRoom = updatedRoom.copyWith(
+              participants: mergedParticipants,
+            );
             _isConnected = true;
             _connectionError = null;
-            
+
             // Process new messages (check against session messages to avoid duplicates)
             for (final message in recentMessages) {
               // Check if we've already seen this message
@@ -487,35 +604,38 @@ class WatchPartyService {
                 if (_sessionMessages.length > _maxSessionMessages) {
                   _sessionMessages.removeAt(0);
                 }
-                // Trigger callback for new message
+                // Trigger callback for new message - this will notify the provider
                 onChatMessage?.call(message);
               }
             }
-            
+
             // Process new reactions (check against recent reactions to avoid duplicates)
             // Reactions are transient, so we check by timestamp and participant
             for (final reaction in recentReactions) {
               // Check if we've already seen this reaction (same ID or very recent from same participant)
-              final isNew = !_recentReactions.any((r) => 
-                r.id == reaction.id || 
-                (r.participantId == reaction.participantId && 
-                 r.type == reaction.type &&
-                 (reaction.timestamp.difference(r.timestamp).inSeconds < 2))
+              final isNew = !_recentReactions.any(
+                (r) =>
+                    r.id == reaction.id ||
+                    (r.participantId == reaction.participantId &&
+                        r.type == reaction.type &&
+                        (reaction.timestamp.difference(r.timestamp).inSeconds <
+                            2)),
               );
-              
+
               if (isNew) {
                 _recentReactions.add(reaction);
                 if (_recentReactions.length > _maxRecentReactions) {
                   _recentReactions.removeAt(0);
                 }
-                // Trigger callback for new reaction
+                // Trigger callback for new reaction - this will notify the provider
                 onReaction?.call(reaction);
               }
             }
-            
-            // Always notify room update (provider will handle deduplication)
-            onRoomUpdate?.call(updatedRoom);
-            
+
+            // Always notify room update to ensure UI updates with latest messages/reactions
+            // Use the merged room with correct participants
+            onRoomUpdate?.call(_currentRoom!);
+
             // Check if room state changed
             final previousVideoUrl = _currentRoom!.videoUrl;
             final previousVideoTitle = _currentRoom!.videoTitle;
@@ -530,33 +650,35 @@ class WatchPartyService {
             // If video changed, notify listeners
             // This is critical for guests to navigate when host starts a video
             if (videoChanged && updatedRoom.videoUrl.isNotEmpty) {
-              debugPrint('WatchPartyService: Video changed from "$previousVideoUrl" to "${updatedRoom.videoUrl}"');
-              onVideoChange?.call(
-                updatedRoom.videoUrl,
-                updatedRoom.videoTitle,
+              debugPrint(
+                'WatchPartyService: Video changed from "$previousVideoUrl" to "${updatedRoom.videoUrl}"',
               );
+              onVideoChange?.call(updatedRoom.videoUrl, updatedRoom.videoTitle);
             }
-            
+
             // Trigger sync messages for play/pause/seek
             if (playingChanged) {
               if (updatedRoom.isPlaying) {
-                onSyncMessage?.call(SyncMessage(
-                  type: SyncMessageType.play,
-                  position: updatedRoom.currentPosition,
-                  isPlaying: true,
-                ));
+                onSyncMessage?.call(
+                  SyncMessage(
+                    type: SyncMessageType.play,
+                    position: updatedRoom.currentPosition,
+                    isPlaying: true,
+                  ),
+                );
               } else {
-                onSyncMessage?.call(SyncMessage(
-                  type: SyncMessageType.pause,
-                  isPlaying: false,
-                ));
+                onSyncMessage?.call(
+                  SyncMessage(type: SyncMessageType.pause, isPlaying: false),
+                );
               }
             } else if (positionChanged && !playingChanged) {
               // Only seek if position changed but playing state didn't
-              onSyncMessage?.call(SyncMessage(
-                type: SyncMessageType.seek,
-                position: updatedRoom.currentPosition,
-              ));
+              onSyncMessage?.call(
+                SyncMessage(
+                  type: SyncMessageType.seek,
+                  position: updatedRoom.currentPosition,
+                ),
+              );
             }
           } else {
             _isConnected = false;
@@ -600,9 +722,25 @@ class WatchPartyService {
     }
 
     try {
+      // Get participant name from current room
+      final participantName =
+          _currentRoom?.participants
+              .firstWhere(
+                (p) => p.id == _currentParticipantId,
+                orElse: () => WatchPartyParticipant(
+                  id: _currentParticipantId!,
+                  name: 'Unknown',
+                  isHost: false,
+                  joinedAt: DateTime.now(),
+                ),
+              )
+              .name ??
+          'Unknown';
+
       final message = SyncMessage(
         type: type,
         participantId: _currentParticipantId,
+        participantName: participantName,
         position: position,
         isPlaying: isPlaying,
         chatMessage: chatMessage,
@@ -641,7 +779,16 @@ class WatchPartyService {
 
   /// Send chat message
   Future<void> sendChatMessage(String message) async {
-    if (_currentParticipantId == null) return;
+    debugPrint('WatchPartyService: sendChatMessage called with: "$message"');
+    debugPrint(
+      'WatchPartyService: _currentParticipantId: $_currentParticipantId, _isHost: $_isHost, _currentRoom: ${_currentRoom != null}',
+    );
+    if (_currentParticipantId == null) {
+      debugPrint(
+        'WatchPartyService: Cannot send chat - participant ID is null',
+      );
+      return;
+    }
 
     final participant = _currentRoom?.participants.firstWhere(
       (p) => p.id == _currentParticipantId,
@@ -662,24 +809,46 @@ class WatchPartyService {
     );
 
     if (_isHost) {
-      // Host broadcasts directly (will trigger onChatMessage via _broadcastSync)
-      // Also trigger callback immediately for host
+      // Host: Store message and broadcast to all (including self)
+      _sessionMessages.add(chatMessage);
+      if (_sessionMessages.length > _maxSessionMessages) {
+        _sessionMessages.removeAt(0);
+      }
+      // Trigger callback immediately for host
       onChatMessage?.call(chatMessage);
+      // Broadcast to all participants via sync message
       _broadcastSync(
         SyncMessage(type: SyncMessageType.chat, chatMessage: chatMessage),
       );
+      // Also trigger room update to ensure UI refreshes
+      onRoomUpdate?.call(_currentRoom!);
     } else {
-      // Guest sends to host
+      // Guest sends to host via POST request
       await sendSyncCommand(
         type: SyncMessageType.chat,
         chatMessage: chatMessage,
       );
+      // Guest also adds their own message locally for immediate UI update
+      _sessionMessages.add(chatMessage);
+      if (_sessionMessages.length > _maxSessionMessages) {
+        _sessionMessages.removeAt(0);
+      }
+      onChatMessage?.call(chatMessage);
     }
   }
 
   /// Send reaction
   Future<void> sendReaction(ReactionType type) async {
-    if (_currentParticipantId == null) return;
+    debugPrint('WatchPartyService: sendReaction called with: $type');
+    debugPrint(
+      'WatchPartyService: _currentParticipantId: $_currentParticipantId, _isHost: $_isHost, _currentRoom: ${_currentRoom != null}',
+    );
+    if (_currentParticipantId == null) {
+      debugPrint(
+        'WatchPartyService: Cannot send reaction - participant ID is null',
+      );
+      return;
+    }
 
     final participant = _currentRoom?.participants.firstWhere(
       (p) => p.id == _currentParticipantId,
@@ -700,18 +869,28 @@ class WatchPartyService {
     );
 
     if (_isHost) {
-      // Store reaction for session
+      // Host: Store reaction and broadcast to all (including self)
       _recentReactions.add(reaction);
       if (_recentReactions.length > _maxRecentReactions) {
         _recentReactions.removeAt(0);
       }
-      // Host broadcasts directly (will trigger onReaction via _broadcastSync)
+      // Trigger callback immediately for host
+      onReaction?.call(reaction);
+      // Broadcast to all participants via sync message
       _broadcastSync(
         SyncMessage(type: SyncMessageType.reaction, reaction: reaction),
       );
+      // Also trigger room update to ensure UI refreshes
+      onRoomUpdate?.call(_currentRoom!);
     } else {
-      // Guest sends to host
+      // Guest sends to host via POST request
       await sendSyncCommand(type: SyncMessageType.reaction, reaction: reaction);
+      // Guest also adds their own reaction locally for immediate UI update
+      _recentReactions.add(reaction);
+      if (_recentReactions.length > _maxRecentReactions) {
+        _recentReactions.removeAt(0);
+      }
+      onReaction?.call(reaction);
     }
   }
 
@@ -729,15 +908,17 @@ class WatchPartyService {
         (videoTitle != null && videoTitle != _currentRoom!.videoTitle);
 
     // Update position timestamp when position changes
-    final positionChanged = position != null && 
-        position != _currentRoom!.currentPosition;
+    final positionChanged =
+        position != null && position != _currentRoom!.currentPosition;
 
     _currentRoom = _currentRoom!.copyWith(
       currentPosition: position ?? _currentRoom!.currentPosition,
       isPlaying: isPlaying ?? _currentRoom!.isPlaying,
       videoUrl: videoUrl ?? _currentRoom!.videoUrl,
       videoTitle: videoTitle ?? _currentRoom!.videoTitle,
-      positionUpdatedAt: positionChanged ? DateTime.now() : _currentRoom!.positionUpdatedAt,
+      positionUpdatedAt: positionChanged
+          ? DateTime.now()
+          : _currentRoom!.positionUpdatedAt,
     );
 
     // Broadcast update
@@ -760,19 +941,62 @@ class WatchPartyService {
 
   /// Leave the current room
   Future<void> leaveRoom() async {
+    debugPrint('WatchPartyService: leaveRoom() called, isHost: $_isHost');
+
+    // If guest, notify host about leaving
+    if (!_isHost &&
+        _currentParticipantId != null &&
+        _hostIp != null &&
+        _hostPort != null) {
+      debugPrint(
+        'WatchPartyService: Guest leaving, notifying host at $_hostIp:$_hostPort',
+      );
+      try {
+        await sendSyncCommand(
+          hostIp: _hostIp,
+          hostPort: _hostPort,
+          type: SyncMessageType.leave,
+        );
+        debugPrint('WatchPartyService: Leave message sent successfully');
+      } catch (e) {
+        debugPrint('WatchPartyService: Error sending leave message: $e');
+        // Continue with cleanup even if notification fails
+      }
+    } else if (_isHost) {
+      debugPrint('WatchPartyService: Host leaving room');
+    }
+
+    // Stop polling timer
+    debugPrint('WatchPartyService: Cancelling sync timer');
     _syncTimer?.cancel();
     _syncTimer = null;
 
+    // Close server if host
     if (_server != null) {
-      await _server!.close(force: true);
-      _server = null;
+      debugPrint('WatchPartyService: Closing server');
+      try {
+        await _server!.close(force: true);
+        _server = null;
+        debugPrint('WatchPartyService: Server closed');
+      } catch (e) {
+        debugPrint('WatchPartyService: Error closing server: $e');
+        _server = null;
+      }
     }
 
     // Stop video streaming if host is leaving
     if (_isHost) {
-      await VideoStreamingService().stopStreaming();
+      debugPrint('WatchPartyService: Stopping video streaming');
+      try {
+        await VideoStreamingService().stopStreaming();
+        debugPrint('WatchPartyService: Video streaming stopped');
+      } catch (e) {
+        debugPrint('WatchPartyService: Error stopping video streaming: $e');
+      }
     }
 
+    // Clear all state
+    debugPrint('WatchPartyService: Clearing room state');
     _currentRoom = null;
     _currentParticipantId = null;
     _isHost = false;
@@ -783,6 +1007,8 @@ class WatchPartyService {
     // Clear session messages and reactions when leaving room
     _sessionMessages.clear();
     _recentReactions.clear();
+
+    debugPrint('WatchPartyService: leaveRoom() completed');
   }
 
   /// Get server port (for sharing with guests)
@@ -795,7 +1021,9 @@ class WatchPartyService {
       // Update _hostPort if we got it from server
       _hostPort = port;
     }
-    debugPrint('WatchParty: getServerPort() called - _hostPort: $_hostPort, _server?.port: ${_server?.port}, _server is null: ${_server == null}, returning: $port');
+    debugPrint(
+      'WatchParty: getServerPort() called - _hostPort: $_hostPort, _server?.port: ${_server?.port}, _server is null: ${_server == null}, returning: $port',
+    );
     return port;
   }
 
