@@ -491,10 +491,10 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   /// Manual sync button handler (host only)
   void _manualSync() {
-    if (!_watchPartyService.isHost || !_watchPartyService.isInRoom) return;
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    if (!provider.isHost || !provider.isInRoom) return;
     if (!_controller.value.isInitialized) return;
 
-    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
     provider.updateRoomState(
       position: _controller.value.position,
       isPlaying: _controller.value.isPlaying,
@@ -560,10 +560,14 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
     // Stop and dispose current controller - ensure audio is stopped
     _controller.pause();
-    await Future.delayed(const Duration(milliseconds: 100)); // Give time for audio to stop
+    await Future.delayed(
+      const Duration(milliseconds: 100),
+    ); // Give time for audio to stop
     _controller.removeListener(_videoPlayerListener);
     await _controller.dispose();
-    await Future.delayed(const Duration(milliseconds: 100)); // Additional delay to ensure cleanup
+    await Future.delayed(
+      const Duration(milliseconds: 100),
+    ); // Additional delay to ensure cleanup
 
     // Clear ad state
     _adController?.pause();
@@ -711,9 +715,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                     }
                   });
                 }
-                
+
                 // Auto-sync on first video start (host only)
-                if (provider.isHost && provider.isInRoom && widget.url != null) {
+                if (provider.isHost &&
+                    provider.isInRoom &&
+                    widget.url != null) {
                   provider.updateRoomState(
                     videoUrl: widget.url!,
                     videoTitle: _videoTitle ?? widget.title ?? 'Video',
@@ -1412,14 +1418,18 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                     },
                   ),
                 if (_showControls && !_isLocked)
-                  Positioned(
-                    bottom: 0,
-                    child: ControlBar(
-                      formatTime: _formatTime,
-                      onSync: _watchPartyService.isHost && _watchPartyService.isInRoom
-                          ? _manualSync
-                          : null,
-                    ),
+                  Consumer<WatchPartyProvider>(
+                    builder: (context, provider, child) {
+                      return Positioned(
+                        bottom: 0,
+                        child: ControlBar(
+                          formatTime: _formatTime,
+                          onSync: provider.isHost && provider.isInRoom
+                              ? _manualSync
+                              : null,
+                        ),
+                      );
+                    },
                   ),
                 if (_showControls && _showEpisodeList && !_isLocked)
                   Positioned(
@@ -1446,7 +1456,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                           room: provider.currentRoom!,
                           isHost: provider.isHost,
                           onClose: () {
-                            debugPrint('WatchParty: Video player overlay onClose called');
+                            debugPrint(
+                              'WatchParty: Video player overlay onClose called',
+                            );
                             if (mounted) {
                               setState(() {
                                 _showWatchParty = false;

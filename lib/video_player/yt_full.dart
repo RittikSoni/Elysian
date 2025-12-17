@@ -526,10 +526,10 @@ class _YTFullState extends State<YTFull> {
 
   /// Manual sync button handler (host only)
   void _manualSync() {
-    if (!_watchPartyService.isHost || !_watchPartyService.isInRoom) return;
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    if (!provider.isHost || !provider.isInRoom) return;
     if (!_controller.value.isReady) return;
 
-    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
     final videoUrl = widget.url ?? widget.mediaUrl ?? '';
     final videoTitle = widget.title ?? 'YouTube Video';
     provider.updateRoomState(
@@ -1202,14 +1202,18 @@ class _YTFullState extends State<YTFull> {
                   },
                 ),
               if (_showControls && !_isLocked)
-                Positioned(
-                  bottom: 0,
-                  child: ControlBar(
-                    formatTime: sharedFormatTime,
-                    onSync: _watchPartyService.isHost && _watchPartyService.isInRoom
-                        ? _manualSync
-                        : null,
-                  ),
+                Consumer<WatchPartyProvider>(
+                  builder: (context, provider, child) {
+                    return Positioned(
+                      bottom: 0,
+                      child: ControlBar(
+                        formatTime: sharedFormatTime,
+                        onSync: provider.isHost && provider.isInRoom
+                            ? _manualSync
+                            : null,
+                      ),
+                    );
+                  },
                 ),
               if (_showControls && _showEpisodeList && !_isLocked)
                 Positioned(
