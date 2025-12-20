@@ -97,13 +97,15 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
     return MessageNotificationOverlay(
       chatProvider: chatProvider,
       child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: Size(MediaQuery.of(context).size.width, 50),
-          child: CustomAppBar(
-            scrollOffset: 0,
-            onNavigateToTab: widget.onNavigateToTab,
-          ),
-        ),
+        appBar: Responsive.isMobile(context)
+            ? null
+            : PreferredSize(
+                preferredSize: Size(MediaQuery.of(context).size.width, 50),
+                child: CustomAppBar(
+                  scrollOffset: 0,
+                  onNavigateToTab: widget.onNavigateToTab,
+                ),
+              ),
         body: isDesktop
             ? _buildDesktopLayout(chatProvider)
             : _buildMobileLayout(chatProvider),

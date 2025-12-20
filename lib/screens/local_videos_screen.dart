@@ -385,13 +385,15 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: PreferredSize(
-        preferredSize: Size(MediaQuery.of(context).size.width, 50),
-        child: CustomAppBar(
-          scrollOffset: _scrollOffset,
-          onNavigateToTab: widget.onNavigateToTab,
-        ),
-      ),
+      appBar: Responsive.isMobile(context)
+          ? null
+          : PreferredSize(
+              preferredSize: Size(MediaQuery.of(context).size.width, 50),
+              child: CustomAppBar(
+                scrollOffset: _scrollOffset,
+                onNavigateToTab: widget.onNavigateToTab,
+              ),
+            ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [

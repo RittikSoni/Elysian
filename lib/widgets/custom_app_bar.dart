@@ -144,6 +144,16 @@ class _MobileCustomAppBar extends StatelessWidget {
 
             tooltip: 'Watch Party',
           ),
+          const SizedBox(width: 12.0),
+          IconButton(
+            padding: EdgeInsets.zero,
+            onPressed: () {
+              onNavigateToTab?.call(4);
+            },
+            icon: const Icon(Icons.person),
+            iconSize: 28.0,
+            color: Colors.white,
+          ),
         ],
       ),
     );

@@ -73,13 +73,15 @@ class MoreScreenState extends State<MoreScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: Size(MediaQuery.of(context).size.width, 50),
-        child: CustomAppBar(
-          scrollOffset: _scrollOffset,
-          onNavigateToTab: widget.onNavigateToTab,
-        ),
-      ),
+      appBar: Responsive.isMobile(context)
+          ? null
+          : PreferredSize(
+              preferredSize: Size(MediaQuery.of(context).size.width, 50),
+              child: CustomAppBar(
+                scrollOffset: _scrollOffset,
+                onNavigateToTab: widget.onNavigateToTab,
+              ),
+            ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
