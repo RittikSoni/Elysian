@@ -7,7 +7,6 @@ import 'package:elysian/screens/more_screen.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/utils/app_themes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
 
@@ -94,7 +93,7 @@ class BottomNavState extends State<BottomNav> {
       // Glass effect for liquid glass mode
       backgroundColor = Colors.transparent;
       selectedColor = Colors.amber;
-      unselectedColor = Colors.white.withOpacity(0.6);
+      unselectedColor = Colors.white.withValues(alpha: 0.6);
     } else if (isLight) {
       // Light mode - light background
       backgroundColor = Colors.white;
@@ -158,10 +157,10 @@ class BottomNavState extends State<BottomNav> {
           filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(opacity),
+              color: Colors.white.withValues(alpha: opacity),
               border: Border(
                 top: BorderSide(
-                  color: Colors.white.withOpacity(border),
+                  color: Colors.white.withValues(alpha: border),
                   width: 1.5,
                 ),
               ),

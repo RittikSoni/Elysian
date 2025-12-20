@@ -44,9 +44,10 @@ class ThemeAwareCard extends StatelessWidget {
             margin: margin,
             decoration: BoxDecoration(
               borderRadius: borderRadius ?? BorderRadius.circular(20),
-              border: border ??
+              border:
+                  border ??
                   Border.all(
-                    color: Colors.white.withOpacity(borderOpacity),
+                    color: Colors.white.withValues(alpha: borderOpacity),
                     width: 1.5,
                   ),
             ),
@@ -57,7 +58,7 @@ class ThemeAwareCard extends StatelessWidget {
                 child: Container(
                   padding: padding,
                   decoration: BoxDecoration(
-                    color: color ?? Colors.white.withOpacity(opacity),
+                    color: color ?? Colors.white.withValues(alpha: opacity),
                     borderRadius: borderRadius ?? BorderRadius.circular(20),
                   ),
                   child: child,
@@ -81,10 +82,7 @@ class ThemeAwareCard extends StatelessWidget {
             ),
             color: color ?? theme.cardColor,
             child: padding != null
-                ? Padding(
-                    padding: padding!,
-                    child: child,
-                  )
+                ? Padding(padding: padding!, child: child)
                 : child,
           );
         }
@@ -137,7 +135,7 @@ class ThemeAwareContainer extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: borderRadius ?? BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(borderOpacity),
+                color: Colors.white.withValues(alpha: borderOpacity),
                 width: 1.5,
               ),
             ),
@@ -148,7 +146,7 @@ class ThemeAwareContainer extends StatelessWidget {
                 child: Container(
                   padding: padding,
                   decoration: BoxDecoration(
-                    color: color ?? Colors.white.withOpacity(opacity),
+                    color: color ?? Colors.white.withValues(alpha: opacity),
                     borderRadius: borderRadius ?? BorderRadius.circular(20),
                   ),
                   child: child,
@@ -163,7 +161,8 @@ class ThemeAwareContainer extends StatelessWidget {
             height: height,
             margin: margin,
             padding: padding,
-            decoration: decoration ??
+            decoration:
+                decoration ??
                 BoxDecoration(
                   color: color ?? theme.cardColor,
                   borderRadius: borderRadius ?? BorderRadius.circular(12),
@@ -175,4 +174,3 @@ class ThemeAwareContainer extends StatelessWidget {
     );
   }
 }
-

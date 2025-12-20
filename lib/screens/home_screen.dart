@@ -92,7 +92,9 @@ class HomeScreenState extends State<HomeScreen> {
                         child: Text(
                           'Made with ❤️ in India',
                           style: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
                           ),

@@ -65,7 +65,7 @@ class _WatchPartyChatOverlayState extends State<WatchPartyChatOverlay> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black.withOpacity(0.95),
+      color: Colors.black.withValues(alpha: 0.95),
       child: SafeArea(
         child: Column(
           children: [
@@ -219,8 +219,8 @@ class _WatchPartyChatOverlayState extends State<WatchPartyChatOverlay> {
                                     const SizedBox(width: 8),
                                     CircleAvatar(
                                       radius: 16,
-                                      backgroundColor: Colors.amber.withOpacity(
-                                        0.3,
+                                      backgroundColor: Colors.amber.withValues(
+                                        alpha: 0.3,
                                       ),
                                       child: const Icon(
                                         Icons.person,
@@ -275,7 +275,7 @@ class _WatchPartyChatOverlayState extends State<WatchPartyChatOverlay> {
                     onPressed: _sendMessage,
                     icon: const Icon(Icons.send, color: Colors.amber),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.amber.withOpacity(0.2),
+                      backgroundColor: Colors.amber.withValues(alpha: 0.2),
                       padding: const EdgeInsets.all(12),
                     ),
                   ),

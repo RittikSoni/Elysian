@@ -62,7 +62,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
         _videoController!.setVolume(0);
         _videoController!.setLooping(true);
         _videoController!.play();
-        
+
         if (mounted && !_isDisposed) {
           setState(() {
             _isInitialized = true;
@@ -122,7 +122,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
     } else if (_youtubeController != null) {
       currentPosition = _youtubeController!.value.position;
     }
-    
+
     // Call PiP callback if available, otherwise open full screen
     if (widget.onPiP != null) {
       widget.onPiP!(currentPosition);
@@ -139,7 +139,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
     } else if (_youtubeController != null) {
       currentPosition = _youtubeController!.value.position;
     }
-    
+
     widget.onFullScreen(currentPosition);
   }
 
@@ -192,7 +192,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
             aspectRatio: _videoController!.value.aspectRatio,
             child: VideoPlayer(_videoController!),
           ),
-        
+
         // Controls Overlay
         Positioned.fill(
           child: GestureDetector(
@@ -206,7 +206,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -220,7 +220,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
             ),
           ),
         ),
-        
+
         // Control Buttons
         Positioned(
           bottom: 16,
@@ -235,23 +235,20 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
                   color: Colors.white,
                 ),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withOpacity(0.6),
+                  backgroundColor: Colors.black.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(width: 8),
-              
+
               // Full Screen
               IconButton(
                 onPressed: _openFullScreen,
-                icon: const Icon(
-                  Icons.fullscreen,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.fullscreen, color: Colors.white),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withOpacity(0.6),
+                  backgroundColor: Colors.black.withValues(alpha: 0.6),
                 ),
               ),
-              
+
               // PiP (only for supported types)
               if (widget.link.type == LinkType.youtube ||
                   widget.link.type == LinkType.directVideo) ...[
@@ -263,7 +260,7 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
                     color: Colors.white,
                   ),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.black.withOpacity(0.6),
+                    backgroundColor: Colors.black.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -274,4 +271,3 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
     );
   }
 }
-

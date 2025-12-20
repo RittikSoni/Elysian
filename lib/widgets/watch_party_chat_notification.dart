@@ -19,8 +19,7 @@ class WatchPartyChatNotification extends StatefulWidget {
       _WatchPartyChatNotificationState();
 }
 
-class _WatchPartyChatNotificationState
-    extends State<WatchPartyChatNotification>
+class _WatchPartyChatNotificationState extends State<WatchPartyChatNotification>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
@@ -37,18 +36,12 @@ class _WatchPartyChatNotificationState
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     // Show notification
     _controller.forward();
@@ -81,12 +74,12 @@ class _WatchPartyChatNotificationState
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey[900]!.withOpacity(0.95),
+              color: Colors.grey[900]!.withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -96,7 +89,7 @@ class _WatchPartyChatNotificationState
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: Colors.amber.withOpacity(0.2),
+                  backgroundColor: Colors.amber.withValues(alpha: 0.2),
                   child: Text(
                     widget.message.participantName.isNotEmpty
                         ? widget.message.participantName[0].toUpperCase()
@@ -151,4 +144,3 @@ class _WatchPartyChatNotificationState
     );
   }
 }
-

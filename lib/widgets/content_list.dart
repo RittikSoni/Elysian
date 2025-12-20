@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:elysian/models/content_model.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
@@ -16,14 +18,15 @@ class ContentList extends StatelessWidget {
     required this.isOriginals,
   });
 
-  Future<void> _showAddToLinkDialog(BuildContext context, {Content? content}) async {
+  Future<void> _showAddToLinkDialog(
+    BuildContext context, {
+    Content? content,
+  }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AddLinkDialog(
-        initialTitle: content?.name,
-      ),
+      builder: (context) => AddLinkDialog(initialTitle: content?.name),
     );
-    
+
     if (result == true) {
       // Refresh providers
       final linksProvider = context.read<LinksProvider>();
@@ -32,6 +35,7 @@ class ContentList extends StatelessWidget {
       listsProvider.loadLists(forceRefresh: true);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -84,7 +88,10 @@ class ContentList extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             ListTile(
-                              leading: const Icon(Icons.playlist_add, color: Colors.white),
+                              leading: const Icon(
+                                Icons.playlist_add,
+                                color: Colors.white,
+                              ),
                               title: Text(
                                 'Add "${content.name}" to List',
                                 style: const TextStyle(color: Colors.white),
@@ -95,8 +102,14 @@ class ContentList extends StatelessWidget {
                               },
                             ),
                             ListTile(
-                              leading: const Icon(Icons.close, color: Colors.white),
-                              title: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                              leading: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
+                              title: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.white),
+                              ),
                               onTap: () => Navigator.pop(context),
                             ),
                           ],
@@ -125,12 +138,13 @@ class ContentList extends StatelessWidget {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => _showAddToLinkDialog(context, content: content),
+                            onTap: () =>
+                                _showAddToLinkDialog(context, content: content),
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -119,7 +121,8 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
@@ -129,11 +132,14 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
         title = await LinkParser.fetchTitleFromUrl(widget.sharedUrl, linkType);
       } catch (e) {
         // Use fallback title if fetch fails
-        print('Error fetching title: $e');
+        debugPrint('Error fetching title: $e');
       }
 
       // Fetch metadata (thumbnail, description) from URL
-      final metadata = await LinkParser.fetchMetadataFromUrl(widget.sharedUrl, linkType);
+      final metadata = await LinkParser.fetchMetadataFromUrl(
+        widget.sharedUrl,
+        linkType,
+      );
       final thumbnailUrl = metadata['thumbnailUrl'];
       final description = metadata['description'];
 
@@ -154,7 +160,7 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
       );
 
       await StorageService.saveLink(savedLink);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
 
@@ -173,7 +179,7 @@ class _ListSelectionDialogState extends State<ListSelectionDialog> {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading
         Navigator.of(context).pop(); // Close list selection dialog
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error saving link: ${e.toString()}'),

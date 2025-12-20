@@ -650,7 +650,9 @@ class WatchPartyService {
             // If video changed, notify listeners
             // This is critical for guests to navigate when host starts a video
             // IMPORTANT: Only trigger if video URL actually changed (not just title)
-            if (videoChanged && updatedRoom.videoUrl.isNotEmpty && updatedRoom.videoUrl != previousVideoUrl) {
+            if (videoChanged &&
+                updatedRoom.videoUrl.isNotEmpty &&
+                updatedRoom.videoUrl != previousVideoUrl) {
               debugPrint(
                 'WatchPartyService: Video changed from "$previousVideoUrl" to "${updatedRoom.videoUrl}"',
               );
@@ -686,7 +688,9 @@ class WatchPartyService {
             _connectionError = 'Server error (${response.statusCode})';
             // If server returns 404, host likely ended the room
             if (response.statusCode == 404) {
-              debugPrint('WatchPartyService: Server returned 404 - host likely ended room');
+              debugPrint(
+                'WatchPartyService: Server returned 404 - host likely ended room',
+              );
               // Clear room state to indicate room ended
               _currentRoom = null;
               _isConnected = false;

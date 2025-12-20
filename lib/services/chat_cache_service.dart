@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:elysian/models/chat_models.dart';
-import 'package:elysian/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for caching chat data locally to reduce Firestore reads and improve performance
@@ -13,7 +12,9 @@ class ChatCacheService {
   static const String _conversationsCacheKey = 'chat_conversations_cache';
   static const String _messagesCachePrefix = 'chat_messages_cache_';
   static const String _cacheTimestampKey = 'chat_cache_timestamp';
-  static const Duration _cacheExpiry = Duration(hours: 1); // Cache expires after 1 hour
+  static const Duration _cacheExpiry = Duration(
+    hours: 1,
+  ); // Cache expires after 1 hour
 
   // In-memory cache for faster access
   final Map<String, List<DirectChatMessage>> _messageCache = {};
@@ -26,7 +27,10 @@ class ChatCacheService {
       final prefs = await SharedPreferences.getInstance();
       final json = conversations.map((c) => c.toJson()).toList();
       await prefs.setString(_conversationsCacheKey, jsonEncode(json));
-      await prefs.setString(_cacheTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+        _cacheTimestampKey,
+        DateTime.now().toIso8601String(),
+      );
     } catch (e) {
       debugPrint('Error caching conversations: $e');
     }
@@ -51,7 +55,9 @@ class ChatCacheService {
       if (jsonStr == null) return null;
 
       final json = jsonDecode(jsonStr) as List<dynamic>;
-      return json.map((j) => ChatConversation.fromJson(j as Map<String, dynamic>)).toList();
+      return json
+          .map((j) => ChatConversation.fromJson(j as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('Error getting cached conversations: $e');
       return null;
@@ -59,7 +65,10 @@ class ChatCacheService {
   }
 
   /// Cache messages for a conversation
-  Future<void> cacheMessages(String conversationId, List<DirectChatMessage> messages) async {
+  Future<void> cacheMessages(
+    String conversationId,
+    List<DirectChatMessage> messages,
+  ) async {
     try {
       // Limit cached messages to reduce memory usage
       final messagesToCache = messages.length > _maxCachedMessages
@@ -76,7 +85,10 @@ class ChatCacheService {
           ? messagesToCache.sublist(messagesToCache.length - 20)
           : messagesToCache;
       final json = messagesToPersist.map((m) => m.toJson()).toList();
-      await prefs.setString('$_messagesCachePrefix$conversationId', jsonEncode(json));
+      await prefs.setString(
+        '$_messagesCachePrefix$conversationId',
+        jsonEncode(json),
+      );
     } catch (e) {
       debugPrint('Error caching messages: $e');
     }
@@ -87,7 +99,8 @@ class ChatCacheService {
     // Check in-memory cache first
     if (_messageCache.containsKey(conversationId)) {
       final timestamp = _cacheTimestamps[conversationId];
-      if (timestamp != null && DateTime.now().difference(timestamp) < _cacheExpiry) {
+      if (timestamp != null &&
+          DateTime.now().difference(timestamp) < _cacheExpiry) {
         return _messageCache[conversationId];
       } else {
         // Cache expired, remove it
@@ -99,14 +112,18 @@ class ChatCacheService {
   }
 
   /// Get persisted messages (for offline support)
-  Future<List<DirectChatMessage>?> getPersistedMessages(String conversationId) async {
+  Future<List<DirectChatMessage>?> getPersistedMessages(
+    String conversationId,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('$_messagesCachePrefix$conversationId');
       if (jsonStr == null) return null;
 
       final json = jsonDecode(jsonStr) as List<dynamic>;
-      return json.map((j) => DirectChatMessage.fromJson(j as Map<String, dynamic>)).toList();
+      return json
+          .map((j) => DirectChatMessage.fromJson(j as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('Error getting persisted messages: $e');
       return null;
@@ -149,7 +166,7 @@ class ChatCacheService {
   void cleanupOldCache() {
     final now = DateTime.now();
     final keysToRemove = <String>[];
-    
+
     for (final entry in _cacheTimestamps.entries) {
       if (now.difference(entry.value) > _cacheExpiry) {
         keysToRemove.add(entry.key);
@@ -166,10 +183,12 @@ class ChatCacheService {
       // Keep only the 10 most recently accessed conversations
       final sortedEntries = _cacheTimestamps.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      
+
       final keysToKeep = sortedEntries.take(10).map((e) => e.key).toSet();
-      final keysToRemove = _messageCache.keys.where((k) => !keysToKeep.contains(k)).toList();
-      
+      final keysToRemove = _messageCache.keys
+          .where((k) => !keysToKeep.contains(k))
+          .toList();
+
       for (final key in keysToRemove) {
         _messageCache.remove(key);
         _cacheTimestamps.remove(key);
@@ -177,4 +196,3 @@ class ChatCacheService {
     }
   }
 }
-

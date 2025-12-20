@@ -24,7 +24,7 @@ class WatchPartyIndicator extends StatelessWidget {
     final hasBottomNav = MediaQuery.of(context).size.width < 600;
     final bottomNavHeight = hasBottomNav ? 60.0 : 0.0;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -34,15 +34,15 @@ class WatchPartyIndicator extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.amber.withOpacity(0.2),
+          color: Colors.amber.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: Colors.amber.withOpacity(0.6),
+            color: Colors.amber.withValues(alpha: 0.6),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withValues(alpha: 0.4),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -51,11 +51,7 @@ class WatchPartyIndicator extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.people,
-              color: Colors.amber,
-              size: 14,
-            ),
+            Icon(Icons.people, color: Colors.amber, size: 14),
             const SizedBox(width: 5),
             Text(
               'Watch Party',
@@ -70,7 +66,7 @@ class WatchPartyIndicator extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.3),
+                  color: Colors.amber.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -87,7 +83,7 @@ class WatchPartyIndicator extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.2),
+                color: Colors.amber.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -119,7 +115,7 @@ class WatchPartyIndicatorOverlay {
       hide();
       return;
     }
-    
+
     final overlay = Navigator.of(context).overlay;
     if (overlay == null) return;
 
@@ -161,7 +157,8 @@ class WatchPartyIndicatorOverlay {
                   listen: false,
                 );
                 // Only show dialog if still in room
-                if (watchPartyProvider.isInRoom && watchPartyProvider.currentRoom != null) {
+                if (watchPartyProvider.isInRoom &&
+                    watchPartyProvider.currentRoom != null) {
                   _showWatchPartyDialog(context, watchPartyProvider);
                 }
               },
@@ -219,11 +216,7 @@ class WatchPartyIndicatorOverlay {
                 top: 40,
                 right: 16,
                 child: IconButton(
-                  icon: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  icon: const Icon(Icons.close, color: Colors.white, size: 28),
                   onPressed: () {
                     if (dialogContext.mounted) {
                       Navigator.of(dialogContext, rootNavigator: true).pop();
@@ -239,4 +232,3 @@ class WatchPartyIndicatorOverlay {
     // Don't hide indicator when dialog closes - only hide when actually leaving room
   }
 }
-

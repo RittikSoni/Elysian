@@ -1,6 +1,7 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:elysian/widgets/widgets.dart';
-import 'package:elysian/widgets/theme_aware_card.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/services/export_import_service.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -93,8 +94,8 @@ class MoreScreenState extends State<MoreScreen> {
                 builder: (context, chatProvider, child) {
                   final authService = AuthService();
                   final isSignedIn = chatProvider.currentUserEmail != null;
-                  final userEmail = isSignedIn 
-                      ? chatProvider.currentUserEmail 
+                  final userEmail = isSignedIn
+                      ? chatProvider.currentUserEmail
                       : authService.userEmail;
                   final userDisplayName = isSignedIn
                       ? chatProvider.currentUserDisplayName
@@ -136,7 +137,10 @@ class MoreScreenState extends State<MoreScreen> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        _getUserInitial(userDisplayName, userEmail),
+                                        _getUserInitial(
+                                          userDisplayName,
+                                          userEmail,
+                                        ),
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 24.0,
@@ -155,13 +159,18 @@ class MoreScreenState extends State<MoreScreen> {
                               decoration: BoxDecoration(
                                 color: isSignedIn
                                     ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurface.withOpacity(0.3),
+                                    : theme.colorScheme.onSurface.withValues(
+                                        alpha: 0.3,
+                                      ),
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
                               child: Center(
                                 child: Text(
                                   isSignedIn
-                                      ? _getUserInitial(userDisplayName, userEmail)
+                                      ? _getUserInitial(
+                                          userDisplayName,
+                                          userEmail,
+                                        )
                                       : '?',
                                   style: TextStyle(
                                     color: Colors.white,
@@ -178,7 +187,9 @@ class MoreScreenState extends State<MoreScreen> {
                               children: [
                                 Text(
                                   isSignedIn
-                                      ? (userDisplayName ?? userEmail?.split('@').first ?? 'User')
+                                      ? (userDisplayName ??
+                                            userEmail?.split('@').first ??
+                                            'User')
                                       : 'Guest User',
                                   style: TextStyle(
                                     color: theme.colorScheme.onSurface,
@@ -194,7 +205,8 @@ class MoreScreenState extends State<MoreScreen> {
                                   style: TextStyle(
                                     color: isSignedIn
                                         ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                                        : theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.6),
                                     fontSize: 16.0,
                                   ),
                                 ),
@@ -203,7 +215,9 @@ class MoreScreenState extends State<MoreScreen> {
                           ),
                           Icon(
                             isSignedIn ? Icons.chevron_right : Icons.login,
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ],
                       ),
@@ -729,11 +743,11 @@ class MoreScreenState extends State<MoreScreen> {
 
                         // Reset all data
                         await StorageService.resetAllData();
-                        
+
                         // Sign out from authentication
                         final authService = AuthService();
                         await authService.signOut();
-                        
+
                         // Clear chat providers
                         final chatProvider = context.read<ChatProvider>();
                         await chatProvider.signOut();
@@ -795,7 +809,7 @@ class MoreScreenState extends State<MoreScreen> {
                   Text(
                     'App Settings',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14.0,
                       fontWeight: FontWeight.w600,
                     ),
@@ -859,11 +873,11 @@ class MoreScreenState extends State<MoreScreen> {
           Consumer<ChatProvider>(
             builder: (context, chatProvider, child) {
               final isSignedIn = chatProvider.currentUserEmail != null;
-              
+
               if (!isSignedIn) {
                 return const SliverToBoxAdapter(child: SizedBox.shrink());
               }
-              
+
               return SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -964,7 +978,9 @@ class MoreScreenState extends State<MoreScreen> {
                     return Text(
                       'Made with ❤️ in India',
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
                         fontSize: 13,
                         fontStyle: FontStyle.italic,
                       ),
@@ -990,7 +1006,10 @@ class MoreScreenState extends State<MoreScreen> {
     return 'U';
   }
 
-  void _showAccountDetailsDialog(BuildContext context, AuthService authService) {
+  void _showAccountDetailsDialog(
+    BuildContext context,
+    AuthService authService,
+  ) {
     final userEmail = authService.userEmail;
     final userDisplayName = authService.userDisplayName;
     final userPhotoUrl = authService.userPhotoUrl;
@@ -999,9 +1018,7 @@ class MoreScreenState extends State<MoreScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Account Details',
           style: TextStyle(color: Colors.white),
@@ -1077,10 +1094,7 @@ class MoreScreenState extends State<MoreScreen> {
             if (userEmail != null)
               Text(
                 userEmail,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
               ),
           ],
         ),
@@ -1099,17 +1113,12 @@ class MoreScreenState extends State<MoreScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.login, color: Colors.amber),
             SizedBox(width: 8),
-            Text(
-              'Sign In Required',
-              style: TextStyle(color: Colors.white),
-            ),
+            Text('Sign In Required', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: const Text(
@@ -1128,9 +1137,7 @@ class MoreScreenState extends State<MoreScreen> {
               if (context.mounted) {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ChatListScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ChatListScreen()),
                 );
               }
             },
@@ -1231,7 +1238,7 @@ class _ThemeOption extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.primary.withOpacity(0.1)
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -1265,7 +1272,7 @@ class _ThemeOption extends StatelessWidget {
                   Text(
                     description,
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -1322,7 +1329,9 @@ class _MoreMenuItem extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                         fontSize: 14.0,
                       ),
                     ),
@@ -1332,7 +1341,7 @@ class _MoreMenuItem extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -1384,7 +1393,9 @@ class _PlayerPreferenceItem extends StatelessWidget {
                     Text(
                       subtitle!,
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                         fontSize: 14.0,
                       ),
                     ),
@@ -1395,7 +1406,7 @@ class _PlayerPreferenceItem extends StatelessWidget {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: Colors.amber,
+              activeThumbColor: Colors.amber,
             ),
           ],
         ),

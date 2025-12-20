@@ -47,10 +47,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _ReceivedRequestsTab(),
-          _SentRequestsTab(),
-        ],
+        children: [_ReceivedRequestsTab(), _SentRequestsTab()],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showSendRequestDialog(context),
@@ -91,8 +88,9 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter an email address';
                     }
-                    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-                        .hasMatch(value.trim())) {
+                    if (!RegExp(
+                      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                    ).hasMatch(value.trim())) {
                       return 'Please enter a valid email address';
                     }
                     return null;
@@ -103,9 +101,7 @@ class _FriendRequestScreenState extends State<FriendRequestScreen>
           ),
           actions: [
             TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () => Navigator.of(context).pop(),
+              onPressed: isLoading ? null : () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
@@ -191,10 +187,7 @@ class _ReceivedRequestsTab extends StatelessWidget {
           itemCount: provider.pendingRequests.length,
           itemBuilder: (context, index) {
             final request = provider.pendingRequests[index];
-            return _FriendRequestTile(
-              request: request,
-              isReceived: true,
-            );
+            return _FriendRequestTile(request: request, isReceived: true);
           },
         );
       },
@@ -232,10 +225,7 @@ class _SentRequestsTab extends StatelessWidget {
           itemCount: provider.sentRequests.length,
           itemBuilder: (context, index) {
             final request = provider.sentRequests[index];
-            return _FriendRequestTile(
-              request: request,
-              isReceived: false,
-            );
+            return _FriendRequestTile(request: request, isReceived: false);
           },
         );
       },
@@ -247,10 +237,7 @@ class _FriendRequestTile extends StatelessWidget {
   final FriendRequest request;
   final bool isReceived;
 
-  const _FriendRequestTile({
-    required this.request,
-    required this.isReceived,
-  });
+  const _FriendRequestTile({required this.request, required this.isReceived});
 
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
@@ -367,4 +354,3 @@ class _FriendRequestTile extends StatelessWidget {
     );
   }
 }
-

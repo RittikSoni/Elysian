@@ -3,7 +3,7 @@ import 'package:elysian/widgets/widgets.dart';
 
 class DownloadsScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
-  
+
   const DownloadsScreen({super.key, this.onNavigateToTab});
 
   @override
@@ -47,7 +47,11 @@ class DownloadsScreenState extends State<DownloadsScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(top: 100.0, left: 20.0, right: 20.0),
+              padding: const EdgeInsets.only(
+                top: 100.0,
+                left: 20.0,
+                right: 20.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -72,10 +76,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
                   const SizedBox(height: 8.0),
                   Text(
                     'Automatically download content you might like',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16.0,
-                    ),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 16.0),
                   ),
                 ],
               ),
@@ -107,10 +108,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
                     child: Text(
                       'Download your favorite shows and movies to watch offline',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 16.0,
-                      ),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 16.0),
                     ),
                   ),
                   const SizedBox(height: 32.0),
@@ -143,4 +141,3 @@ class DownloadsScreenState extends State<DownloadsScreen> {
     );
   }
 }
-

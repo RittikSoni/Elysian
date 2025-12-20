@@ -6,10 +6,7 @@ import 'package:flutter/material.dart';
 class UserListsWidget extends StatefulWidget {
   final VoidCallback? onRefresh;
 
-  const UserListsWidget({
-    super.key,
-    this.onRefresh,
-  });
+  const UserListsWidget({super.key, this.onRefresh});
 
   @override
   State<UserListsWidget> createState() => _UserListsWidgetState();
@@ -48,9 +45,12 @@ class _UserListsWidgetState extends State<UserListsWidget> {
       _filteredLists = List.from(_lists);
     } else {
       _filteredLists = _lists
-          .where((list) =>
-              list.name.toLowerCase().contains(_searchQuery) ||
-              (list.description?.toLowerCase().contains(_searchQuery) ?? false))
+          .where(
+            (list) =>
+                list.name.toLowerCase().contains(_searchQuery) ||
+                (list.description?.toLowerCase().contains(_searchQuery) ??
+                    false),
+          )
           .toList();
     }
   }
@@ -65,7 +65,7 @@ class _UserListsWidgetState extends State<UserListsWidget> {
         if (b.id == StorageService.defaultListId) return 1;
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
-      
+
       setState(() {
         _lists = lists;
         _filterLists();
@@ -105,9 +105,7 @@ class _UserListsWidgetState extends State<UserListsWidget> {
                   // Search Icon Button
                   IconButton(
                     icon: Icon(
-                      _searchQuery.isNotEmpty
-                          ? Icons.close
-                          : Icons.search,
+                      _searchQuery.isNotEmpty ? Icons.close : Icons.search,
                       color: Colors.white,
                     ),
                     onPressed: () {
@@ -129,7 +127,10 @@ class _UserListsWidgetState extends State<UserListsWidget> {
         // Search Bar (if searching)
         if (_searchQuery.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
@@ -174,19 +175,16 @@ class _UserListsWidgetState extends State<UserListsWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _searchQuery.isNotEmpty ? Icons.search_off : Icons.folder_outlined,
+                    _searchQuery.isNotEmpty
+                        ? Icons.search_off
+                        : Icons.folder_outlined,
                     size: 48,
                     color: Colors.grey[600],
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _searchQuery.isNotEmpty
-                        ? 'No lists found'
-                        : 'No lists yet',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                    ),
+                    _searchQuery.isNotEmpty ? 'No lists found' : 'No lists yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
                   ),
                 ],
               ),
@@ -211,16 +209,14 @@ class _UserListsWidgetState extends State<UserListsWidget> {
 
   Widget _buildListCard(UserList list) {
     final isDefault = list.id == StorageService.defaultListId;
-    
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SavedLinksScreen(
-              listId: list.id,
-              listName: list.name,
-            ),
+            builder: (context) =>
+                SavedLinksScreen(listId: list.id, listName: list.name),
           ),
         ).then((_) => _refresh());
       },
@@ -247,7 +243,9 @@ class _UserListsWidgetState extends State<UserListsWidget> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isDefault ? Colors.amber.withOpacity(0.2) : Colors.grey[800],
+                      color: isDefault
+                          ? Colors.amber.withValues(alpha: 0.2)
+                          : Colors.grey[800],
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -257,11 +255,7 @@ class _UserListsWidgetState extends State<UserListsWidget> {
                     ),
                   ),
                   if (isDefault)
-                    const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                      size: 20,
-                    ),
+                    const Icon(Icons.star, color: Colors.amber, size: 20),
                 ],
               ),
             ),
@@ -285,10 +279,7 @@ class _UserListsWidgetState extends State<UserListsWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Text(
                 '${list.itemCount} ${list.itemCount == 1 ? 'item' : 'items'}',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
               ),
             ),
             const Spacer(),
@@ -298,10 +289,7 @@ class _UserListsWidgetState extends State<UserListsWidget> {
                 padding: const EdgeInsets.all(12.0),
                 child: Text(
                   list.description!,
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -311,6 +299,4 @@ class _UserListsWidgetState extends State<UserListsWidget> {
       ),
     );
   }
-
 }
-

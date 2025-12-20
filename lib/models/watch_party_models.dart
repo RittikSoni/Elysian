@@ -12,7 +12,8 @@ class WatchPartyRoom {
   final DateTime createdAt;
   final List<WatchPartyParticipant> participants;
   final String? roomCode; // 6-digit code for easy joining
-  final DateTime? positionUpdatedAt; // Timestamp when position was last updated (for sync prediction)
+  final DateTime?
+  positionUpdatedAt; // Timestamp when position was last updated (for sync prediction)
 
   WatchPartyRoom({
     required this.roomId,
@@ -249,14 +250,7 @@ class ChatMessage {
 }
 
 /// Reaction types for watch party
-enum ReactionType {
-  like,
-  love,
-  laugh,
-  wow,
-  sad,
-  angry,
-}
+enum ReactionType { like, love, laugh, wow, sad, angry }
 
 extension ReactionTypeExtension on ReactionType {
   String get emoji {
@@ -333,4 +327,3 @@ class Reaction {
     );
   }
 }
-

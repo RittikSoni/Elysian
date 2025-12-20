@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
@@ -28,17 +30,13 @@ class WelcomeScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.amber,
-                        Colors.orange,
-                        Colors.deepOrange,
-                      ],
+                      colors: [Colors.amber, Colors.orange, Colors.deepOrange],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.amber.withOpacity(0.5),
+                        color: Colors.amber.withValues(alpha: 0.5),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
@@ -65,10 +63,7 @@ class WelcomeScreen extends StatelessWidget {
                 // Subtitle
                 Text(
                   'Your personal media hub for organizing and watching content',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[400],
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey[400]),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 50),
@@ -145,10 +140,7 @@ class WelcomeScreen extends StatelessWidget {
                   },
                   child: Text(
                     'Skip for now',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -298,7 +290,9 @@ class WelcomeScreen extends StatelessWidget {
       // This will be handled by the app bar watch party button
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tap the watch party icon in the app bar to get started!'),
+          content: Text(
+            'Tap the watch party icon in the app bar to get started!',
+          ),
           backgroundColor: Colors.amber,
           duration: Duration(seconds: 3),
         ),
@@ -356,10 +350,7 @@ class _QuickStartCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.grey[900],
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1.5,
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Row(
           children: [
@@ -367,14 +358,10 @@ class _QuickStartCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 28,
-              ),
+              child: Icon(icon, color: color, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -392,23 +379,15 @@ class _QuickStartCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[400],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[400]),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey[600],
-              size: 20,
-            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.grey[600], size: 20),
           ],
         ),
       ),
     );
   }
 }
-

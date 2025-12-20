@@ -1,6 +1,7 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:elysian/services/watch_party_service.dart';
-import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/link_parser.dart';
@@ -13,7 +14,8 @@ import 'dart:async';
 
 /// Global manager for watch party that works across all screens
 class WatchPartyGlobalManager {
-  static final WatchPartyGlobalManager _instance = WatchPartyGlobalManager._internal();
+  static final WatchPartyGlobalManager _instance =
+      WatchPartyGlobalManager._internal();
   factory WatchPartyGlobalManager() => _instance;
   WatchPartyGlobalManager._internal();
 
@@ -61,7 +63,7 @@ class WatchPartyGlobalManager {
     final modalRoute = ModalRoute.of(context);
     if (modalRoute != null) {
       final routeName = modalRoute.settings.name ?? '';
-      if (routeName.contains('video') || 
+      if (routeName.contains('video') ||
           routeName.contains('YTFull') ||
           routeName.contains('RSNewVideoPlayerScreen')) {
         // Already in video player, let it handle the change
@@ -109,7 +111,10 @@ class WatchPartyGlobalManager {
       } else {
         // External link
         if (await canLaunchUrl(Uri.parse(videoUrl))) {
-          await launchUrl(Uri.parse(videoUrl), mode: LaunchMode.externalApplication);
+          await launchUrl(
+            Uri.parse(videoUrl),
+            mode: LaunchMode.externalApplication,
+          );
         }
       }
     } catch (e) {
@@ -123,19 +128,19 @@ class WatchPartyGlobalManager {
     if (!_watchPartyService.isHost && room.videoUrl.isNotEmpty) {
       final context = navigatorKey.currentContext;
       if (context != null) {
-      // Check if we're not already in a video player
-      final modalRoute = ModalRoute.of(context);
-      if (modalRoute != null) {
-        final routeName = modalRoute.settings.name ?? '';
-        if (!routeName.contains('video') && 
-            !routeName.contains('YTFull') &&
-            !routeName.contains('RSNewVideoPlayerScreen')) {
+        // Check if we're not already in a video player
+        final modalRoute = ModalRoute.of(context);
+        if (modalRoute != null) {
+          final routeName = modalRoute.settings.name ?? '';
+          if (!routeName.contains('video') &&
+              !routeName.contains('YTFull') &&
+              !routeName.contains('RSNewVideoPlayerScreen')) {
+            _handleVideoChange(room.videoUrl, room.videoTitle);
+          }
+        } else {
+          // No route info, try to navigate
           _handleVideoChange(room.videoUrl, room.videoTitle);
         }
-      } else {
-        // No route info, try to navigate
-        _handleVideoChange(room.videoUrl, room.videoTitle);
-      }
       }
     }
   }
@@ -216,4 +221,3 @@ class WatchPartyGlobalManager {
     _isInitialized = false;
   }
 }
-

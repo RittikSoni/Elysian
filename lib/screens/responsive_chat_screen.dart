@@ -121,7 +121,10 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             border: Border(
-              right: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
+              right: BorderSide(
+                color: Colors.grey.withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
           ),
           child: _ConversationList(
@@ -203,7 +206,10 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             border: Border(
-              bottom: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
+              bottom: BorderSide(
+                color: Colors.grey.withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
           ),
           child: Row(
@@ -236,7 +242,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
                       otherUserEmail,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.withOpacity(0.7),
+                        color: Colors.grey.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -268,7 +274,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
             Icon(
               Icons.chat_bubble_outline,
               size: 80,
-              color: Colors.grey.withOpacity(0.5),
+              color: Colors.grey.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -276,7 +282,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.withOpacity(0.7),
+                color: Colors.grey.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 8),
@@ -284,7 +290,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
               'Choose a conversation from the list to start chatting',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.withOpacity(0.5),
+                color: Colors.grey.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -432,7 +438,7 @@ class _ConversationList extends StatelessWidget {
                     color: theme.scaffoldBackgroundColor,
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.grey.withOpacity(0.2),
+                        color: Colors.grey.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -447,7 +453,7 @@ class _ConversationList extends StatelessWidget {
                         hintText: 'Search conversations...',
                         prefixIcon: Icon(
                           Icons.search,
-                          color: Colors.grey.withOpacity(0.7),
+                          color: Colors.grey.withValues(alpha: 0.7),
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
@@ -468,7 +474,7 @@ class _ConversationList extends StatelessWidget {
                           separatorBuilder: (context, index) => Divider(
                             height: 1,
                             thickness: 1,
-                            color: Colors.grey.withOpacity(0.1),
+                            color: Colors.grey.withValues(alpha: 0.1),
                             indent: 80,
                           ),
                           itemBuilder: (context, index) {
@@ -500,7 +506,7 @@ class _ConversationList extends StatelessWidget {
             Icon(
               Icons.chat_bubble_outline,
               size: 80,
-              color: Colors.grey.withOpacity(0.5),
+              color: Colors.grey.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -512,7 +518,7 @@ class _ConversationList extends StatelessWidget {
               'Sign in with Google to access chat features',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.withOpacity(0.7),
+                color: Colors.grey.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -542,7 +548,7 @@ class _ConversationList extends StatelessWidget {
           Icon(
             Icons.inbox_outlined,
             size: 64,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -550,13 +556,16 @@ class _ConversationList extends StatelessWidget {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: Colors.grey.withOpacity(0.7),
+              color: Colors.grey.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Start a new conversation to begin chatting',
-            style: TextStyle(fontSize: 14, color: Colors.grey.withOpacity(0.5)),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
@@ -600,7 +609,7 @@ class _ConversationTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         color: isSelected
-            ? theme.colorScheme.primary.withOpacity(0.1)
+            ? theme.colorScheme.primary.withValues(alpha: 0.1)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

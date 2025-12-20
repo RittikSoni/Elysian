@@ -1,5 +1,6 @@
 import 'package:elysian/models/home_screen_section.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:elysian/utils/kroute.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -34,7 +35,11 @@ class _HomeScreenCustomizationScreenState
                 icon: const Icon(Icons.add, color: Colors.white),
                 tooltip: 'Add List Section',
                 onPressed: () {
-                  _showAddListSectionDialog(context, layoutProvider, listsProvider);
+                  _showAddListSectionDialog(
+                    context,
+                    layoutProvider,
+                    listsProvider,
+                  );
                 },
               );
             },
@@ -77,7 +82,9 @@ class _HomeScreenCustomizationScreenState
                   if (confirmed == true) {
                     await provider.resetToDefault();
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(
+                        navigatorKey.currentContext!,
+                      ).showSnackBar(
                         const SnackBar(
                           content: Text('Layout reset to default'),
                           backgroundColor: Colors.green,
@@ -207,7 +214,10 @@ class _HomeScreenCustomizationScreenState
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   color: Colors.grey[800],
-                                  child: const Icon(Icons.link, color: Colors.white),
+                                  child: const Icon(
+                                    Icons.link,
+                                    color: Colors.white,
+                                  ),
                                 );
                               },
                             ),
@@ -303,10 +313,13 @@ class _HomeScreenCustomizationScreenState
                             ? const Icon(Icons.check, color: Colors.amber)
                             : null,
                         onTap: () {
-                          final newConfig = Map<String, dynamic>.from(section.config ?? {});
+                          final newConfig = Map<String, dynamic>.from(
+                            section.config ?? {},
+                          );
                           newConfig['listId'] = list.id;
                           if (newConfig['layout'] == null) {
-                            newConfig['layout'] = ListLayoutStyle.rectangle.toString();
+                            newConfig['layout'] = ListLayoutStyle.rectangle
+                                .toString();
                           }
                           provider.updateSectionConfig(section.id, newConfig);
                           Navigator.pop(context);
@@ -346,7 +359,9 @@ class _HomeScreenCustomizationScreenState
                       selected: isSelected,
                       onSelected: (selected) {
                         if (selected) {
-                          final newConfig = Map<String, dynamic>.from(section.config ?? {});
+                          final newConfig = Map<String, dynamic>.from(
+                            section.config ?? {},
+                          );
                           newConfig['layout'] = layout.toString();
                           provider.updateSectionConfig(section.id, newConfig);
                           Navigator.pop(context);
@@ -416,7 +431,9 @@ class _HomeScreenCustomizationScreenState
             itemBuilder: (context, index) {
               final list = userLists[index];
               // Check if this list is already added
-              final existingSection = layoutProvider.getSectionById('list_${list.id}');
+              final existingSection = layoutProvider.getSectionById(
+                'list_${list.id}',
+              );
               if (existingSection != null) {
                 return const SizedBox.shrink();
               }
@@ -438,19 +455,20 @@ class _HomeScreenCustomizationScreenState
                   );
 
                   // Update config with default layout
-                  final newSection = layoutProvider.getSectionById('list_${list.id}');
+                  final newSection = layoutProvider.getSectionById(
+                    'list_${list.id}',
+                  );
                   if (newSection != null) {
-                    await layoutProvider.updateSectionConfig(
-                      newSection.id,
-                      {
-                        'listId': list.id,
-                        'layout': ListLayoutStyle.rectangle.toString(),
-                      },
-                    );
+                    await layoutProvider.updateSectionConfig(newSection.id, {
+                      'listId': list.id,
+                      'layout': ListLayoutStyle.rectangle.toString(),
+                    });
                   }
 
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(
+                      navigatorKey.currentContext!,
+                    ).showSnackBar(
                       SnackBar(
                         content: Text('${list.name} added to home screen'),
                         backgroundColor: Colors.green,
@@ -530,7 +548,7 @@ class _SectionTile extends StatelessWidget {
             Switch(
               value: section.isVisible,
               onChanged: onVisibilityChanged,
-              activeColor: Colors.amber,
+              activeThumbColor: Colors.amber,
             ),
           ],
         ),
@@ -538,4 +556,3 @@ class _SectionTile extends StatelessWidget {
     );
   }
 }
-

@@ -10,10 +10,7 @@ import 'package:video_player/video_player.dart';
 class CustomFeaturedHeader extends StatelessWidget {
   final SavedLink savedLink;
 
-  const CustomFeaturedHeader({
-    super.key,
-    required this.savedLink,
-  });
+  const CustomFeaturedHeader({super.key, required this.savedLink});
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +32,7 @@ class _MobileCustomHeader extends StatelessWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        Container(
+        SizedBox(
           height: 500,
           child: ThumbnailImage(
             link: savedLink,
@@ -85,11 +82,7 @@ class _MobileCustomHeader extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              VericalIconButton(
-                icon: Icons.add,
-                title: 'Add',
-                onTap: () {},
-              ),
+              VericalIconButton(icon: Icons.add, title: 'Add', onTap: () {}),
               _PlayButton(savedLink: savedLink),
               VericalIconButton(
                 icon: Icons.info_outline,
@@ -238,7 +231,7 @@ class _DesktopCustomHeaderState extends State<_DesktopCustomHeader>
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        Container(
+        SizedBox(
           height: 500,
           child: _isVideoInitialized && _videoController != null
               ? SizedBox.expand(
@@ -268,158 +261,168 @@ class _DesktopCustomHeaderState extends State<_DesktopCustomHeader>
             ),
           ),
         ),
-          Positioned(
-            left: 60,
-            right: 60,
-            bottom: 150,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        Positioned(
+          left: 60,
+          right: 60,
+          bottom: 150,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Text(
+                  widget.savedLink.title,
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black,
+                        offset: Offset(3.0, 5.0),
+                        blurRadius: 8.0,
+                      ),
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 20.0),
+              if (widget.savedLink.description != null)
                 Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
+                  constraints: const BoxConstraints(maxWidth: 500),
                   child: Text(
-                    widget.savedLink.title,
+                    widget.savedLink.description!,
                     style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 20.0,
                       color: Colors.white,
-                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w400,
+                      height: 1.4,
                       shadows: [
                         Shadow(
                           color: Colors.black,
-                          offset: Offset(3.0, 5.0),
-                          blurRadius: 8.0,
+                          offset: Offset(2.0, 4.0),
+                          blurRadius: 6.0,
                         ),
                       ],
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 20.0),
-                if (widget.savedLink.description != null)
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 500),
-                    child: Text(
-                      widget.savedLink.description!,
-                      style: const TextStyle(
-                        fontSize: 20.0,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w400,
-                        height: 1.4,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black,
-                            offset: Offset(2.0, 4.0),
-                            blurRadius: 6.0,
-                          ),
-                        ],
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                const SizedBox(height: 30.0),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth > 800;
-                    return SizedBox(
-                      width: isDesktop ? 500 : 300,
-                      height: 50,
-                      child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            LinkHandler.openLink(
-                              context,
-                              widget.savedLink.url,
-                              linkType: widget.savedLink.type,
-                              title: widget.savedLink.title,
-                              description: widget.savedLink.description,
-                              linkId: widget.savedLink.id,
-                              savedLink: widget.savedLink,
-                            );
-                          },
-                          icon: const Icon(Icons.play_arrow, size: 28),
-                          label: const Text(
-                            'Play',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10.0),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                backgroundColor: Colors.grey[900],
-                                title: Text(
-                                  widget.savedLink.title,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                content: SingleChildScrollView(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (widget.savedLink.description != null) ...[
-                                        Text(
-                                          widget.savedLink.description!,
-                                          style: const TextStyle(color: Colors.white70),
-                                        ),
-                                        const SizedBox(height: 12),
-                                      ],
-                                      Text(
-                                        'URL: ${widget.savedLink.url}',
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Close'),
-                                  ),
-                                ],
+              const SizedBox(height: 30.0),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth > 800;
+                  return SizedBox(
+                    width: isDesktop ? 500 : 300,
+                    height: 50,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              LinkHandler.openLink(
+                                context,
+                                widget.savedLink.url,
+                                linkType: widget.savedLink.type,
+                                title: widget.savedLink.title,
+                                description: widget.savedLink.description,
+                                linkId: widget.savedLink.id,
+                                savedLink: widget.savedLink,
+                              );
+                            },
+                            icon: const Icon(Icons.play_arrow, size: 28),
+                            label: const Text(
+                              'Play',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.info_outline, size: 20),
-                          label: const Text(
-                            'More Info',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white, width: 1.5),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                        const SizedBox(width: 10.0),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  backgroundColor: Colors.grey[900],
+                                  title: Text(
+                                    widget.savedLink.title,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  content: SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (widget.savedLink.description !=
+                                            null) ...[
+                                          Text(
+                                            widget.savedLink.description!,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
+                                        Text(
+                                          'URL: ${widget.savedLink.url}',
+                                          style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Close'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            label: const Text(
+                              'More Info',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
+        ),
         Positioned(
           bottom: 10,
           right: 10,
@@ -465,16 +468,11 @@ class _PlayButton extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         padding: const EdgeInsets.all(20),
-        child: const Icon(
-          Icons.play_arrow,
-          color: Colors.black,
-          size: 30,
-        ),
+        child: const Icon(Icons.play_arrow, color: Colors.black, size: 30),
       ),
     );
   }
 }
-

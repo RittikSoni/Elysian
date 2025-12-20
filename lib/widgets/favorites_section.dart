@@ -90,20 +90,23 @@ class FavoritesSection extends StatelessWidget {
         builder: (context, appState, _) {
           final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
           final theme = Theme.of(context);
-          
+
           if (isLiquidGlass) {
             final liquidGlass = theme.extension<LiquidGlassTheme>();
             final blur = liquidGlass?.blurIntensity ?? 15.0;
             final opacity = liquidGlass?.glassOpacity ?? 0.18;
             final borderOpacity = liquidGlass?.borderOpacity ?? 0.25;
-            
+
             return Container(
               width: 250,
-              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.amber.withOpacity(borderOpacity * 1.5),
+                  color: Colors.amber.withValues(alpha: borderOpacity * 1.5),
                   width: 1.5,
                 ),
               ),
@@ -113,7 +116,7 @@ class FavoritesSection extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(opacity),
+                      color: Colors.white.withValues(alpha: opacity),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: _buildLinkCardContent(context, link),
@@ -124,12 +127,15 @@ class FavoritesSection extends StatelessWidget {
           } else {
             return Container(
               width: 250,
-              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.amber.withOpacity(0.3),
+                  color: Colors.amber.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -169,11 +175,7 @@ class FavoritesSection extends StatelessWidget {
                   color: Colors.amber,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.star,
-                  color: Colors.black,
-                  size: 16,
-                ),
+                child: const Icon(Icons.star, color: Colors.black, size: 16),
               ),
             ),
           ],
@@ -215,7 +217,8 @@ class FavoritesSection extends StatelessWidget {
                       child: Text(
                         _getTypeLabel(link.type),
                         style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.light
+                          color:
+                              Theme.of(context).brightness == Brightness.light
                               ? Colors.grey[600]
                               : Colors.grey[500],
                           fontSize: 11,
@@ -271,4 +274,3 @@ class FavoritesSection extends StatelessWidget {
     }
   }
 }
-

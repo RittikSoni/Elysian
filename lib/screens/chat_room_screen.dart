@@ -1,3 +1,4 @@
+import 'package:elysian/utils/kroute.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/providers/chat_room_provider.dart';
@@ -218,7 +219,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     if (confirmed == true) {
       try {
-        final provider = context.read<ChatRoomProvider>();
+        final provider = navigatorKey.currentContext!.read<ChatRoomProvider>();
         await provider.leaveRoom(widget.room.id);
 
         if (mounted) {
@@ -326,6 +327,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           PopupMenuButton(
             itemBuilder: (context) => [
               PopupMenuItem(
+                onTap: _leaveRoom,
                 child: const Row(
                   children: [
                     Icon(Icons.exit_to_app, color: Colors.red),
@@ -333,7 +335,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     Text('Leave Room'),
                   ],
                 ),
-                onTap: _leaveRoom,
               ),
             ],
           ),
@@ -346,7 +347,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.orange.withOpacity(0.2),
+              color: Colors.orange.withValues(alpha: 0.2),
               child: Row(
                 children: [
                   const Icon(
@@ -462,22 +463,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                         ).format(message.timestamp),
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                       ),
-                                      if (message.isRead && message.readAt != null) ...[
+                                      if (message.isRead &&
+                                          message.readAt != null) ...[
                                         const SizedBox(width: 4),
                                         Icon(
                                           Icons.done_all,
                                           size: 12,
-                                          color: Colors.blue.withOpacity(0.7),
+                                          color: Colors.blue.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                         const SizedBox(width: 2),
                                         Text(
                                           'Seen ${_formatSeenTime(message.readAt!)}',
                                           style: TextStyle(
                                             fontSize: 9,
-                                            color: Colors.white.withOpacity(0.6),
+                                            color: Colors.white.withValues(
+                                              alpha: 0.6,
+                                            ),
                                             fontStyle: FontStyle.italic,
                                           ),
                                         ),
@@ -501,7 +509,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               color: Theme.of(context).scaffoldBackgroundColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, -2),
                 ),

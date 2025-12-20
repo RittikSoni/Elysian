@@ -1,5 +1,4 @@
 import 'package:elysian/models/models.dart';
-import 'package:elysian/models/home_screen_section.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -51,7 +50,9 @@ class UserListSectionWidget extends StatelessWidget {
                     '(${links.length})',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -71,7 +72,9 @@ class UserListSectionWidget extends StatelessWidget {
                 child: Text(
                   'See All',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -149,7 +152,7 @@ class UserListSectionWidget extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.5),
+                          color: Colors.amber.withValues(alpha: 0.5),
                           blurRadius: 12,
                           spreadRadius: 2,
                         ),
@@ -173,7 +176,7 @@ class UserListSectionWidget extends StatelessWidget {
                                 gradient: LinearGradient(
                                   colors: [
                                     Colors.transparent,
-                                    Colors.black.withOpacity(0.3),
+                                    Colors.black.withValues(alpha: 0.3),
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,

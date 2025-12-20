@@ -22,9 +22,6 @@ class AuthService {
     );
   }
 
-  // TODO: Scopes are now handled via Google Cloud Console configuration mostly,
-  // or incremental authorization. Basic 'email' and 'profile' are default.
-
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   GoogleSignInAccount? _currentUser;
@@ -216,7 +213,7 @@ class AuthService {
 
         // Authenticate with Firebase using Google credentials
         try {
-          final googleAuth = await account.authentication;
+          final googleAuth = account.authentication;
           final credential = GoogleAuthProvider.credential(
             accessToken: null,
             idToken: googleAuth.idToken,
@@ -289,7 +286,7 @@ class AuthService {
         _currentUser = account;
         // Try to authenticate with Firebase
         try {
-          final googleAuth = await account.authentication;
+          final googleAuth = account.authentication;
           final credential = GoogleAuthProvider.credential(
             accessToken: null,
             idToken: googleAuth.idToken,

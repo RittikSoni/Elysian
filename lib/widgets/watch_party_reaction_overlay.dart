@@ -39,7 +39,6 @@ class _WatchPartyReactionOverlayState extends State<WatchPartyReactionOverlay> {
 
   @override
   Widget build(BuildContext context) {
-
     return Positioned.fill(
       child: IgnorePointer(
         child: Center(
@@ -58,7 +57,7 @@ class _WatchPartyReactionOverlayState extends State<WatchPartyReactionOverlay> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.black.withValues(alpha: 0.7),
                           shape: BoxShape.circle,
                         ),
                         child: Text(
@@ -84,7 +83,7 @@ class _WatchPartyReactionOverlayState extends State<WatchPartyReactionOverlay> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -111,10 +110,7 @@ class _WatchPartyReactionOverlayState extends State<WatchPartyReactionOverlay> {
 class ReactionPicker extends StatelessWidget {
   final Function(ReactionType) onReactionSelected;
 
-  const ReactionPicker({
-    super.key,
-    required this.onReactionSelected,
-  });
+  const ReactionPicker({super.key, required this.onReactionSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -140,10 +136,7 @@ class ReactionPicker extends StatelessWidget {
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  type.emoji,
-                  style: const TextStyle(fontSize: 20),
-                ),
+                child: Text(type.emoji, style: const TextStyle(fontSize: 20)),
               ),
             );
           }).toList(),
@@ -152,4 +145,3 @@ class ReactionPicker extends StatelessWidget {
     );
   }
 }
-

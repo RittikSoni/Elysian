@@ -48,7 +48,8 @@ class WatchPartyFirebaseService {
   Function(ChatMessage)? onChatMessage;
   Function(Reaction)? onReaction;
   Function(String videoUrl, String videoTitle)? onVideoChange;
-  Function(String reason)? onRoomEnded; // Called when host ends party or room is deleted
+  Function(String reason)?
+  onRoomEnded; // Called when host ends party or room is deleted
 
   // Getters
   bool get isConnected => _isConnected;
@@ -63,7 +64,7 @@ class WatchPartyFirebaseService {
     return random.toString().padLeft(6, '0');
   }
 
-  /// Safely convert Firebase data to Map<String, dynamic>
+  /// Safely convert Firebase data to `Map<String, dynamic>`
   Map<String, dynamic> _convertFirebaseData(dynamic data) {
     if (data == null) return {};
     if (data is Map) {
@@ -634,8 +635,9 @@ class WatchPartyFirebaseService {
 
   /// Send chat message (via Firestore)
   Future<void> sendChatMessage(String message) async {
-    if (_currentParticipantId == null || _currentParticipantName == null)
+    if (_currentParticipantId == null || _currentParticipantName == null) {
       return;
+    }
 
     try {
       await _firestoreService.sendChatMessage(
@@ -650,8 +652,9 @@ class WatchPartyFirebaseService {
 
   /// Send reaction (via Firestore)
   Future<void> sendReaction(ReactionType type) async {
-    if (_currentParticipantId == null || _currentParticipantName == null)
+    if (_currentParticipantId == null || _currentParticipantName == null) {
       return;
+    }
 
     try {
       await _firestoreService.sendReaction(
@@ -713,11 +716,13 @@ class WatchPartyFirebaseService {
       try {
         // Delete all Firestore chat messages and reactions first
         await _firestoreService.deleteRoomData(_currentRoomId!);
-        
+
         // Then delete the room from Realtime DB (this will trigger onRoomEnded for participants)
         await _roomRef!.remove();
-        
-        debugPrint('Host ended watch party - deleted room and all chat/reactions');
+
+        debugPrint(
+          'Host ended watch party - deleted room and all chat/reactions',
+        );
       } catch (e) {
         debugPrint('Error deleting room: $e');
       }

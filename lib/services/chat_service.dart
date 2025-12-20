@@ -52,10 +52,7 @@ class ChatService {
       final userDoc = await userRef.get();
 
       if (userDoc.exists) {
-        return ChatUser.fromJson({
-          'email': email,
-          ...userDoc.data()!,
-        });
+        return ChatUser.fromJson({'email': email, ...userDoc.data()!});
       } else {
         // Create new user
         final newUser = ChatUser(
@@ -161,7 +158,9 @@ class ChatService {
         throw Exception('Request ID cannot be empty');
       }
 
-      final requestRef = _firestore.collection('friend_requests').doc(requestId);
+      final requestRef = _firestore
+          .collection('friend_requests')
+          .doc(requestId);
       final requestDoc = await requestRef.get();
 
       if (!requestDoc.exists) {
@@ -176,7 +175,9 @@ class ChatService {
       // Security: Verify current user is the recipient
       if (currentUserEmail != null) {
         if (request.toEmail.toLowerCase() != currentUserEmail.toLowerCase()) {
-          throw Exception('Unauthorized: You can only accept requests sent to you');
+          throw Exception(
+            'Unauthorized: You can only accept requests sent to you',
+          );
         }
       }
 
@@ -231,10 +232,7 @@ class ChatService {
           .get();
 
       return snapshot.docs
-          .map((doc) => FriendRequest.fromJson({
-                'id': doc.id,
-                ...doc.data(),
-              }))
+          .map((doc) => FriendRequest.fromJson({'id': doc.id, ...doc.data()}))
           .toList();
     } catch (e) {
       debugPrint('Error getting pending requests: $e');
@@ -253,10 +251,7 @@ class ChatService {
           .get();
 
       return snapshot.docs
-          .map((doc) => FriendRequest.fromJson({
-                'id': doc.id,
-                ...doc.data(),
-              }))
+          .map((doc) => FriendRequest.fromJson({'id': doc.id, ...doc.data()}))
           .toList();
     } catch (e) {
       debugPrint('Error getting sent requests: $e');
@@ -275,14 +270,14 @@ class ChatService {
       // Security: Validate inputs
       final normalizedUser1 = user1Email.toLowerCase().trim();
       final normalizedUser2 = user2Email.toLowerCase().trim();
-      
+
       if (normalizedUser1.isEmpty || normalizedUser2.isEmpty) {
         throw Exception('Email addresses cannot be empty');
       }
       if (normalizedUser1 == normalizedUser2) {
         throw Exception('Cannot create conversation with yourself');
       }
-      
+
       // Check if conversation already exists
       final existing = await getConversation(
         user1Email: normalizedUser1,
@@ -302,8 +297,12 @@ class ChatService {
         id: conversationId,
         user1Email: emails[0],
         user2Email: emails[1],
-        user1DisplayName: emails[0] == user1Email ? user1DisplayName : user2DisplayName,
-        user2DisplayName: emails[1] == user2Email ? user2DisplayName : user1DisplayName,
+        user1DisplayName: emails[0] == user1Email
+            ? user1DisplayName
+            : user2DisplayName,
+        user2DisplayName: emails[1] == user2Email
+            ? user2DisplayName
+            : user1DisplayName,
         createdAt: DateTime.now(),
         expiresAt: expiresAt,
       );
@@ -338,10 +337,7 @@ class ChatService {
         return null;
       }
 
-      return ChatConversation.fromJson({
-        'id': conversationId,
-        ...doc.data()!,
-      });
+      return ChatConversation.fromJson({'id': conversationId, ...doc.data()!});
     } catch (e) {
       debugPrint('Error getting conversation: $e');
       return null;
@@ -372,10 +368,9 @@ class ChatService {
             continue; // Skip expired conversations
           }
         }
-        allConversations.add(ChatConversation.fromJson({
-          'id': doc.id,
-          ...data,
-        }));
+        allConversations.add(
+          ChatConversation.fromJson({'id': doc.id, ...data}),
+        );
       }
 
       for (final doc in snapshot2.docs) {
@@ -387,10 +382,9 @@ class ChatService {
             continue; // Skip expired conversations
           }
         }
-        allConversations.add(ChatConversation.fromJson({
-          'id': doc.id,
-          ...data,
-        }));
+        allConversations.add(
+          ChatConversation.fromJson({'id': doc.id, ...data}),
+        );
       }
 
       // Sort by last message time
@@ -415,33 +409,37 @@ class ChatService {
         .collection('chat_conversations')
         .where('user1Email', isEqualTo: email)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatConversation.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .where((conv) {
-              // Filter expired conversations
-              if (conv.expiresAt == null) return true;
-              return !DateTime.now().isAfter(conv.expiresAt!);
-            })
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    ChatConversation.fromJson({'id': doc.id, ...doc.data()}),
+              )
+              .where((conv) {
+                // Filter expired conversations
+                if (conv.expiresAt == null) return true;
+                return !DateTime.now().isAfter(conv.expiresAt!);
+              })
+              .toList(),
+        );
 
     final stream2 = _firestore
         .collection('chat_conversations')
         .where('user2Email', isEqualTo: email)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatConversation.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .where((conv) {
-              // Filter expired conversations
-              if (conv.expiresAt == null) return true;
-              return !DateTime.now().isAfter(conv.expiresAt!);
-            })
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    ChatConversation.fromJson({'id': doc.id, ...doc.data()}),
+              )
+              .where((conv) {
+                // Filter expired conversations
+                if (conv.expiresAt == null) return true;
+                return !DateTime.now().isAfter(conv.expiresAt!);
+              })
+              .toList(),
+        );
 
     // Merge and deduplicate streams
     return StreamZip([stream1, stream2]).map((lists) {
@@ -467,12 +465,13 @@ class ChatService {
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => FriendRequest.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => FriendRequest.fromJson({'id': doc.id, ...doc.data()}),
+              )
+              .toList(),
+        );
   }
 
   /// Listen to sent friend requests for a user (real-time)
@@ -483,12 +482,13 @@ class ChatService {
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => FriendRequest.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => FriendRequest.fromJson({'id': doc.id, ...doc.data()}),
+              )
+              .toList(),
+        );
   }
 
   /// Send a message
@@ -526,7 +526,7 @@ class ChatService {
       }
 
       final convData = convDoc.data()!;
-      
+
       // Security: Verify sender is part of the conversation
       final user1Email = convData['user1Email'] as String?;
       final user2Email = convData['user2Email'] as String?;
@@ -573,13 +573,13 @@ class ChatService {
           .collection('chat_conversations')
           .doc(conversationId)
           .update({
-        'lastMessageAt': now.toIso8601String(),
-        'lastMessage': trimmedMessage,
-        // Reset expiration when new message is sent
-        'expiresAt': expiresAt.toIso8601String(),
-        // Increment unread count for the other user only (atomic operation)
-        'unreadCount': FieldValue.increment(1),
-      });
+            'lastMessageAt': now.toIso8601String(),
+            'lastMessage': trimmedMessage,
+            // Reset expiration when new message is sent
+            'expiresAt': expiresAt.toIso8601String(),
+            // Increment unread count for the other user only (atomic operation)
+            'unreadCount': FieldValue.increment(1),
+          });
 
       debugPrint('Message sent: $conversationId');
     } catch (e) {
@@ -610,10 +610,9 @@ class ChatService {
       final snapshot = await query.get();
 
       return snapshot.docs
-          .map((doc) => DirectChatMessage.fromJson({
-                'id': doc.id,
-                ...doc.data(),
-              }))
+          .map(
+            (doc) => DirectChatMessage.fromJson({'id': doc.id, ...doc.data()}),
+          )
           .where((msg) => !msg.isExpired) // Filter expired messages
           .toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -636,13 +635,15 @@ class ChatService {
         .orderBy('timestamp', descending: true)
         .limit(limit) // Optimized limit for cost efficiency
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => DirectChatMessage.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-            }))
-            .where((msg) => !msg.isExpired) // Filter expired messages
-            .toList())
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    DirectChatMessage.fromJson({'id': doc.id, ...doc.data()}),
+              )
+              .where((msg) => !msg.isExpired) // Filter expired messages
+              .toList(),
+        )
         .map((messages) {
           // Sort chronologically
           messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -661,10 +662,15 @@ class ChatService {
         return;
       }
 
-      await _firestore.collection('chat_conversations').doc(conversationId).update({
-        'typingUserEmail': isTyping ? userEmail.toLowerCase().trim() : null,
-        'typingUpdatedAt': isTyping ? DateTime.now().toIso8601String() : null,
-      });
+      await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .update({
+            'typingUserEmail': isTyping ? userEmail.toLowerCase().trim() : null,
+            'typingUpdatedAt': isTyping
+                ? DateTime.now().toIso8601String()
+                : null,
+          });
     } catch (e) {
       debugPrint('Error setting typing indicator: $e');
       // Don't throw - typing indicator is non-critical
@@ -689,12 +695,10 @@ class ChatService {
       if (snapshot.docs.isEmpty) return;
 
       // Filter to only messages from other users
-      final unreadMessages = snapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            return data['senderEmail'] != currentUserEmail;
-          })
-          .toList();
+      final unreadMessages = snapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['senderEmail'] != currentUserEmail;
+      }).toList();
 
       if (unreadMessages.isEmpty) return;
 
@@ -807,4 +811,3 @@ class ChatService {
     }
   }
 }
-

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:io';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_parser.dart';
@@ -699,7 +701,7 @@ class _AddLinkDialogState extends State<AddLinkDialog> {
                         _isFavorite = value;
                       });
                     },
-                    activeColor: Colors.amber,
+                    activeThumbColor: Colors.amber,
                   ),
                 ],
               ),

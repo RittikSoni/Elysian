@@ -102,15 +102,11 @@ class AppThemes {
       colorScheme: const ColorScheme.light(
         primary: Colors.amber,
         secondary: Colors.amber,
-        surface: Color(
-          0xFFF0F0F0,
-        ), // Slightly darker for better card visibility
-        background: Color(0xFFFAFAFA),
+        surface: Color(0xFFF0F0F0),
         error: Colors.red,
         onPrimary: Colors.black,
         onSecondary: Colors.black,
-        onSurface: Color(0xFF1A1A1A), // Darker for better readability
-        onBackground: Color(0xFF1A1A1A),
+        onSurface: Color(0xFF1A1A1A),
         onError: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
@@ -212,21 +208,23 @@ class AppThemes {
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white.withOpacity(0.18), // Increased from 0.05 to 0.18
+        color: Colors.white.withValues(
+          alpha: 0.18,
+        ), // Increased from 0.05 to 0.18
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: Colors.white.withOpacity(
-              0.25,
+            color: Colors.white.withValues(
+              alpha: 0.25,
             ), // Increased border visibility
             width: 1.5, // Slightly thicker border
           ),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white.withOpacity(
-          0.2,
+        backgroundColor: Colors.white.withValues(
+          alpha: 0.2,
         ), // Increased from 0.1 to 0.2
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -242,14 +240,14 @@ class AppThemes {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withOpacity(
-          0.15,
+        fillColor: Colors.white.withValues(
+          alpha: 0.15,
         ), // Increased from 0.05 to 0.15
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: Colors.white.withOpacity(
-              0.25,
+            color: Colors.white.withValues(
+              alpha: 0.25,
             ), // Increased border visibility
             width: 1.5,
           ),
@@ -257,7 +255,7 @@ class AppThemes {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.25),
             width: 1.5,
           ),
         ),
@@ -267,7 +265,7 @@ class AppThemes {
         ),
         labelStyle: const TextStyle(color: Colors.white), // Full opacity
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.7),
+          color: Colors.white.withValues(alpha: 0.7),
         ), // Better visibility
       ),
       textTheme: const TextTheme(
@@ -398,7 +396,7 @@ class GlassContainer extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: borderRadius ?? BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(border),
+          color: Colors.white.withValues(alpha: border),
           width: 1.5, // Slightly thicker for better visibility
         ),
       ),
@@ -409,7 +407,7 @@ class GlassContainer extends StatelessWidget {
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(opacity),
+              color: Colors.white.withValues(alpha: opacity),
               borderRadius: borderRadius ?? BorderRadius.circular(20),
             ),
             child: child,

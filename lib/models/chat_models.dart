@@ -36,11 +36,7 @@ class ChatUser {
 }
 
 /// Friend request status
-enum FriendRequestStatus {
-  pending,
-  accepted,
-  rejected,
-}
+enum FriendRequestStatus { pending, accepted, rejected }
 
 /// Represents a friend request
 class FriendRequest {
@@ -201,10 +197,10 @@ class ChatConversation {
 
 /// Message status for tracking delivery
 enum MessageStatus {
-  sending,    // Message is being sent (optimistic UI)
-  sent,       // Message sent to server
-  delivered,  // Message delivered to recipient
-  read,       // Message read by recipient
+  sending, // Message is being sent (optimistic UI)
+  sent, // Message sent to server
+  delivered, // Message delivered to recipient
+  read, // Message read by recipient
 }
 
 /// Represents a chat message in a direct conversation
@@ -587,4 +583,3 @@ class RoomMessage {
     return expiresAt.difference(now);
   }
 }
-

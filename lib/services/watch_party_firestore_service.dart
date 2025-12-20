@@ -41,27 +41,29 @@ class WatchPartyFirestoreService {
         .limitToLast(100)
         .snapshots()
         .listen((snapshot) {
-      for (final docChange in snapshot.docChanges) {
-        if (docChange.type == DocumentChangeType.added) {
-          try {
-            final data = docChange.doc.data();
-            if (data != null) {
-              final message = ChatMessage(
-                id: docChange.doc.id,
-                participantId: data['participantId'] as String? ?? '',
-                participantName: data['participantName'] as String? ?? 'Unknown',
-                message: data['message'] as String? ?? '',
-                timestamp: (data['timestamp'] as Timestamp?)?.toDate() ??
-                    DateTime.now(),
-              );
-              onChatMessage?.call(message);
+          for (final docChange in snapshot.docChanges) {
+            if (docChange.type == DocumentChangeType.added) {
+              try {
+                final data = docChange.doc.data();
+                if (data != null) {
+                  final message = ChatMessage(
+                    id: docChange.doc.id,
+                    participantId: data['participantId'] as String? ?? '',
+                    participantName:
+                        data['participantName'] as String? ?? 'Unknown',
+                    message: data['message'] as String? ?? '',
+                    timestamp:
+                        (data['timestamp'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                  );
+                  onChatMessage?.call(message);
+                }
+              } catch (e) {
+                debugPrint('Error parsing chat message from Firestore: $e');
+              }
             }
-          } catch (e) {
-            debugPrint('Error parsing chat message from Firestore: $e');
           }
-        }
-      }
-    });
+        });
   }
 
   /// Set up reaction listeners
@@ -76,30 +78,32 @@ class WatchPartyFirestoreService {
         .limitToLast(50)
         .snapshots()
         .listen((snapshot) {
-      for (final docChange in snapshot.docChanges) {
-        if (docChange.type == DocumentChangeType.added) {
-          try {
-            final data = docChange.doc.data();
-            if (data != null) {
-              final reaction = Reaction(
-                id: docChange.doc.id,
-                participantId: data['participantId'] as String? ?? '',
-                participantName: data['participantName'] as String? ?? 'Unknown',
-                type: ReactionType.values.firstWhere(
-                  (type) => type.name == data['type'],
-                  orElse: () => ReactionType.like,
-                ),
-                timestamp: (data['timestamp'] as Timestamp?)?.toDate() ??
-                    DateTime.now(),
-              );
-              onReaction?.call(reaction);
+          for (final docChange in snapshot.docChanges) {
+            if (docChange.type == DocumentChangeType.added) {
+              try {
+                final data = docChange.doc.data();
+                if (data != null) {
+                  final reaction = Reaction(
+                    id: docChange.doc.id,
+                    participantId: data['participantId'] as String? ?? '',
+                    participantName:
+                        data['participantName'] as String? ?? 'Unknown',
+                    type: ReactionType.values.firstWhere(
+                      (type) => type.name == data['type'],
+                      orElse: () => ReactionType.like,
+                    ),
+                    timestamp:
+                        (data['timestamp'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                  );
+                  onReaction?.call(reaction);
+                }
+              } catch (e) {
+                debugPrint('Error parsing reaction from Firestore: $e');
+              }
             }
-          } catch (e) {
-            debugPrint('Error parsing reaction from Firestore: $e');
           }
-        }
-      }
-    });
+        });
   }
 
   /// Send chat message
@@ -181,11 +185,11 @@ class WatchPartyFirestoreService {
           participantId: data['participantId'] as String? ?? '',
           participantName: data['participantName'] as String? ?? 'Unknown',
           message: data['message'] as String? ?? '',
-          timestamp: (data['timestamp'] as Timestamp?)?.toDate() ??
-              DateTime.now(),
+          timestamp:
+              (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
       }).toList();
-      
+
       // Reverse to get chronological order (oldest first)
       return messages.reversed.toList();
     } catch (e) {
@@ -197,15 +201,11 @@ class WatchPartyFirestoreService {
   /// Delete all chat messages and reactions for a room (when party ends)
   Future<void> deleteRoomData(String roomId) async {
     try {
-      final roomRef = _firestore
-          .collection('watch_party_rooms')
-          .doc(roomId);
+      final roomRef = _firestore.collection('watch_party_rooms').doc(roomId);
 
       // Get all messages and delete them in batch
-      final messagesSnapshot = await roomRef
-          .collection('messages')
-          .get();
-      
+      final messagesSnapshot = await roomRef.collection('messages').get();
+
       if (messagesSnapshot.docs.isNotEmpty) {
         final batch = _firestore.batch();
         for (final doc in messagesSnapshot.docs) {
@@ -215,10 +215,8 @@ class WatchPartyFirestoreService {
       }
 
       // Get all reactions and delete them in batch
-      final reactionsSnapshot = await roomRef
-          .collection('reactions')
-          .get();
-      
+      final reactionsSnapshot = await roomRef.collection('reactions').get();
+
       if (reactionsSnapshot.docs.isNotEmpty) {
         final batch = _firestore.batch();
         for (final doc in reactionsSnapshot.docs) {
@@ -243,4 +241,3 @@ class WatchPartyFirestoreService {
     _currentRoomId = null;
   }
 }
-

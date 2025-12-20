@@ -9,8 +9,8 @@ class ChatRoomProvider extends ChangeNotifier {
   final ChatRoomService _roomService = ChatRoomService();
 
   List<ChatRoom> _rooms = [];
-  Map<String, List<RoomMessage>> _messages = {};
-  Map<String, StreamSubscription> _subscriptions = {};
+  final Map<String, List<RoomMessage>> _messages = {};
+  final Map<String, StreamSubscription> _subscriptions = {};
 
   bool _isLoading = false;
   String? _error;
@@ -67,16 +67,16 @@ class ChatRoomProvider extends ChangeNotifier {
     _subscriptions['rooms'] = _roomService
         .listenToUserRooms(userEmail)
         .listen(
-      (rooms) {
-        _rooms = rooms;
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to rooms: $error');
-        _error = 'Failed to load rooms';
-        notifyListeners();
-      },
-    );
+          (rooms) {
+            _rooms = rooms;
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to rooms: $error');
+            _error = 'Failed to load rooms';
+            notifyListeners();
+          },
+        );
 
     // Set up callbacks
     _roomService.onRoomUpdated = (room) {
@@ -181,14 +181,14 @@ class ChatRoomProvider extends ChangeNotifier {
     _subscriptions['messages_$roomId'] = _roomService
         .listenToMessages(roomId)
         .listen(
-      (messages) {
-        _messages[roomId] = messages;
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to messages: $error');
-      },
-    );
+          (messages) {
+            _messages[roomId] = messages;
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to messages: $error');
+          },
+        );
   }
 
   /// Listen to room updates (real-time)
@@ -197,30 +197,32 @@ class ChatRoomProvider extends ChangeNotifier {
       return; // Already listening
     }
 
-    _subscriptions['room_$roomId'] = _roomService.listenToRoom(roomId).listen(
-      (room) {
-        if (room == null) {
-          // Room was deleted
-          _rooms.removeWhere((r) => r.id == roomId);
-          _messages.remove(roomId);
-          stopListeningToMessages(roomId);
-          stopListeningToRoom(roomId);
-          notifyListeners();
-          return;
-        }
+    _subscriptions['room_$roomId'] = _roomService
+        .listenToRoom(roomId)
+        .listen(
+          (room) {
+            if (room == null) {
+              // Room was deleted
+              _rooms.removeWhere((r) => r.id == roomId);
+              _messages.remove(roomId);
+              stopListeningToMessages(roomId);
+              stopListeningToRoom(roomId);
+              notifyListeners();
+              return;
+            }
 
-        final index = _rooms.indexWhere((r) => r.id == roomId);
-        if (index != -1) {
-          _rooms[index] = room;
-        } else {
-          _rooms.add(room);
-        }
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to room: $error');
-      },
-    );
+            final index = _rooms.indexWhere((r) => r.id == roomId);
+            if (index != -1) {
+              _rooms[index] = room;
+            } else {
+              _rooms.add(room);
+            }
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to room: $error');
+          },
+        );
   }
 
   /// Stop listening to messages
@@ -298,10 +300,7 @@ class ChatRoomProvider extends ChangeNotifier {
         throw Exception('User email not set');
       }
 
-      await _roomService.leaveRoom(
-        roomId: roomId,
-        userEmail: userEmail,
-      );
+      await _roomService.leaveRoom(roomId: roomId, userEmail: userEmail);
 
       // Room will be removed from list via onRoomDeleted callback
       _rooms.removeWhere((r) => r.id == roomId);
@@ -370,4 +369,3 @@ class ChatRoomProvider extends ChangeNotifier {
     super.dispose();
   }
 }
-

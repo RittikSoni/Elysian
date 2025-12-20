@@ -34,25 +34,28 @@ class SavedLink {
   });
 
   // Helper getter for backward compatibility (returns first listId)
-  String get listId => listIds.isNotEmpty ? listIds.first : StorageService.defaultListId;
+  String get listId =>
+      listIds.isNotEmpty ? listIds.first : StorageService.defaultListId;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'url': url,
-        'title': title,
-        'thumbnailUrl': thumbnailUrl,
-        'customThumbnailPath': customThumbnailPath,
-        'description': description,
-        'type': type.toString(),
-        'listIds': listIds, // New field
-        'listId': listIds.isNotEmpty ? listIds.first : null, // Keep for backward compatibility
-        'savedAt': savedAt.toIso8601String(),
-        'isFavorite': isFavorite,
-        'notes': notes,
-        'lastViewedAt': lastViewedAt?.toIso8601String(),
-        'viewCount': viewCount,
-        'duration': duration,
-      };
+    'id': id,
+    'url': url,
+    'title': title,
+    'thumbnailUrl': thumbnailUrl,
+    'customThumbnailPath': customThumbnailPath,
+    'description': description,
+    'type': type.toString(),
+    'listIds': listIds, // New field
+    'listId': listIds.isNotEmpty
+        ? listIds.first
+        : null, // Keep for backward compatibility
+    'savedAt': savedAt.toIso8601String(),
+    'isFavorite': isFavorite,
+    'notes': notes,
+    'lastViewedAt': lastViewedAt?.toIso8601String(),
+    'viewCount': viewCount,
+    'duration': duration,
+  };
 
   factory SavedLink.fromJson(Map<String, dynamic> json) {
     // Handle migration from old single listId to new listIds
@@ -169,4 +172,3 @@ enum LinkType {
     }
   }
 }
-

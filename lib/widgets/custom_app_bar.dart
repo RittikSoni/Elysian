@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:ui';
 import 'package:elysian/assets.dart';
 import 'package:elysian/models/models.dart';
@@ -55,12 +57,12 @@ class CustomAppBar extends StatelessWidget {
                   horizontal: 24.0,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(
-                    opacity * (0.3 + scrollAlpha * 0.7),
+                  color: Colors.white.withValues(
+                    alpha: opacity * (0.3 + scrollAlpha * 0.7),
                   ),
                   border: Border(
                     bottom: BorderSide(
-                      color: Colors.white.withOpacity(border),
+                      color: Colors.white.withValues(alpha: border),
                       width: 1.5,
                     ),
                   ),

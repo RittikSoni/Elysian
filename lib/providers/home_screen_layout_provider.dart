@@ -14,9 +14,7 @@ class HomeScreenLayoutProvider with ChangeNotifier {
 
   /// Get visible sections in order
   List<HomeScreenSection> get visibleSections {
-    return _sections
-        .where((s) => s.isVisible)
-        .toList()
+    return _sections.where((s) => s.isVisible).toList()
       ..sort((a, b) => a.order.compareTo(b.order));
   }
 
@@ -70,7 +68,10 @@ class HomeScreenLayoutProvider with ChangeNotifier {
   }
 
   /// Update section configuration
-  Future<void> updateSectionConfig(String sectionId, Map<String, dynamic> config) async {
+  Future<void> updateSectionConfig(
+    String sectionId,
+    Map<String, dynamic> config,
+  ) async {
     final index = _sections.indexWhere((s) => s.id == sectionId);
     if (index == -1) return;
 
@@ -133,4 +134,3 @@ class HomeScreenLayoutProvider with ChangeNotifier {
     }
   }
 }
-

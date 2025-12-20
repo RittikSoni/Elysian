@@ -21,7 +21,7 @@ class ChatProvider extends ChangeNotifier {
   List<FriendRequest> _pendingRequests = [];
   List<FriendRequest> _sentRequests = [];
   Map<String, List<DirectChatMessage>> _messages = {};
-  Map<String, StreamSubscription> _subscriptions = {};
+  final Map<String, StreamSubscription> _subscriptions = {};
 
   bool _isLoading = false;
   String? _error;
@@ -58,13 +58,13 @@ class ChatProvider extends ChangeNotifier {
     final optimistic = _optimisticMessages.values
         .where((m) => m.conversationId == conversationId)
         .toList();
-    
+
     if (optimistic.isEmpty) return messages;
-    
+
     // Combine and sort
     final allMessages = [...messages, ...optimistic];
     allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
+
     // Remove duplicates (optimistic messages that are now confirmed)
     final seenIds = <String>{};
     return allMessages.where((m) {
@@ -124,12 +124,13 @@ class ChatProvider extends ChangeNotifier {
 
       // Check for Google Sign-In first
       final googleAccount = await _authService.getLastSignedInAccount();
-      
+
       if (googleAccount != null) {
         // User is signed in with Google
         _currentUserEmail = googleAccount.email;
-        _currentUserDisplayName = googleAccount.displayName ?? googleAccount.email.split('@').first;
-        
+        _currentUserDisplayName =
+            googleAccount.displayName ?? googleAccount.email.split('@').first;
+
         // Save to storage for backward compatibility
         await StorageService.setUserEmail(_currentUserEmail!);
         await StorageService.setUserDisplayName(_currentUserDisplayName!);
@@ -195,7 +196,8 @@ class ChatProvider extends ChangeNotifier {
       }
 
       _currentUserEmail = account.email;
-      _currentUserDisplayName = account.displayName ?? account.email.split('@').first;
+      _currentUserDisplayName =
+          account.displayName ?? account.email.split('@').first;
 
       // Save to storage
       await StorageService.setUserEmail(_currentUserEmail!);
@@ -315,78 +317,80 @@ class ChatProvider extends ChangeNotifier {
     _subscriptions['conversations'] = _chatService
         .listenToConversations(_currentUserEmail!)
         .listen(
-      (conversations) {
-        // Update typing indicators from conversation data
-        for (final conversation in conversations) {
-          _typingUsers[conversation.id] = conversation.typingUserEmail;
-        }
+          (conversations) {
+            // Update typing indicators from conversation data
+            for (final conversation in conversations) {
+              _typingUsers[conversation.id] = conversation.typingUserEmail;
+            }
 
-        // Check for new messages in conversations
-        // OPTIMIZATION: Only listen to messages for conversations with recent activity
-        // Don't listen to all conversations to save costs
-        for (final conversation in conversations) {
-          // Only listen to messages if:
-          // 1. Conversation is being viewed, OR
-          // 2. Conversation has unread messages, OR
-          // 3. Conversation has very recent activity (last 5 minutes)
-          final hasRecentActivity = conversation.lastMessageAt != null &&
-              DateTime.now().difference(conversation.lastMessageAt!) <
-                  const Duration(minutes: 5);
+            // Check for new messages in conversations
+            // OPTIMIZATION: Only listen to messages for conversations with recent activity
+            // Don't listen to all conversations to save costs
+            for (final conversation in conversations) {
+              // Only listen to messages if:
+              // 1. Conversation is being viewed, OR
+              // 2. Conversation has unread messages, OR
+              // 3. Conversation has very recent activity (last 5 minutes)
+              final hasRecentActivity =
+                  conversation.lastMessageAt != null &&
+                  DateTime.now().difference(conversation.lastMessageAt!) <
+                      const Duration(minutes: 5);
 
-          final shouldListen = conversation.id == _currentlyViewingConversationId ||
-              conversation.unreadCount > 0 ||
-              hasRecentActivity;
+              final shouldListen =
+                  conversation.id == _currentlyViewingConversationId ||
+                  conversation.unreadCount > 0 ||
+                  hasRecentActivity;
 
-          if (shouldListen &&
-              !_subscriptions.containsKey('messages_${conversation.id}')) {
-            listenToMessages(conversation.id);
-          } else if (!shouldListen &&
-              _subscriptions.containsKey('messages_${conversation.id}') &&
-              conversation.id != _currentlyViewingConversationId) {
-            // Stop listening to inactive conversations to save costs
-            stopListeningToMessages(conversation.id);
-          }
-        }
+              if (shouldListen &&
+                  !_subscriptions.containsKey('messages_${conversation.id}')) {
+                listenToMessages(conversation.id);
+              } else if (!shouldListen &&
+                  _subscriptions.containsKey('messages_${conversation.id}') &&
+                  conversation.id != _currentlyViewingConversationId) {
+                // Stop listening to inactive conversations to save costs
+                stopListeningToMessages(conversation.id);
+              }
+            }
 
-        _conversations = conversations;
-        
-        // Cache conversations
-        _cacheService.cacheConversations(conversations);
-        
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to conversations: $error');
-        _error = 'Failed to load conversations';
-        notifyListeners();
-      },
-    );
+            _conversations = conversations;
+
+            // Cache conversations
+            _cacheService.cacheConversations(conversations);
+
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to conversations: $error');
+            _error = 'Failed to load conversations';
+            notifyListeners();
+          },
+        );
 
     // Listen to friend requests
     _subscriptions['friendRequests'] = _chatService
         .listenToFriendRequests(_currentUserEmail!)
         .listen(
-      (requests) {
-        _pendingRequests = requests;
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to friend requests: $error');
-      },
-    );
+          (requests) {
+            _pendingRequests = requests;
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to friend requests: $error');
+          },
+        );
 
     // Listen to sent friend requests
     _subscriptions['sentFriendRequests'] = _chatService
         .listenToSentFriendRequests(_currentUserEmail!)
         .listen(
-      (requests) {
-        _sentRequests = requests;
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to sent friend requests: $error');
-      },
-    );
+          (requests) {
+            _sentRequests = requests;
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to sent friend requests: $error');
+          },
+        );
   }
 
   /// Load sent friend requests
@@ -394,7 +398,9 @@ class ChatProvider extends ChangeNotifier {
     if (_currentUserEmail == null) return;
 
     try {
-      _sentRequests = await _chatService.getSentFriendRequests(_currentUserEmail!);
+      _sentRequests = await _chatService.getSentFriendRequests(
+        _currentUserEmail!,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading sent requests: $e');
@@ -471,7 +477,9 @@ class ChatProvider extends ChangeNotifier {
     if (_currentUserEmail == null) return;
 
     try {
-      _pendingRequests = await _chatService.getPendingFriendRequests(_currentUserEmail!);
+      _pendingRequests = await _chatService.getPendingFriendRequests(
+        _currentUserEmail!,
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading pending requests: $e');
@@ -485,7 +493,7 @@ class ChatProvider extends ChangeNotifier {
     try {
       _isLoading = true;
       _error = null;
-      
+
       // Try to load from cache first (unless force refresh)
       if (!forceRefresh) {
         final cached = await _cacheService.getCachedConversations();
@@ -498,10 +506,10 @@ class ChatProvider extends ChangeNotifier {
 
       // Load from Firestore
       _conversations = await _chatService.getConversations(_currentUserEmail!);
-      
+
       // Cache the result
       await _cacheService.cacheConversations(_conversations);
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -512,7 +520,10 @@ class ChatProvider extends ChangeNotifier {
   }
 
   /// Load messages for a conversation (with caching and pagination)
-  Future<void> loadMessages(String conversationId, {bool loadMore = false}) async {
+  Future<void> loadMessages(
+    String conversationId, {
+    bool loadMore = false,
+  }) async {
     try {
       // Check cache first
       if (!loadMore) {
@@ -527,7 +538,9 @@ class ChatProvider extends ChangeNotifier {
       DirectChatMessage? startAfter;
       if (loadMore && _messages[conversationId]?.isNotEmpty == true) {
         // Load older messages
-        final sortedMessages = List<DirectChatMessage>.from(_messages[conversationId]!);
+        final sortedMessages = List<DirectChatMessage>.from(
+          _messages[conversationId]!,
+        );
         sortedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         startAfter = sortedMessages.first;
       }
@@ -547,14 +560,18 @@ class ChatProvider extends ChangeNotifier {
         final combined = [...messages, ...existing];
         combined.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         _messages[conversationId] = combined;
-        _hasMoreMessages[conversationId] = messages.length == 50; // More available if we got full limit
+        _hasMoreMessages[conversationId] =
+            messages.length == 50; // More available if we got full limit
       } else {
         _messages[conversationId] = messages;
         _hasMoreMessages[conversationId] = messages.length == 50;
       }
 
       // Cache messages
-      await _cacheService.cacheMessages(conversationId, _messages[conversationId]!);
+      await _cacheService.cacheMessages(
+        conversationId,
+        _messages[conversationId]!,
+      );
 
       _isLoadingMoreMessages[conversationId] = false;
       notifyListeners();
@@ -576,54 +593,56 @@ class ChatProvider extends ChangeNotifier {
     _subscriptions['messages_$conversationId'] = _chatService
         .listenToMessages(conversationId, limit: 50)
         .listen(
-      (messages) {
-        final previousMessages = _messages[conversationId] ?? [];
-        final previousMessageIds = previousMessages.map((m) => m.id).toSet();
-        _messages[conversationId] = messages;
+          (messages) {
+            final previousMessages = _messages[conversationId] ?? [];
+            final previousMessageIds = previousMessages
+                .map((m) => m.id)
+                .toSet();
+            _messages[conversationId] = messages;
 
-        // Detect new messages (messages that weren't in the previous list)
-        if (messages.isNotEmpty && previousMessages.isNotEmpty) {
-          final newMessages = messages.where(
-            (m) => !previousMessageIds.contains(m.id),
-          ).toList();
+            // Detect new messages (messages that weren't in the previous list)
+            if (messages.isNotEmpty && previousMessages.isNotEmpty) {
+              final newMessages = messages
+                  .where((m) => !previousMessageIds.contains(m.id))
+                  .toList();
 
-          // If there's a new message and it's not from the current user
-          if (newMessages.isNotEmpty &&
-              _currentUserEmail != null &&
-              newMessages.last.senderEmail.toLowerCase() !=
-                  _currentUserEmail!.toLowerCase()) {
-            // Only show notification if not currently viewing this conversation
-            if (_currentlyViewingConversationId != conversationId) {
-              _latestNewMessage = newMessages.last;
-              _latestNewMessageConversationId = conversationId;
-              // Force notify to trigger notification overlay
-              notifyListeners();
-              // Small delay to ensure state is updated
-              Future.delayed(const Duration(milliseconds: 100), () {
-                notifyListeners();
-              });
+              // If there's a new message and it's not from the current user
+              if (newMessages.isNotEmpty &&
+                  _currentUserEmail != null &&
+                  newMessages.last.senderEmail.toLowerCase() !=
+                      _currentUserEmail!.toLowerCase()) {
+                // Only show notification if not currently viewing this conversation
+                if (_currentlyViewingConversationId != conversationId) {
+                  _latestNewMessage = newMessages.last;
+                  _latestNewMessageConversationId = conversationId;
+                  // Force notify to trigger notification overlay
+                  notifyListeners();
+                  // Small delay to ensure state is updated
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    notifyListeners();
+                  });
+                }
+              }
+            } else if (messages.isNotEmpty &&
+                previousMessages.isEmpty &&
+                _currentUserEmail != null &&
+                messages.last.senderEmail.toLowerCase() !=
+                    _currentUserEmail!.toLowerCase()) {
+              // First load of messages - don't notify on initial load
+              // (only notify on actual new messages)
             }
-          }
-        } else if (messages.isNotEmpty &&
-            previousMessages.isEmpty &&
-            _currentUserEmail != null &&
-            messages.last.senderEmail.toLowerCase() !=
-                _currentUserEmail!.toLowerCase()) {
-          // First load of messages - don't notify on initial load
-          // (only notify on actual new messages)
-        }
 
-        // Cache messages
-        _cacheService.cacheMessages(conversationId, messages);
-        
-        notifyListeners();
-      },
-      onError: (error) {
-        debugPrint('Error listening to messages: $error');
-        _error = 'Failed to load messages';
-        notifyListeners();
-      },
-    );
+            // Cache messages
+            _cacheService.cacheMessages(conversationId, messages);
+
+            notifyListeners();
+          },
+          onError: (error) {
+            debugPrint('Error listening to messages: $error');
+            _error = 'Failed to load messages';
+            notifyListeners();
+          },
+        );
   }
 
   /// Stop listening to messages (to save costs)
@@ -631,7 +650,7 @@ class ChatProvider extends ChangeNotifier {
     final key = 'messages_$conversationId';
     _subscriptions[key]?.cancel();
     _subscriptions.remove(key);
-    
+
     // Clear messages from memory if not viewing (memory optimization)
     if (_currentlyViewingConversationId != conversationId) {
       // Keep last 20 messages in memory for quick access
@@ -643,15 +662,12 @@ class ChatProvider extends ChangeNotifier {
   }
 
   /// Send a message (with optimistic UI update)
-  Future<void> sendMessage(
-    String conversationId,
-    String message,
-  ) async {
+  Future<void> sendMessage(String conversationId, String message) async {
     if (_currentUserEmail == null) return;
 
     try {
       _error = null;
-      
+
       // Create optimistic message for immediate UI update
       final optimisticId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
       final optimisticMessage = DirectChatMessage(
@@ -686,8 +702,9 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       // Remove failed optimistic message
       final optimisticId = _optimisticMessages.keys.firstWhere(
-        (id) => _optimisticMessages[id]?.conversationId == conversationId &&
-                _optimisticMessages[id]?.message == message.trim(),
+        (id) =>
+            _optimisticMessages[id]?.conversationId == conversationId &&
+            _optimisticMessages[id]?.message == message.trim(),
         orElse: () => '',
       );
       if (optimisticId.isNotEmpty) {
@@ -697,7 +714,7 @@ class ChatProvider extends ChangeNotifier {
             .where((m) => m.id != optimisticId)
             .toList();
       }
-      
+
       _error = e.toString();
       notifyListeners();
       rethrow;
@@ -711,14 +728,14 @@ class ChatProvider extends ChangeNotifier {
 
     // Debounce typing indicator updates (save costs)
     _typingTimer?.cancel();
-    
+
     if (isTyping) {
       _chatService.setTypingIndicator(
         conversationId: conversationId,
         userEmail: _currentUserEmail!,
         isTyping: true,
       );
-      
+
       // Auto-clear typing indicator after 3 seconds
       _typingTimer = Timer(const Duration(seconds: 3), () {
         _chatService.setTypingIndicator(
@@ -797,8 +814,9 @@ class ChatProvider extends ChangeNotifier {
 
   /// Validate email format
   bool _isValidEmail(String email) {
-    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-        .hasMatch(email);
+    return RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    ).hasMatch(email);
   }
 
   @override
@@ -810,4 +828,3 @@ class ChatProvider extends ChangeNotifier {
     super.dispose();
   }
 }
-

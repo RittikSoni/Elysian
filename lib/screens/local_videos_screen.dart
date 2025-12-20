@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -430,7 +429,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                         ? 'No videos found on your device'
                         : 'Found ${_videos.length} video${_videos.length != 1 ? 's' : ''}',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 16.0,
                     ),
                   ),
@@ -452,7 +451,9 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                     Text(
                       _isScanning ? 'Scanning for videos...' : 'Loading...',
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                         fontSize: 16.0,
                       ),
                     ),
@@ -472,7 +473,9 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                       Icon(
                         Icons.lock_outline,
                         size: 80.0,
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                       const SizedBox(height: 24.0),
                       Text(
@@ -488,7 +491,9 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                         _errorMessage!,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                           fontSize: 16.0,
                         ),
                       ),
@@ -541,7 +546,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                     Icon(
                       Icons.video_library_outlined,
                       size: 80.0,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 24.0),
                     Text(
@@ -559,7 +564,9 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                         'Videos on your device will appear here',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                           fontSize: 16.0,
                         ),
                       ),
@@ -681,7 +688,7 @@ class _VideoCard extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.7),
+                            Colors.black.withValues(alpha: 0.7),
                           ],
                         ),
                       ),
@@ -713,7 +720,7 @@ class _VideoCard extends StatelessWidget {
                           //         vertical: 6,
                           //       ),
                           //       decoration: BoxDecoration(
-                          //         color: Colors.amber.withOpacity(0.9),
+                          //         color: Colors.amber.withValues(alpha:0.9),
                           //         borderRadius: BorderRadius.circular(20),
                           //       ),
                           //       child: Row(
@@ -766,7 +773,9 @@ class _VideoCard extends StatelessWidget {
                     Text(
                       _formatFileSize(video.fileSize),
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                         fontSize: 12.0,
                       ),
                     ),
@@ -786,7 +795,7 @@ class _VideoCard extends StatelessWidget {
         child: Icon(
           Icons.video_library,
           size: 48,
-          color: theme.colorScheme.onSurface.withOpacity(0.3),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
         ),
       ),
     );

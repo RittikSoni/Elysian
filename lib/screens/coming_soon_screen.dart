@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 
 class ComingSoonScreen extends StatelessWidget {
   final String title;
-  
-  const ComingSoonScreen({
-    super.key,
-    required this.title,
-  });
+
+  const ComingSoonScreen({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -37,12 +34,15 @@ class ComingSoonScreen extends StatelessWidget {
               padding: const EdgeInsets.all(30),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.amber.withOpacity(0.2), Colors.amber.withOpacity(0.1)],
+                  colors: [
+                    Colors.amber.withValues(alpha: 0.2),
+                    Colors.amber.withValues(alpha: 0.1),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
               ),
               child: const Icon(
                 Icons.construction,
@@ -63,7 +63,7 @@ class ComingSoonScreen extends StatelessWidget {
             Text(
               'This feature is under development.\nWe\'re working hard to bring it to you soon!',
               style: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
               textAlign: TextAlign.center,
@@ -74,4 +74,3 @@ class ComingSoonScreen extends StatelessWidget {
     );
   }
 }
-

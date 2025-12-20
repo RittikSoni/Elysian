@@ -9,7 +9,7 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -47,7 +47,7 @@ class AboutScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withOpacity(0.3),
+                          color: Colors.amber.withValues(alpha: 0.3),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
@@ -73,7 +73,7 @@ class AboutScreen extends StatelessWidget {
                   Text(
                     'Version ${AppInfo.fullVersion}',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 16,
                     ),
                   ),
@@ -114,7 +114,9 @@ class AboutScreen extends StatelessWidget {
                     Text(
                       'Elysian is your ultimate video streaming companion. Watch your favorite content, organize playlists, and enjoy synchronized watch parties with friends and family.',
                       style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
                         fontSize: 15,
                         height: 1.5,
                       ),
@@ -135,7 +137,7 @@ class AboutScreen extends StatelessWidget {
                   Text(
                     'Features',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -261,7 +263,10 @@ class AboutScreen extends StatelessWidget {
                     title: 'Report a Bug',
                     theme: theme,
                     isDark: isDark,
-                    onTap: () => _launchEmail('support@elysian.app', subject: 'Bug Report'),
+                    onTap: () => _launchEmail(
+                      'support@elysian.app',
+                      subject: 'Bug Report',
+                    ),
                   ),
                 ],
               ),
@@ -275,7 +280,7 @@ class AboutScreen extends StatelessWidget {
               child: Text(
                 '© 2025 Kingrittik. All rights reserved.',
                 style: TextStyle(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
                 textAlign: TextAlign.center,
@@ -303,7 +308,9 @@ class AboutScreen extends StatelessWidget {
       final uri = Uri(
         scheme: 'mailto',
         path: email,
-        query: subject != null ? 'subject=${Uri.encodeComponent(subject)}' : null,
+        query: subject != null
+            ? 'subject=${Uri.encodeComponent(subject)}'
+            : null,
       );
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
@@ -346,7 +353,7 @@ class _FeatureItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.2),
+              color: Colors.amber.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: Colors.amber, size: 24),
@@ -368,7 +375,7 @@ class _FeatureItem extends StatelessWidget {
                 Text(
                   description,
                   style: TextStyle(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 13,
                   ),
                 ),
@@ -404,14 +411,14 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             size: 20,
           ),
           const SizedBox(width: 12),
           Text(
             '$label: ',
             style: TextStyle(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -479,7 +486,7 @@ class _LinkButton extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -487,4 +494,3 @@ class _LinkButton extends StatelessWidget {
     );
   }
 }
-

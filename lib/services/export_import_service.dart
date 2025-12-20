@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,28 +9,30 @@ import 'package:elysian/services/storage_service.dart';
 /// Uses .elysian extension and basic obfuscation to prevent easy access
 class ExportImportService {
   static const String _fileExtension = '.elysian';
-  static const String _magicHeader = 'ELYSIAN_DATA_V1'; // Magic header to verify file
-  static const String _obfuscationKey = 'ElysianExport2024!'; // Simple obfuscation key
+  static const String _magicHeader =
+      'ELYSIAN_DATA_V1'; // Magic header to verify file
+  static const String _obfuscationKey =
+      'ElysianExport2024!'; // Simple obfuscation key
 
   /// Export data to a custom .elysian file
   static Future<String?> exportToFile() async {
     try {
       // Get export data
       final jsonData = await StorageService.exportData();
-      
+
       // Create file content with magic header and obfuscated data
       final fileContent = _createFileContent(jsonData);
-      
+
       // Get temporary directory
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'elysian_export_$timestamp$_fileExtension';
       final filePath = '${tempDir.path}/$fileName';
-      
+
       // Write file
       final file = File(filePath);
       await file.writeAsBytes(fileContent);
-      
+
       debugPrint('Export file created: $filePath');
       return filePath;
     } catch (e) {
@@ -50,7 +51,9 @@ class ExportImportService {
       }
 
       final xFile = XFile(filePath);
-      await Share.shareXFiles([xFile], text: 'Elysian Data Export');
+      await SharePlus.instance.share(
+        ShareParams(files: [xFile], text: 'Elysian Data Export'),
+      );
       return true;
     } catch (e) {
       debugPrint('Error sharing file: $e');
@@ -63,37 +66,32 @@ class ExportImportService {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
-        return ImportResult(
-          success: false,
-          error: 'File does not exist',
-        );
+        return ImportResult(success: false, error: 'File does not exist');
       }
 
       // Read file bytes
       final fileBytes = await file.readAsBytes();
-      
+
       // Verify and extract data
       final jsonData = _extractFileContent(fileBytes);
       if (jsonData == null) {
         return ImportResult(
           success: false,
-          error: 'Invalid file format. This is not a valid Elysian export file.',
+          error:
+              'Invalid file format. This is not a valid Elysian export file.',
         );
       }
 
       // Import data
       await StorageService.importData(jsonData);
-      
+
       return ImportResult(
         success: true,
         message: 'Data imported successfully!',
       );
     } catch (e) {
       debugPrint('Error importing from file: $e');
-      return ImportResult(
-        success: false,
-        error: 'Error importing data: $e',
-      );
+      return ImportResult(success: false, error: 'Error importing data: $e');
     }
   }
 
@@ -101,23 +99,30 @@ class ExportImportService {
   static Uint8List _createFileContent(String jsonData) {
     // Convert JSON to bytes
     final jsonBytes = utf8.encode(jsonData);
-    
+
     // Apply simple obfuscation (XOR cipher)
     final obfuscatedBytes = _obfuscateData(jsonBytes);
-    
+
     // Create file content: [magic header][data length][obfuscated data]
     final magicBytes = utf8.encode(_magicHeader);
-    final lengthBytes = Uint8List(4)..buffer.asByteData().setUint32(0, obfuscatedBytes.length, Endian.big);
-    
+    final lengthBytes = Uint8List(4)
+      ..buffer.asByteData().setUint32(0, obfuscatedBytes.length, Endian.big);
+
     // Combine all parts
-    final fileContent = Uint8List(magicBytes.length + 4 + obfuscatedBytes.length);
+    final fileContent = Uint8List(
+      magicBytes.length + 4 + obfuscatedBytes.length,
+    );
     var offset = 0;
     fileContent.setRange(offset, offset + magicBytes.length, magicBytes);
     offset += magicBytes.length;
     fileContent.setRange(offset, offset + 4, lengthBytes);
     offset += 4;
-    fileContent.setRange(offset, offset + obfuscatedBytes.length, obfuscatedBytes);
-    
+    fileContent.setRange(
+      offset,
+      offset + obfuscatedBytes.length,
+      obfuscatedBytes,
+    );
+
     return fileContent;
   }
 
@@ -139,8 +144,11 @@ class ExportImportService {
 
       // Read data length
       final lengthOffset = magicBytes.length;
-      final dataLength = fileBytes.buffer.asByteData().getUint32(lengthOffset, Endian.big);
-      
+      final dataLength = fileBytes.buffer.asByteData().getUint32(
+        lengthOffset,
+        Endian.big,
+      );
+
       // Check if file is large enough
       if (fileBytes.length < lengthOffset + 4 + dataLength) {
         debugPrint('File too small for declared data length');
@@ -149,11 +157,14 @@ class ExportImportService {
 
       // Extract obfuscated data
       final dataOffset = lengthOffset + 4;
-      final obfuscatedBytes = fileBytes.sublist(dataOffset, dataOffset + dataLength);
-      
+      final obfuscatedBytes = fileBytes.sublist(
+        dataOffset,
+        dataOffset + dataLength,
+      );
+
       // Deobfuscate data
       final jsonBytes = _deobfuscateData(obfuscatedBytes);
-      
+
       // Convert back to string
       return utf8.decode(jsonBytes);
     } catch (e) {
@@ -166,11 +177,11 @@ class ExportImportService {
   static Uint8List _obfuscateData(Uint8List data) {
     final keyBytes = utf8.encode(_obfuscationKey);
     final result = Uint8List(data.length);
-    
+
     for (int i = 0; i < data.length; i++) {
       result[i] = data[i] ^ keyBytes[i % keyBytes.length];
     }
-    
+
     return result;
   }
 
@@ -196,7 +207,7 @@ class ExportImportService {
     try {
       final file = File(filePath);
       if (!await file.exists()) return false;
-      
+
       final fileBytes = await file.readAsBytes();
       return _extractFileContent(fileBytes) != null;
     } catch (e) {
@@ -209,20 +220,20 @@ class ExportImportService {
     try {
       // Get list export data
       final jsonData = await StorageService.exportListForSharing(listId);
-      
+
       // Create file content with magic header and obfuscated data
       final fileContent = _createFileContent(jsonData);
-      
+
       // Get temporary directory
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'elysian_list_$timestamp$_fileExtension';
       final filePath = '${tempDir.path}/$fileName';
-      
+
       // Write file
       final file = File(filePath);
       await file.writeAsBytes(fileContent);
-      
+
       debugPrint('List export file created: $filePath');
       return filePath;
     } catch (e) {
@@ -241,7 +252,9 @@ class ExportImportService {
       }
 
       final xFile = XFile(filePath);
-      await Share.shareXFiles([xFile], text: 'Elysian List: $listName');
+      await SharePlus.instance.share(
+        ShareParams(files: [xFile], text: 'Elysian List: $listName'),
+      );
       return true;
     } catch (e) {
       debugPrint('Error sharing list file: $e');
@@ -254,15 +267,12 @@ class ExportImportService {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
-        return ImportResult(
-          success: false,
-          error: 'File does not exist',
-        );
+        return ImportResult(success: false, error: 'File does not exist');
       }
 
       // Read file bytes
       final fileBytes = await file.readAsBytes();
-      
+
       // Verify and extract data
       final jsonData = _extractFileContent(fileBytes);
       if (jsonData == null) {
@@ -283,17 +293,14 @@ class ExportImportService {
 
       // Import list
       final importedList = await StorageService.importSharedList(jsonData);
-      
+
       return ImportResult(
         success: true,
         message: 'List "${importedList.name}" imported successfully!',
       );
     } catch (e) {
       debugPrint('Error importing list from file: $e');
-      return ImportResult(
-        success: false,
-        error: 'Error importing list: $e',
-      );
+      return ImportResult(success: false, error: 'Error importing list: $e');
     }
   }
 }
@@ -304,10 +311,5 @@ class ImportResult {
   final String? message;
   final String? error;
 
-  ImportResult({
-    required this.success,
-    this.message,
-    this.error,
-  });
+  ImportResult({required this.success, this.message, this.error});
 }
-

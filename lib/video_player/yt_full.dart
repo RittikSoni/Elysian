@@ -56,7 +56,8 @@ class _YTFullState extends State<YTFull> {
 
   final bool _isPlayerReady = false;
   bool _wasPlayerReady = false; // Track if player was ready before
-  String _currentVideoUrl = ''; // Track current video URL to prevent reverting to old video
+  String _currentVideoUrl =
+      ''; // Track current video URL to prevent reverting to old video
 
   final List<String> _ids = [
     // 'QdBZY2fkU-0',
@@ -194,10 +195,12 @@ class _YTFullState extends State<YTFull> {
           // IMPORTANT: Check against room.videoUrl to ensure we get the latest update
           final currentVideoId = _controller.metadata.videoId;
           final roomVideoId = LinkParser.extractYouTubeVideoId(room.videoUrl);
-          if (room.videoUrl.isNotEmpty && 
-              roomVideoId != null && 
+          if (room.videoUrl.isNotEmpty &&
+              roomVideoId != null &&
               currentVideoId != roomVideoId) {
-            debugPrint('YTPlayer: Guest video mismatch - current: $currentVideoId, room: $roomVideoId');
+            debugPrint(
+              'YTPlayer: Guest video mismatch - current: $currentVideoId, room: $roomVideoId',
+            );
             // Video mismatch - load the correct video
             _loadVideoFromUrl(room.videoUrl, room.videoTitle);
             return;
@@ -349,7 +352,7 @@ class _YTFullState extends State<YTFull> {
         }
         return;
       }
-      
+
       // Mark video as initializing
       _isVideoInitializing = true;
       _lastSeekTime = null;
@@ -363,7 +366,7 @@ class _YTFullState extends State<YTFull> {
         _currentVideoUrl = videoUrl;
         _isVideoInitializing = true;
         _wasPlayerReady = false; // Reset ready flag for new video
-        
+
         // Load the new video
         _controller.load(videoId);
         if (mounted) {
@@ -531,8 +534,8 @@ class _YTFullState extends State<YTFull> {
     // First update with video URL and title when sync starts
     // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
     if (provider.isHost && provider.isInRoom) {
-      final videoUrl = _currentVideoUrl.isNotEmpty 
-          ? _currentVideoUrl 
+      final videoUrl = _currentVideoUrl.isNotEmpty
+          ? _currentVideoUrl
           : (widget.url ?? widget.mediaUrl ?? '');
       final videoTitle = widget.title ?? 'YouTube Video';
       if (videoUrl.isNotEmpty) {
@@ -560,13 +563,13 @@ class _YTFullState extends State<YTFull> {
     if (!_controller.value.isReady) return;
 
     // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
-    final videoUrl = _currentVideoUrl.isNotEmpty 
-        ? _currentVideoUrl 
+    final videoUrl = _currentVideoUrl.isNotEmpty
+        ? _currentVideoUrl
         : (widget.url ?? widget.mediaUrl ?? '');
     final videoTitle = widget.title ?? 'YouTube Video';
-    
+
     if (videoUrl.isEmpty) return;
-    
+
     provider.updateRoomState(
       position: _controller.value.position,
       isPlaying: _controller.value.isPlaying,
@@ -612,8 +615,8 @@ class _YTFullState extends State<YTFull> {
       if (provider.isHost && provider.isInRoom) {
         // IMPORTANT: Use _currentVideoUrl instead of widget.url to ensure we use the correct video
         // This prevents reverting to old video when host changes video from content list
-        final videoUrl = _currentVideoUrl.isNotEmpty 
-            ? _currentVideoUrl 
+        final videoUrl = _currentVideoUrl.isNotEmpty
+            ? _currentVideoUrl
             : (widget.url ?? widget.mediaUrl ?? '');
         final videoTitle = widget.title ?? 'YouTube Video';
         provider.updateRoomState(
@@ -1625,7 +1628,7 @@ class GestureDetectorOverlay extends StatelessWidget {
         state._showControls = !state._showControls;
       });
 
-      // TODO: Uncomment this to hide controls after a delay
+      //  Uncomment this to hide controls after a delay
       // if (state._showControls) {
       //   _startHideTimer(); // Start or reset timer when controls are shown
       // } else {
@@ -1893,7 +1896,9 @@ class _ListContentOverlayState extends State<ListContentOverlay>
         // Update watch party room state if host
         // IMPORTANT: Update BEFORE loading new video to ensure joiners get the update
         if (state._watchPartyService.isHost && state._watchPartyRoom != null) {
-          debugPrint('YTPlayer: Host changing video to ${link.url}, updating room state');
+          debugPrint(
+            'YTPlayer: Host changing video to ${link.url}, updating room state',
+          );
           // Update current video URL immediately
           state._currentVideoUrl = link.url;
           state._wasPlayerReady = false; // Reset ready flag for new video
@@ -2040,7 +2045,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                             horizontal: 12,
                           ),
                           color: isCurrentVideo
-                              ? Colors.amber.withOpacity(0.2)
+                              ? Colors.amber.withValues(alpha: 0.2)
                               : Colors.transparent,
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2059,7 +2064,9 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                       width: 50,
                                       height: 35,
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),

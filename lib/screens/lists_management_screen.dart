@@ -1,11 +1,13 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:elysian/models/models.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/export_import_service.dart';
+import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -24,7 +26,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final listsProvider = context.read<ListsProvider>();
       final linksProvider = context.read<LinksProvider>();
-      
+
       if (!listsProvider.isInitialized) {
         listsProvider.initialize();
       }
@@ -42,8 +44,8 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
     if (result == true) {
       // Refresh providers
-      final listsProvider = context.read<ListsProvider>();
-      final linksProvider = context.read<LinksProvider>();
+      final listsProvider = navigatorKey.currentContext!.read<ListsProvider>();
+      final linksProvider = navigatorKey.currentContext!.read<LinksProvider>();
       await Future.wait([
         listsProvider.loadLists(forceRefresh: true),
         linksProvider.loadLinks(forceRefresh: true),
@@ -126,7 +128,8 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
     if (result != null) {
       try {
-        final listsProvider = context.read<ListsProvider>();
+        final listsProvider = navigatorKey.currentContext!
+            .read<ListsProvider>();
         await listsProvider.createList(
           result['name']!,
           description: result['description']!.isEmpty
@@ -134,7 +137,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
               : result['description'],
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
             const SnackBar(
               content: Text('List created successfully'),
               backgroundColor: Colors.green,
@@ -143,7 +146,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
             SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
           );
         }
@@ -153,7 +156,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
   Future<void> _editList(UserList list) async {
     if (list.id == StorageService.defaultListId) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
         const SnackBar(content: Text('Cannot edit the default list')),
       );
       return;
@@ -263,14 +266,16 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
           await StorageService.saveLink(updatedLink);
         }
 
-        final listsProvider = context.read<ListsProvider>();
-        final linksProvider = context.read<LinksProvider>();
+        final listsProvider = navigatorKey.currentContext!
+            .read<ListsProvider>();
+        final linksProvider = navigatorKey.currentContext!
+            .read<LinksProvider>();
         await Future.wait([
           listsProvider.loadLists(forceRefresh: true),
           linksProvider.loadLinks(forceRefresh: true),
         ]);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
             const SnackBar(
               content: Text('List updated successfully'),
               backgroundColor: Colors.green,
@@ -290,36 +295,35 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
   Future<void> _shareList(UserList list) async {
     try {
       final links = await StorageService.getSavedLinksByList(list.id);
-      
+
       if (links.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This list is empty')),
-        );
+        ScaffoldMessenger.of(
+          navigatorKey.currentContext!,
+        ).showSnackBar(const SnackBar(content: Text('This list is empty')));
         return;
       }
 
       // Show loading
       if (context.mounted) {
         showDialog(
-          context: context,
+          context: navigatorKey.currentContext!,
           barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
       // Export list to file
       final filePath = await ExportImportService.exportListToFile(list.id);
-      
+
       // Close loading
       if (context.mounted) {
-        Navigator.pop(context);
+        Navigator.pop(navigatorKey.currentContext!);
       }
 
       if (filePath == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
             const SnackBar(
               content: Text('Error creating export file'),
               backgroundColor: Colors.red,
@@ -330,10 +334,13 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
       }
 
       // Share the file
-      final shared = await ExportImportService.shareListFile(filePath, list.name);
-      
+      final shared = await ExportImportService.shareListFile(
+        filePath,
+        list.name,
+      );
+
       if (!shared && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
           const SnackBar(
             content: Text('Error sharing file'),
             backgroundColor: Colors.red,
@@ -342,22 +349,22 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sharing list: $e')),
-        );
+        ScaffoldMessenger.of(
+          navigatorKey.currentContext!,
+        ).showSnackBar(SnackBar(content: Text('Error sharing list: $e')));
       }
     }
   }
 
   Future<void> _importList() async {
     debugPrint('Import List: Button pressed, function called');
-    
+
     // Show immediate feedback that button was pressed
     if (!mounted) return;
-    
+
     try {
       debugPrint('Import List: Starting file picker...');
-      
+
       // Pick file using file_picker
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
@@ -374,7 +381,7 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
 
       final filePath = result.files.single.path;
       debugPrint('Import List: Selected file path: $filePath');
-      
+
       if (filePath == null) {
         debugPrint('Import List: File path is null');
         if (context.mounted) {
@@ -392,12 +399,14 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
       debugPrint('Import List: Validating file format...');
       final isValid = await ExportImportService.isValidElysianFile(filePath);
       debugPrint('Import List: File is valid: $isValid');
-      
+
       if (!isValid) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Invalid file format. Please select a valid .elysian list file.'),
+              content: Text(
+                'Invalid file format. Please select a valid .elysian list file.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -410,17 +419,20 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
       debugPrint('Import List: Starting import...');
       // Import the list
-      final importResult = await ExportImportService.importListFromFile(filePath);
-      debugPrint('Import List: Import result - success: ${importResult.success}, error: ${importResult.error}');
-      
+      final importResult = await ExportImportService.importListFromFile(
+        filePath,
+      );
+      debugPrint(
+        'Import List: Import result - success: ${importResult.success}, error: ${importResult.error}',
+      );
+
       // Close loading
       if (context.mounted) {
         Navigator.pop(context);
@@ -439,7 +451,9 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
         if (importResult.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(importResult.message ?? 'List imported successfully!'),
+              content: Text(
+                importResult.message ?? 'List imported successfully!',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -464,7 +478,9 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error importing list: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              'Error importing list: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -576,9 +592,9 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
           if (listsProvider.isLoading && !listsProvider.isInitialized) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final lists = listsProvider.allLists;
-          
+
           if (lists.isEmpty) {
             return Center(
               child: Column(
@@ -619,161 +635,167 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
               ),
             );
           }
-          
-          return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: lists.length,
-              itemBuilder: (context, index) {
-                final list = lists[index];
-                final isDefault = list.id == StorageService.defaultListId;
 
-                return Card(
-                  color: Colors.grey[900],
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SavedLinksScreen(
-                            listId: list.id,
-                            listName: list.name,
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: lists.length,
+            itemBuilder: (context, index) {
+              final list = lists[index];
+              final isDefault = list.id == StorageService.defaultListId;
+
+              return Card(
+                color: Colors.grey[900],
+                margin: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SavedLinksScreen(
+                          listId: list.id,
+                          listName: list.name,
                         ),
                       ),
                     ).then((_) {
                       // Refresh lists when returning
-                      context.read<ListsProvider>().loadLists(forceRefresh: true);
+                      context.read<ListsProvider>().loadLists(
+                        forceRefresh: true,
+                      );
                     });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isDefault ? Icons.star : Icons.playlist_play,
-                            color: isDefault ? Colors.amber : Colors.white,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        list.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isDefault ? Icons.star : Icons.playlist_play,
+                          color: isDefault ? Colors.amber : Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      list.name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isDefault)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'Default',
+                                        style: TextStyle(
+                                          color: Colors.amber,
+                                          fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
-                                    if (isDefault)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Default',
-                                          style: TextStyle(
-                                            color: Colors.amber,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                ],
+                              ),
+                              if (list.description != null &&
+                                  list.description!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  list.description!,
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                '${list.itemCount} ${list.itemCount == 1 ? 'item' : 'items'}',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!isDefault)
+                          PopupMenuButton<String>(
+                            icon: const Icon(
+                              Icons.more_vert,
+                              color: Colors.white,
+                            ),
+                            color: Colors.grey[900],
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'share':
+                                  _shareList(list);
+                                  break;
+                                case 'edit':
+                                  _editList(list);
+                                  break;
+                                case 'delete':
+                                  _deleteList(list);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'share',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.share,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Share',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                   ],
                                 ),
-                                if (list.description != null &&
-                                    list.description!.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    list.description!,
-                                    style: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${list.itemCount} ${list.itemCount == 1 ? 'item' : 'items'}',
-                                  style: TextStyle(
-                                    color: Colors.grey[500],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!isDefault)
-                            PopupMenuButton<String>(
-                              icon: const Icon(
-                                Icons.more_vert,
-                                color: Colors.white,
                               ),
-                              color: Colors.grey[900],
-                              onSelected: (value) {
-                                switch (value) {
-                                  case 'share':
-                                    _shareList(list);
-                                    break;
-                                  case 'edit':
-                                    _editList(list);
-                                    break;
-                                  case 'delete':
-                                    _deleteList(list);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'share',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.share, color: Colors.white, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Share',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    ],
-                                  ),
+                              const PopupMenuDivider(),
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text(
+                                  'Edit',
+                                  style: TextStyle(color: Colors.white),
                                 ),
-                                const PopupMenuDivider(),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text(
-                                    'Edit',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
-                );
-              },
-            );
+                ),
+              );
+            },
+          );
         },
       ),
     );

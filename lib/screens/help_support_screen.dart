@@ -8,7 +8,7 @@ class HelpSupportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -38,12 +38,17 @@ class HelpSupportScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.amber.withOpacity(0.2), Colors.amber.withOpacity(0.1)],
+                        colors: [
+                          Colors.amber.withValues(alpha: 0.2),
+                          Colors.amber.withValues(alpha: 0.1),
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Icon(
                       Icons.help_outline,
@@ -65,7 +70,7 @@ class HelpSupportScreen extends StatelessWidget {
                   Text(
                     'We\'re here to assist you with any questions or issues',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
@@ -83,7 +88,7 @@ class HelpSupportScreen extends StatelessWidget {
                   Text(
                     'Quick Actions',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -107,7 +112,10 @@ class HelpSupportScreen extends StatelessWidget {
                     color: Colors.red,
                     theme: theme,
                     isDark: isDark,
-                    onTap: () => _launchEmail('support@elysian.app', subject: 'Bug Report'),
+                    onTap: () => _launchEmail(
+                      'support@elysian.app',
+                      subject: 'Bug Report',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _ActionCard(
@@ -117,7 +125,10 @@ class HelpSupportScreen extends StatelessWidget {
                     color: Colors.purple,
                     theme: theme,
                     isDark: isDark,
-                    onTap: () => _launchEmail('support@elysian.app', subject: 'Feature Request'),
+                    onTap: () => _launchEmail(
+                      'support@elysian.app',
+                      subject: 'Feature Request',
+                    ),
                   ),
                 ],
               ),
@@ -134,7 +145,7 @@ class HelpSupportScreen extends StatelessWidget {
                   Text(
                     'Frequently Asked Questions',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -143,25 +154,29 @@ class HelpSupportScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _FAQItem(
                     question: 'How do I create a watch party?',
-                    answer: 'Go to any video, tap the watch party icon, and create a room. Share the room code with your friends to join!',
+                    answer:
+                        'Go to any video, tap the watch party icon, and create a room. Share the room code with your friends to join!',
                     theme: theme,
                     isDark: isDark,
                   ),
                   _FAQItem(
                     question: 'Can I import my playlists?',
-                    answer: 'Yes! Use the Import Data feature in Settings to import your saved playlists and links from a .elysian file.',
+                    answer:
+                        'Yes! Use the Import Data feature in Settings to import your saved playlists and links from a .elysian file.',
                     theme: theme,
                     isDark: isDark,
                   ),
                   _FAQItem(
                     question: 'How do I sync videos with friends?',
-                    answer: 'When in a watch party, the host controls playback. All participants will automatically sync to the host\'s position.',
+                    answer:
+                        'When in a watch party, the host controls playback. All participants will automatically sync to the host\'s position.',
                     theme: theme,
                     isDark: isDark,
                   ),
                   _FAQItem(
                     question: 'Is my data secure?',
-                    answer: 'Yes! We use encryption and follow best practices to keep your data safe. Check our Privacy Policy for more details.',
+                    answer:
+                        'Yes! We use encryption and follow best practices to keep your data safe. Check our Privacy Policy for more details.',
                     theme: theme,
                     isDark: isDark,
                   ),
@@ -180,7 +195,7 @@ class HelpSupportScreen extends StatelessWidget {
                   Text(
                     'Resources',
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -221,12 +236,17 @@ class HelpSupportScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.amber.withOpacity(0.1), Colors.amber.withOpacity(0.05)],
+                    colors: [
+                      Colors.amber.withValues(alpha: 0.1),
+                      Colors.amber.withValues(alpha: 0.05),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.amber.withOpacity(0.2)),
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -248,7 +268,9 @@ class HelpSupportScreen extends StatelessWidget {
                           Text(
                             'Monday - Friday: 9 AM - 6 PM',
                             style: TextStyle(
-                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
                               fontSize: 14,
                             ),
                           ),
@@ -283,7 +305,9 @@ class HelpSupportScreen extends StatelessWidget {
       final uri = Uri(
         scheme: 'mailto',
         path: email,
-        query: subject != null ? 'subject=${Uri.encodeComponent(subject)}' : null,
+        query: subject != null
+            ? 'subject=${Uri.encodeComponent(subject)}'
+            : null,
       );
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
@@ -331,7 +355,7 @@ class _ActionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 28),
@@ -353,7 +377,7 @@ class _ActionCard extends StatelessWidget {
                   Text(
                     description,
                     style: TextStyle(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   ),
@@ -362,7 +386,7 @@ class _ActionCard extends StatelessWidget {
             ),
             Icon(
               Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -434,7 +458,9 @@ class _FAQItemState extends State<_FAQItem> {
               child: Text(
                 widget.answer,
                 style: TextStyle(
-                  color: widget.theme.colorScheme.onSurface.withOpacity(0.8),
+                  color: widget.theme.colorScheme.onSurface.withValues(
+                    alpha: 0.8,
+                  ),
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -496,4 +522,3 @@ class _ResourceLink extends StatelessWidget {
     );
   }
 }
-

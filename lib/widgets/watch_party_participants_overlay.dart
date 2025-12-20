@@ -1,6 +1,6 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/widgets/watch_party_chat_overlay.dart';
 import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
@@ -55,9 +55,10 @@ class _WatchPartyParticipantsOverlayState
         final now = DateTime.now();
         final recentReactions = provider.recentReactions.where((reaction) {
           final age = now.difference(reaction.timestamp);
-          return age.inSeconds < 3; // Only show reactions less than 3 seconds old
+          return age.inSeconds <
+              3; // Only show reactions less than 3 seconds old
         }).toList();
-        
+
         // Add new reactions that aren't already active
         for (final reaction in recentReactions) {
           if (!_activeReactions.any((r) => r.id == reaction.id)) {
@@ -77,7 +78,7 @@ class _WatchPartyParticipantsOverlayState
             _pendingReactionRemovals[reaction.id] = removalFuture;
           }
         }
-        
+
         // Remove reactions that are too old or no longer in recent reactions
         _activeReactions.removeWhere((reaction) {
           final age = now.difference(reaction.timestamp);
@@ -123,7 +124,7 @@ class _WatchPartyParticipantsOverlayState
 
   Widget _buildParticipantsView() {
     return Container(
-      color: Colors.black.withOpacity(0.9),
+      color: Colors.black.withValues(alpha: 0.9),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -154,7 +155,7 @@ class _WatchPartyParticipantsOverlayState
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.2),
+                        color: Colors.amber.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: Colors.amber),
                       ),
@@ -172,7 +173,9 @@ class _WatchPartyParticipantsOverlayState
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () {
-                      debugPrint('WatchParty: Close button pressed in participants overlay');
+                      debugPrint(
+                        'WatchParty: Close button pressed in participants overlay',
+                      );
                       if (widget.onClose != null) {
                         debugPrint('WatchParty: Calling onClose callback');
                         widget.onClose!();
@@ -269,35 +272,47 @@ class _WatchPartyParticipantsOverlayState
                                 if (widget.onClose != null) {
                                   widget.onClose!();
                                 }
-                                
+
                                 // Wait a bit for dialog to close
-                                await Future.delayed(const Duration(milliseconds: 200));
-                                
+                                await Future.delayed(
+                                  const Duration(milliseconds: 200),
+                                );
+
                                 // Navigate to video using the provider's navigation
                                 // Access the provider's internal navigation method via a helper
-                                final watchPartyProvider = Provider.of<WatchPartyProvider>(
-                                  context,
-                                  listen: false,
-                                );
-                                
+                                final watchPartyProvider =
+                                    Provider.of<WatchPartyProvider>(
+                                      context,
+                                      listen: false,
+                                    );
+
                                 // Check if we're still in the room and have a valid video URL
-                                if (watchPartyProvider.currentRoom != null && 
-                                    watchPartyProvider.currentRoom!.videoUrl == widget.room.videoUrl) {
+                                if (watchPartyProvider.currentRoom != null &&
+                                    watchPartyProvider.currentRoom!.videoUrl ==
+                                        widget.room.videoUrl) {
                                   // Use a direct navigation approach since we can't access private methods
                                   // The provider will handle navigation when room state is checked
                                   // For now, we'll manually trigger navigation by checking room state
-                                  final navigator = Navigator.of(context, rootNavigator: true);
-                                  
+                                  final navigator = Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  );
+
                                   // Import necessary services
                                   try {
-                                    final allLinks = await StorageService.getSavedLinks();
+                                    final allLinks =
+                                        await StorageService.getSavedLinks();
                                     final link = allLinks.firstWhere(
                                       (l) => l.url == widget.room.videoUrl,
                                       orElse: () => SavedLink(
                                         id: '',
                                         url: widget.room.videoUrl,
                                         title: widget.room.videoTitle,
-                                        type: LinkParser.parseLinkType(widget.room.videoUrl) ?? LinkType.unknown,
+                                        type:
+                                            LinkParser.parseLinkType(
+                                              widget.room.videoUrl,
+                                            ) ??
+                                            LinkType.unknown,
                                         listIds: [],
                                         savedAt: DateTime.now(),
                                       ),
@@ -308,7 +323,9 @@ class _WatchPartyParticipantsOverlayState
                                         MaterialPageRoute(
                                           builder: (context) => YTFull(
                                             url: link.url,
-                                            title: link.title.isNotEmpty ? link.title : widget.room.videoTitle,
+                                            title: link.title.isNotEmpty
+                                                ? link.title
+                                                : widget.room.videoTitle,
                                             listIds: link.listIds,
                                           ),
                                         ),
@@ -316,12 +333,15 @@ class _WatchPartyParticipantsOverlayState
                                     } else if (link.type.canPlayInbuilt) {
                                       navigator.push(
                                         MaterialPageRoute(
-                                          builder: (context) => RSNewVideoPlayerScreen(
-                                            url: link.url,
-                                            title: link.title.isNotEmpty ? link.title : widget.room.videoTitle,
-                                            listIds: link.listIds,
-                                            adsEnabled: false,
-                                          ),
+                                          builder: (context) =>
+                                              RSNewVideoPlayerScreen(
+                                                url: link.url,
+                                                title: link.title.isNotEmpty
+                                                    ? link.title
+                                                    : widget.room.videoTitle,
+                                                listIds: link.listIds,
+                                                adsEnabled: false,
+                                              ),
                                         ),
                                       );
                                     }
@@ -335,7 +355,9 @@ class _WatchPartyParticipantsOverlayState
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.amber,
                                 foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -389,8 +411,10 @@ class _WatchPartyParticipantsOverlayState
                   return ElevatedButton.icon(
                     onPressed: () async {
                       debugPrint('WatchParty: Leave button pressed');
-                      debugPrint('WatchParty: Is in room: ${provider.isInRoom}');
-                      
+                      debugPrint(
+                        'WatchParty: Is in room: ${provider.isInRoom}',
+                      );
+
                       // Show confirmation dialog
                       final shouldExit = await showDialog<bool>(
                         context: context,
@@ -432,8 +456,10 @@ class _WatchPartyParticipantsOverlayState
                         ),
                       );
 
-                      debugPrint('WatchParty: Confirmation result: $shouldExit');
-                      
+                      debugPrint(
+                        'WatchParty: Confirmation result: $shouldExit',
+                      );
+
                       if (shouldExit == true) {
                         debugPrint('WatchParty: Starting leave process');
                         try {
@@ -445,15 +471,21 @@ class _WatchPartyParticipantsOverlayState
                           }
 
                           // Wait for dialog to fully close before leaving room
-                          await Future.delayed(const Duration(milliseconds: 200));
+                          await Future.delayed(
+                            const Duration(milliseconds: 200),
+                          );
 
                           // Leave the room (this will clean up state)
                           // This is done after dialog is closed to prevent UI issues
-                          debugPrint('WatchParty: Calling provider.leaveRoom()');
+                          debugPrint(
+                            'WatchParty: Calling provider.leaveRoom()',
+                          );
                           await provider.leaveRoom();
                           debugPrint('WatchParty: Successfully left room');
                         } catch (e, stackTrace) {
-                          debugPrint('WatchParty: Error during leave process: $e');
+                          debugPrint(
+                            'WatchParty: Error during leave process: $e',
+                          );
                           debugPrint('WatchParty: Stack trace: $stackTrace');
                           // Show error to user
                           if (context.mounted) {
@@ -474,7 +506,7 @@ class _WatchPartyParticipantsOverlayState
                       widget.isHost ? 'End Watch Party' : 'Leave Watch Party',
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withOpacity(0.8),
+                      backgroundColor: Colors.red.withValues(alpha: 0.8),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -542,7 +574,9 @@ class _WatchPartyParticipantsOverlayState
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.2),
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.2,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
@@ -595,8 +629,8 @@ class _WatchPartyParticipantsOverlayState
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isConnected
-            ? Colors.green.withOpacity(0.2)
-            : Colors.red.withOpacity(0.2),
+            ? Colors.green.withValues(alpha: 0.2)
+            : Colors.red.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: isConnected ? Colors.green : Colors.red,

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -17,10 +19,7 @@ import 'package:elysian/widgets/small_video_player.dart';
 class VideoDetailScreen extends StatefulWidget {
   final SavedLink link;
 
-  const VideoDetailScreen({
-    super.key,
-    required this.link,
-  });
+  const VideoDetailScreen({super.key, required this.link});
 
   @override
   State<VideoDetailScreen> createState() => _VideoDetailScreenState();
@@ -40,7 +39,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     _loadLinkDetails();
     _initWatchParty();
   }
-  
+
   void _initWatchParty() {
     // Handle video changes when joining a room
     _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
@@ -49,7 +48,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         _navigateToVideo(videoUrl);
       }
     };
-    
+
     // Handle room updates (when joining)
     _watchPartyService.onRoomUpdate = (room) {
       if (mounted && !_watchPartyService.isHost) {
@@ -58,7 +57,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       }
     };
   }
-  
+
   Future<void> _navigateToVideo(String videoUrl) async {
     try {
       final allLinks = await StorageService.getSavedLinks();
@@ -73,17 +72,14 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           savedAt: DateTime.now(),
         ),
       );
-      
+
       // Navigate to full screen player
       if (link.type == LinkType.youtube) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => YTFull(
-              url: link.url,
-              title: link.title,
-              listIds: link.listIds,
-            ),
+            builder: (context) =>
+                YTFull(url: link.url, title: link.title, listIds: link.listIds),
           ),
         );
       } else if (link.type.canPlayInbuilt) {
@@ -102,7 +98,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       debugPrint('Error navigating to video: $e');
     }
   }
-  
+
   Future<void> _showWatchPartyDialog() async {
     final room = await showDialog<WatchPartyRoom>(
       context: context,
@@ -152,17 +148,19 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   Future<void> _loadRelatedVideos() async {
     try {
       final allLinks = await StorageService.getSavedLinks();
-      
+
       // Get the primary list (first list ID, or default list)
-      final primaryListId = _currentListIds.isNotEmpty 
-          ? _currentListIds.first 
+      final primaryListId = _currentListIds.isNotEmpty
+          ? _currentListIds.first
           : StorageService.defaultListId;
-      
+
       // Get videos ONLY from the primary list, excluding current video
       final relatedLinks = allLinks
-          .where((link) =>
-              link.id != widget.link.id &&
-              link.listIds.contains(primaryListId))
+          .where(
+            (link) =>
+                link.id != widget.link.id &&
+                link.listIds.contains(primaryListId),
+          )
           .toList();
 
       // Sort by date (latest first)
@@ -182,7 +180,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     final updatedLink = widget.link.copyWith(isFavorite: !_isFavorite);
     await StorageService.saveLink(updatedLink);
     setState(() => _isFavorite = !_isFavorite);
-    
+
     // Refresh links provider
     if (mounted) {
       final linksProvider = Provider.of<LinksProvider>(context, listen: false);
@@ -192,7 +190,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   Future<void> _showListPicker() async {
     List<String> selectedListIds = List.from(_currentListIds);
-    
+
     final result = await showDialog<List<String>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -234,10 +232,13 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       await StorageService.saveLink(updatedLink);
       setState(() => _currentListIds = result);
       _loadRelatedVideos(); // Reload to show updated related videos
-      
+
       // Refresh links provider
       if (mounted) {
-        final linksProvider = Provider.of<LinksProvider>(context, listen: false);
+        final linksProvider = Provider.of<LinksProvider>(
+          context,
+          listen: false,
+        );
         linksProvider.loadLinks(forceRefresh: true);
       }
     }
@@ -249,10 +250,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text(
-          'Edit Notes',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Edit Notes', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: controller,
           style: const TextStyle(color: Colors.white),
@@ -260,9 +258,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           decoration: InputDecoration(
             hintText: 'Add your notes...',
             hintStyle: TextStyle(color: Colors.grey[600]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.amber),
@@ -283,27 +279,31 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     );
 
     if (result != null) {
-      final updatedLink = widget.link.copyWith(notes: result.isEmpty ? null : result);
+      final updatedLink = widget.link.copyWith(
+        notes: result.isEmpty ? null : result,
+      );
       await StorageService.saveLink(updatedLink);
-      
+
       // Refresh links provider
       if (mounted) {
-        final linksProvider = Provider.of<LinksProvider>(context, listen: false);
+        final linksProvider = Provider.of<LinksProvider>(
+          context,
+          listen: false,
+        );
         linksProvider.loadLinks(forceRefresh: true);
       }
     }
   }
 
   Future<void> _shareLink() async {
-    await Share.share(
-      widget.link.url,
-      subject: widget.link.title,
+    await SharePlus.instance.share(
+      ShareParams(text: widget.link.url, subject: widget.link.title),
     );
   }
 
   void _openFullScreen(Duration? initialPosition) {
     final linkType = widget.link.type;
-    
+
     if (linkType == LinkType.youtube) {
       final videoId = LinkParser.extractYouTubeVideoId(widget.link.url);
       if (videoId != null) {
@@ -350,7 +350,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   void _enterPiP(Duration? initialPosition) {
     final linkType = widget.link.type;
-    
+
     // Navigate to full screen player and auto-enter PiP
     if (linkType == LinkType.youtube) {
       final videoId = LinkParser.extractYouTubeVideoId(widget.link.url);
@@ -403,7 +403,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: CustomScrollView(
@@ -424,7 +424,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                   color: _isFavorite ? Colors.red : Colors.white,
                 ),
                 onPressed: _toggleFavorite,
-                tooltip: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
+                tooltip: _isFavorite
+                    ? 'Remove from favorites'
+                    : 'Add to favorites',
               ),
               IconButton(
                 icon: const Icon(Icons.share, color: Colors.white),
@@ -436,16 +438,16 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               background: _buildVideoPlayerOrThumbnail(),
             ),
           ),
-          
+
           // Content
           SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth > 600;
-                final horizontalPadding = isTablet 
-                    ? constraints.maxWidth * 0.1 
+                final horizontalPadding = isTablet
+                    ? constraints.maxWidth * 0.1
                     : 16.0;
-                
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -465,7 +467,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          
+
                           // Meta info - Wrap on small screens
                           Wrap(
                             spacing: 8,
@@ -526,10 +528,12 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.withOpacity(0.2),
+                                    color: Colors.amber.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: Colors.amber.withOpacity(0.3),
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       width: 1,
                                     ),
                                   ),
@@ -556,7 +560,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          
+
                           // Action Buttons
                           Row(
                             children: [
@@ -574,7 +578,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -594,7 +600,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ),
                                 child: IconButton(
                                   onPressed: _showWatchPartyDialog,
-                                  icon: const Icon(Icons.people, color: Colors.amber),
+                                  icon: const Icon(
+                                    Icons.people,
+                                    color: Colors.amber,
+                                  ),
                                   tooltip: 'Watch Party',
                                   iconSize: 24,
                                 ),
@@ -611,7 +620,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ),
                                 child: IconButton(
                                   onPressed: _showListPicker,
-                                  icon: const Icon(Icons.playlist_add, color: Colors.white),
+                                  icon: const Icon(
+                                    Icons.playlist_add,
+                                    color: Colors.white,
+                                  ),
                                   tooltip: 'Add to Lists',
                                   iconSize: 24,
                                 ),
@@ -628,7 +640,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ),
                                 child: IconButton(
                                   onPressed: _showNotesEditor,
-                                  icon: const Icon(Icons.note_add, color: Colors.white),
+                                  icon: const Icon(
+                                    Icons.note_add,
+                                    color: Colors.white,
+                                  ),
                                   tooltip: 'Edit Notes',
                                   iconSize: 24,
                                 ),
@@ -636,7 +651,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
-                          
+
                           // Description
                           if (widget.link.description != null &&
                               widget.link.description!.isNotEmpty) ...[
@@ -651,7 +666,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ),
                             const SizedBox(height: 24),
                           ],
-                          
+
                           // Notes
                           if (widget.link.notes != null &&
                               widget.link.notes!.isNotEmpty) ...[
@@ -661,7 +676,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 color: Colors.grey[900],
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.amber.withOpacity(0.3),
+                                  color: Colors.amber.withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
@@ -703,11 +718,13 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         ],
                       ),
                     ),
-                
+
                     // Related Videos Section
                     if (_relatedVideos.isNotEmpty) ...[
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                        ),
                         child: Row(
                           children: [
                             const Icon(
@@ -732,21 +749,22 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         height: isTablet ? 240 : 200,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding,
+                          ),
                           itemCount: _relatedVideos.length,
                           itemBuilder: (context, index) {
                             final video = _relatedVideos[index];
                             final cardWidth = isTablet ? 180.0 : 150.0;
                             final cardHeight = isTablet ? 120.0 : 100.0;
-                            
+
                             return GestureDetector(
                               onTap: () {
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => VideoDetailScreen(
-                                      link: video,
-                                    ),
+                                    builder: (context) =>
+                                        VideoDetailScreen(link: video),
                                   ),
                                 );
                               },
@@ -758,7 +776,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -786,7 +806,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                                   end: Alignment.bottomCenter,
                                                   colors: [
                                                     Colors.transparent,
-                                                    Colors.black.withOpacity(0.7),
+                                                    Colors.black.withValues(
+                                                      alpha: 0.7,
+                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -796,13 +818,17 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                             bottom: 8,
                                             right: 8,
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 4,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 4,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: Colors.black.withOpacity(0.7),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.7,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: video.duration != null
                                                   ? Text(
@@ -810,7 +836,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                                       style: const TextStyle(
                                                         color: Colors.white,
                                                         fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     )
                                                   : const SizedBox.shrink(),
@@ -823,7 +850,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                       child: Padding(
                                         padding: const EdgeInsets.all(10.0),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Expanded(
                                               child: Text(
@@ -884,7 +912,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   Widget _buildVideoPlayerOrThumbnail() {
     // Check if video can be played in-app
     final canPlayInApp = widget.link.type.canPlayInbuilt;
-    
+
     if (canPlayInApp) {
       // Show small video player
       return SmallVideoPlayer(
@@ -923,4 +951,3 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     }
   }
 }
-

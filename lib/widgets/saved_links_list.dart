@@ -6,6 +6,7 @@ import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/thumbnail_service.dart';
+import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:elysian/widgets/multi_list_picker.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
@@ -61,7 +62,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
     await linksProvider.toggleFavorite(link.id);
     widget.onRefresh?.call();
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
         SnackBar(
           content: Text(
             wasFavorite ? 'Removed from favorites' : 'Added to favorites',
@@ -86,7 +87,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
       await linksProvider.deleteLink(link.id);
       widget.onRefresh?.call();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
           const SnackBar(
             content: Text('Link deleted successfully'),
             backgroundColor: Colors.green,
@@ -96,7 +97,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(
-          context,
+          navigatorKey.currentContext!,
         ).showSnackBar(SnackBar(content: Text('Error deleting link: $e')));
       }
     }
@@ -105,9 +106,11 @@ class _SavedLinksListState extends State<SavedLinksList> {
   Future<void> _shareLink(SavedLink link) async {
     final shareText = '${link.title}\n${link.url}';
     if (link.description != null && link.description!.isNotEmpty) {
-      await Share.share('$shareText\n\n${link.description}');
+      await SharePlus.instance.share(
+        ShareParams(text: '$shareText\n\n${link.description}'),
+      );
     } else {
-      await Share.share(shareText);
+      await SharePlus.instance.share(ShareParams(text: shareText));
     }
   }
 
@@ -140,7 +143,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
 
     if (confirmed == true) {
       try {
-        final linksProvider = context.read<LinksProvider>();
+        final linksProvider = navigatorKey.currentContext!
+            .read<LinksProvider>();
         await linksProvider.deleteLink(link.id);
         widget.onRefresh?.call();
         if (mounted) {
@@ -192,7 +196,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
     }
 
     final result = await showDialog<Map<String, dynamic>>(
-      context: context,
+      context: navigatorKey.currentContext!,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: Colors.grey[900],
@@ -333,7 +337,9 @@ class _SavedLinksListState extends State<SavedLinksList> {
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(
+                                navigatorKey.currentContext!,
+                              ).showSnackBar(
                                 SnackBar(
                                   content: Text('Error picking image: $e'),
                                 ),
@@ -372,7 +378,9 @@ class _SavedLinksListState extends State<SavedLinksList> {
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(
+                                navigatorKey.currentContext!,
+                              ).showSnackBar(
                                 SnackBar(
                                   content: Text('Error taking photo: $e'),
                                 ),
@@ -595,7 +603,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
 
                                       if (mounted) {
                                         ScaffoldMessenger.of(
-                                          context,
+                                          navigatorKey.currentContext!,
                                         ).showSnackBar(
                                           const SnackBar(
                                             content: Text(
@@ -611,7 +619,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                                       );
                                       if (mounted) {
                                         ScaffoldMessenger.of(
-                                          context,
+                                          navigatorKey.currentContext!,
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
@@ -689,7 +697,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                             isFavorite = value;
                           });
                         },
-                        activeColor: Colors.amber,
+                        activeThumbColor: Colors.amber,
                       ),
                     ],
                   ),
@@ -844,7 +852,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
           lastViewedAt: link.lastViewedAt,
           viewCount: link.viewCount,
         );
-        final linksProvider = context.read<LinksProvider>();
+        final linksProvider = navigatorKey.currentContext!
+            .read<LinksProvider>();
         await linksProvider.saveLink(updatedLink);
         widget.onRefresh?.call();
 
@@ -874,8 +883,8 @@ class _SavedLinksListState extends State<SavedLinksList> {
 
     if (result == true) {
       // Refresh providers
-      final linksProvider = context.read<LinksProvider>();
-      final listsProvider = context.read<ListsProvider>();
+      final linksProvider = navigatorKey.currentContext!.read<LinksProvider>();
+      final listsProvider = navigatorKey.currentContext!.read<ListsProvider>();
       linksProvider.loadLinks(forceRefresh: true);
       listsProvider.loadLists(forceRefresh: true);
       widget.onRefresh?.call();
@@ -938,25 +947,6 @@ class _SavedLinksListState extends State<SavedLinksList> {
         return Icons.language;
       case LinkType.unknown:
         return Icons.link;
-    }
-  }
-
-  String _getTypeLabel(LinkType type) {
-    switch (type) {
-      case LinkType.youtube:
-        return 'YouTube';
-      case LinkType.instagram:
-        return 'Instagram';
-      case LinkType.vimeo:
-        return 'Vimeo';
-      case LinkType.googledrive:
-        return 'Google Drive';
-      case LinkType.directVideo:
-        return 'Video';
-      case LinkType.web:
-        return 'Web';
-      case LinkType.unknown:
-        return 'Link';
     }
   }
 
@@ -1326,13 +1316,13 @@ class _SavedLinksListState extends State<SavedLinksList> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: link.isFavorite
-                        ? Colors.amber.withOpacity(0.9)
-                        : Colors.black.withOpacity(0.7),
+                        ? Colors.amber.withValues(alpha: 0.9)
+                        : Colors.black.withValues(alpha: 0.7),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: link.isFavorite
                           ? Colors.amber
-                          : Colors.white.withOpacity(0.3),
+                          : Colors.white.withValues(alpha: 0.3),
                       width: 1.5,
                     ),
                   ),
@@ -1352,7 +1342,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.note, color: Colors.blue, size: 16),
@@ -1369,7 +1359,7 @@ class _SavedLinksListState extends State<SavedLinksList> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
+                    color: Colors.black.withValues(alpha: 0.8),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -1403,7 +1393,10 @@ class _SavedLinksListState extends State<SavedLinksList> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.8),
+                    ],
                   ),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(4.0),

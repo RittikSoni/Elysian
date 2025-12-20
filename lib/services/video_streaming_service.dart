@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart';
 
 /// Service for streaming local video files over HTTP
 class VideoStreamingService {
-  static final VideoStreamingService _instance = VideoStreamingService._internal();
+  static final VideoStreamingService _instance =
+      VideoStreamingService._internal();
   factory VideoStreamingService() => _instance;
   VideoStreamingService._internal();
 
@@ -14,9 +15,9 @@ class VideoStreamingService {
 
   /// Check if a URL is a local file path
   static bool isLocalFile(String url) {
-    return url.startsWith('/') && 
-           !url.startsWith('http') && 
-           !url.startsWith('file://');
+    return url.startsWith('/') &&
+        !url.startsWith('http') &&
+        !url.startsWith('file://');
   }
 
   /// Start streaming a local video file
@@ -28,8 +29,8 @@ class VideoStreamingService {
   }) async {
     try {
       // If already streaming the same video, return existing URL
-      if (_videoServer != null && 
-          _currentVideoPath == videoPath && 
+      if (_videoServer != null &&
+          _currentVideoPath == videoPath &&
           _videoServerPort != null) {
         return 'http://$hostIp:$_videoServerPort/video';
       }
@@ -80,11 +81,13 @@ class VideoStreamingService {
 
         if (rangeHeader != null) {
           // Handle range requests for video seeking
-          final rangeMatch = RegExp(r'bytes=(\d+)-(\d*)').firstMatch(rangeHeader);
+          final rangeMatch = RegExp(
+            r'bytes=(\d+)-(\d*)',
+          ).firstMatch(rangeHeader);
           if (rangeMatch != null) {
             final start = int.parse(rangeMatch.group(1)!);
-            final end = rangeMatch.group(2)!.isEmpty 
-                ? fileLength - 1 
+            final end = rangeMatch.group(2)!.isEmpty
+                ? fileLength - 1
                 : int.parse(rangeMatch.group(2)!);
 
             final contentLength = end - start + 1;
@@ -172,9 +175,7 @@ class VideoStreamingService {
 
   /// Get the current streaming URL if active
   String? get streamingUrl {
-    if (_videoServer != null && 
-        _videoServerPort != null && 
-        _hostIp != null) {
+    if (_videoServer != null && _videoServerPort != null && _hostIp != null) {
       return 'http://$_hostIp:$_videoServerPort/video';
     }
     return null;
@@ -183,4 +184,3 @@ class VideoStreamingService {
   /// Check if currently streaming
   bool get isStreaming => _videoServer != null;
 }
-

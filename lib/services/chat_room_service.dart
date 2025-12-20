@@ -74,10 +74,7 @@ class ChatRoomService {
       );
 
       // Save to Firestore
-      await _firestore
-          .collection('chat_rooms')
-          .doc(roomId)
-          .set(room.toJson());
+      await _firestore.collection('chat_rooms').doc(roomId).set(room.toJson());
 
       debugPrint('Chat room created: $roomId by $hostEmail');
       return room;
@@ -96,10 +93,7 @@ class ChatRoomService {
         return null;
       }
 
-      final room = ChatRoom.fromJson({
-        'id': roomId,
-        ...doc.data()!,
-      });
+      final room = ChatRoom.fromJson({'id': roomId, ...doc.data()!});
 
       // Check if expired
       if (room.isExpired) {
@@ -130,10 +124,7 @@ class ChatRoomService {
 
       for (final doc in snapshot.docs) {
         try {
-          final room = ChatRoom.fromJson({
-            'id': doc.id,
-            ...doc.data(),
-          });
+          final room = ChatRoom.fromJson({'id': doc.id, ...doc.data()});
 
           // Check expiration
           if (room.isExpired) {
@@ -171,39 +162,36 @@ class ChatRoomService {
         .where('isActive', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
-      final rooms = <ChatRoom>[];
+          final rooms = <ChatRoom>[];
 
-      for (final doc in snapshot.docs) {
-        try {
-          final room = ChatRoom.fromJson({
-            'id': doc.id,
-            ...doc.data(),
+          for (final doc in snapshot.docs) {
+            try {
+              final room = ChatRoom.fromJson({'id': doc.id, ...doc.data()});
+
+              // Check expiration
+              if (room.isExpired) {
+                continue;
+              }
+
+              // Check if user is participant
+              if (room.isParticipant(userEmail)) {
+                rooms.add(room);
+              }
+            } catch (e) {
+              debugPrint('Error parsing room: $e');
+              continue;
+            }
+          }
+
+          // Sort by last message time
+          rooms.sort((a, b) {
+            final aTime = a.lastMessageAt ?? a.createdAt;
+            final bTime = b.lastMessageAt ?? b.createdAt;
+            return bTime.compareTo(aTime);
           });
 
-          // Check expiration
-          if (room.isExpired) {
-            continue;
-          }
-
-          // Check if user is participant
-          if (room.isParticipant(userEmail)) {
-            rooms.add(room);
-          }
-        } catch (e) {
-          debugPrint('Error parsing room: $e');
-          continue;
-        }
-      }
-
-      // Sort by last message time
-      rooms.sort((a, b) {
-        final aTime = a.lastMessageAt ?? a.createdAt;
-        final bTime = b.lastMessageAt ?? b.createdAt;
-        return bTime.compareTo(aTime);
-      });
-
-      return rooms;
-    });
+          return rooms;
+        });
   }
 
   /// Add a participant to the room (host only)
@@ -252,7 +240,8 @@ class ChatRoomService {
       // Add participant
       final newParticipant = RoomParticipant(
         email: participantEmail,
-        displayName: participantDisplayName ?? participantEmail.split('@').first,
+        displayName:
+            participantDisplayName ?? participantEmail.split('@').first,
         joinedAt: DateTime.now(),
         isHost: false,
       );
@@ -464,10 +453,7 @@ class ChatRoomService {
           .get();
 
       return snapshot.docs
-          .map((doc) => RoomMessage.fromJson({
-                'id': doc.id,
-                ...doc.data(),
-              }))
+          .map((doc) => RoomMessage.fromJson({'id': doc.id, ...doc.data()}))
           .where((msg) => !msg.isExpired) // Filter expired messages
           .toList()
         ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -486,36 +472,30 @@ class ChatRoomService {
         .orderBy('timestamp', descending: true)
         .limit(100) // Limit for performance
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => RoomMessage.fromJson({
-                  'id': doc.id,
-                  ...doc.data(),
-                }))
-            .where((msg) => !msg.isExpired) // Filter expired messages
-            .toList())
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => RoomMessage.fromJson({'id': doc.id, ...doc.data()}))
+              .where((msg) => !msg.isExpired) // Filter expired messages
+              .toList(),
+        )
         .map((messages) {
-      // Sort chronologically
-      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      return messages;
-    });
+          // Sort chronologically
+          messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          return messages;
+        });
   }
 
   /// Listen to room updates (real-time)
   Stream<ChatRoom?> listenToRoom(String roomId) {
-    return _firestore
-        .collection('chat_rooms')
-        .doc(roomId)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection('chat_rooms').doc(roomId).snapshots().map((
+      snapshot,
+    ) {
       if (!snapshot.exists) {
         return null;
       }
 
       try {
-        final room = ChatRoom.fromJson({
-          'id': roomId,
-          ...snapshot.data()!,
-        });
+        final room = ChatRoom.fromJson({'id': roomId, ...snapshot.data()!});
 
         // Check expiration
         if (room.isExpired) {
@@ -533,10 +513,7 @@ class ChatRoomService {
   }
 
   /// Mark messages as read
-  Future<void> markMessagesAsRead(
-    String roomId,
-    String userEmail,
-  ) async {
+  Future<void> markMessagesAsRead(String roomId, String userEmail) async {
     try {
       // Get unread messages (from other users)
       final snapshot = await _firestore
@@ -549,12 +526,10 @@ class ChatRoomService {
       if (snapshot.docs.isEmpty) return;
 
       // Filter to only messages from other users
-      final unreadMessages = snapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            return data['senderEmail'] != userEmail;
-          })
-          .toList();
+      final unreadMessages = snapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['senderEmail'] != userEmail;
+      }).toList();
 
       if (unreadMessages.isEmpty) return;
 
@@ -622,10 +597,7 @@ class ChatRoomService {
 
       for (final doc in roomsSnapshot.docs) {
         try {
-          final room = ChatRoom.fromJson({
-            'id': doc.id,
-            ...doc.data(),
-          });
+          final room = ChatRoom.fromJson({'id': doc.id, ...doc.data()});
 
           if (room.isExpired) {
             expiredRoomIds.add(room.id);
@@ -653,10 +625,7 @@ class ChatRoomService {
 
       for (final roomDoc in activeRooms.docs) {
         try {
-          final room = ChatRoom.fromJson({
-            'id': roomDoc.id,
-            ...roomDoc.data(),
-          });
+          final room = ChatRoom.fromJson({'id': roomDoc.id, ...roomDoc.data()});
 
           if (room.isExpired) continue;
 
@@ -683,4 +652,3 @@ class ChatRoomService {
     }
   }
 }
-

@@ -41,7 +41,7 @@ class AppStateProvider with ChangeNotifier {
   /// Load player preference
   Future<void> _loadPlayerPreference() async {
     if (_isLoadingPlayerPreference) return;
-    
+
     _isLoadingPlayerPreference = true;
     notifyListeners();
 
@@ -70,7 +70,7 @@ class AppStateProvider with ChangeNotifier {
   /// Load recent searches
   Future<void> _loadRecentSearches() async {
     if (_isLoadingRecentSearches) return;
-    
+
     _isLoadingRecentSearches = true;
     notifyListeners();
 
@@ -112,7 +112,7 @@ class AppStateProvider with ChangeNotifier {
   /// Load theme preference
   Future<void> _loadThemePreference() async {
     if (_isLoadingTheme) return;
-    
+
     _isLoadingTheme = true;
     notifyListeners();
 
@@ -141,7 +141,7 @@ class AppStateProvider with ChangeNotifier {
   /// Load theme type
   Future<void> _loadThemeType() async {
     if (_isLoadingThemeType) return;
-    
+
     _isLoadingThemeType = true;
     notifyListeners();
 
@@ -175,4 +175,3 @@ class AppStateProvider with ChangeNotifier {
     }
   }
 }
-

@@ -119,7 +119,8 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
       if (mounted) {
         // Check if it's an authentication error - close dialog and show alert
         final errorMessage = e.toString();
-        if (errorMessage.contains('sign in') || errorMessage.contains('Authentication')) {
+        if (errorMessage.contains('sign in') ||
+            errorMessage.contains('Authentication')) {
           Navigator.of(context).pop(); // Close the dialog first
           // Show alert dialog after dialog closes
           Future.delayed(const Duration(milliseconds: 100), () {
@@ -247,7 +248,8 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
       if (mounted) {
         // Check if it's an authentication error - close dialog and show alert
         final errorMessage = e.toString();
-        if (errorMessage.contains('sign in') || errorMessage.contains('Authentication')) {
+        if (errorMessage.contains('sign in') ||
+            errorMessage.contains('Authentication')) {
           Navigator.of(context).pop(); // Close the dialog first
           // Show alert dialog after dialog closes
           Future.delayed(const Duration(milliseconds: 100), () {
@@ -303,21 +305,21 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
       context,
     ).showSnackBar(const SnackBar(content: Text('Copied to clipboard!')));
   }
-  
+
   Future<void> _scanQRCode() async {
     // Show QR scanner dialog
     final result = await showDialog<String>(
       context: context,
       builder: (context) => _QRScannerDialog(),
     );
-    
+
     if (result != null && result.isNotEmpty) {
       // Parse QR code data - format: "elysian_wp:ROOM_CODE" or just "ROOM_CODE"
       String roomCode = result;
       if (result.startsWith('elysian_wp:')) {
         roomCode = result.substring('elysian_wp:'.length);
       }
-      
+
       if (roomCode.length == 6 && roomCode.contains(RegExp(r'^[0-9]+$'))) {
         _roomCodeController.text = roomCode;
       } else {
@@ -325,7 +327,9 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Invalid QR code format. Please scan a valid Watch Party QR code.'),
+              content: Text(
+                'Invalid QR code format. Please scan a valid Watch Party QR code.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -410,7 +414,7 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: _mode == WatchPartyMode.localNetwork
-                                    ? Colors.amber.withOpacity(0.2)
+                                    ? Colors.amber.withValues(alpha: 0.2)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
@@ -465,7 +469,7 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: _mode == WatchPartyMode.online
-                                    ? Colors.amber.withOpacity(0.2)
+                                    ? Colors.amber.withValues(alpha: 0.2)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
@@ -595,9 +599,11 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
+                    color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,9 +643,11 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
+                    color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,7 +714,10 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                     borderSide: const BorderSide(color: Colors.amber),
                   ),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code_scanner, color: Colors.amber),
+                    icon: const Icon(
+                      Icons.qr_code_scanner,
+                      color: Colors.amber,
+                    ),
                     onPressed: _scanQRCode,
                     tooltip: 'Scan QR Code',
                   ),
@@ -907,7 +918,8 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                         const SizedBox(width: 12),
                         IconButton(
                           icon: const Icon(Icons.copy, color: Colors.amber),
-                          onPressed: () => _copyToClipboard(_createdRoom!.roomCode ?? ''),
+                          onPressed: () =>
+                              _copyToClipboard(_createdRoom!.roomCode ?? ''),
                           tooltip: 'Copy room code',
                         ),
                       ],
@@ -936,10 +948,10 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
+                          color: Colors.amber.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: Colors.amber.withOpacity(0.3),
+                            color: Colors.amber.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -1044,10 +1056,10 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
+                            color: Colors.red.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                              color: Colors.red.withOpacity(0.3),
+                              color: Colors.red.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -1074,10 +1086,10 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.1),
+                            color: Colors.amber.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                              color: Colors.amber.withOpacity(0.3),
+                              color: Colors.amber.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -1152,35 +1164,37 @@ class _QRScannerDialogState extends State<_QRScannerDialog> {
 
   void _handleBarcode(BarcodeCapture barcodeCapture) {
     if (!_isScanning) return;
-    
+
     final barcodes = barcodeCapture.barcodes;
     if (barcodes.isEmpty) return;
-    
+
     final barcode = barcodes.first;
     if (barcode.rawValue == null) return;
-    
+
     setState(() {
       _isScanning = false;
     });
-    
+
     // Parse QR code data
     String qrData = barcode.rawValue!;
     String? roomCode;
-    
+
     if (qrData.startsWith('elysian_wp:')) {
       roomCode = qrData.substring('elysian_wp:'.length);
     } else if (qrData.length == 6 && qrData.contains(RegExp(r'^[0-9]+$'))) {
       // Direct room code
       roomCode = qrData;
     }
-    
+
     if (roomCode != null && roomCode.length == 6) {
       Navigator.of(context).pop(roomCode);
     } else {
       // Invalid format
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid QR code. Please scan a valid Watch Party QR code.'),
+          content: Text(
+            'Invalid QR code. Please scan a valid Watch Party QR code.',
+          ),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 2),
         ),
@@ -1245,10 +1259,7 @@ class _QRScannerDialogState extends State<_QRScannerDialog> {
                         width: 250,
                         height: 250,
                         decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.amber,
-                            width: 3,
-                          ),
+                          border: Border.all(color: Colors.amber, width: 3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
@@ -1261,10 +1272,7 @@ class _QRScannerDialogState extends State<_QRScannerDialog> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 'Point your camera at the Watch Party QR code',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 textAlign: TextAlign.center,
               ),
             ),

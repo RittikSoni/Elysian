@@ -74,12 +74,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Timer? _typingTimer;
-  
+
   void _onTextChanged(String text) {
     // Set typing indicator when user types
     final provider = context.read<ChatProvider>();
     provider.setTypingIndicator(widget.conversation.id, text.isNotEmpty);
-    
+
     // Auto-clear typing indicator after 2 seconds of no typing
     _typingTimer?.cancel();
     if (text.isNotEmpty) {
@@ -98,12 +98,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       // Clear typing indicator
       provider.setTypingIndicator(widget.conversation.id, false);
       _typingTimer?.cancel();
-      
+
       _messageController.clear();
-      
+
       // Optimistic UI update (message appears immediately)
       await provider.sendMessage(widget.conversation.id, message);
-      
+
       // Scroll to bottom
       if (_scrollController.hasClients) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -202,7 +202,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.orange.withOpacity(0.2),
+              color: Colors.orange.withValues(alpha: 0.2),
               child: Row(
                 children: [
                   const Icon(
@@ -239,8 +239,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     controller: _scrollController,
                     padding: const EdgeInsets.all(8),
                     itemCount: messages.length,
-                    reverse: false, // Messages are already sorted chronologically
-                    key: const PageStorageKey('chat_messages'), // For scroll position persistence
+                    reverse:
+                        false, // Messages are already sorted chronologically
+                    key: const PageStorageKey(
+                      'chat_messages',
+                    ), // For scroll position persistence
                     itemBuilder: (context, index) {
                       final message = messages[index];
                       final isCurrentUser =
@@ -267,7 +270,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                   _formatMessageTime(message.timestamp),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context).brightness == Brightness.light
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.light
                                         ? Colors.grey[700]
                                         : Colors.grey[400],
                                   ),
@@ -303,7 +308,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -326,9 +331,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                         fontWeight: FontWeight.bold,
                                         color: isCurrentUser
                                             ? Colors.white
-                                            : Theme.of(context).brightness == Brightness.light
-                                                ? Colors.black87
-                                                : Colors.white70,
+                                            : Theme.of(context).brightness ==
+                                                  Brightness.light
+                                            ? Colors.black87
+                                            : Colors.white70,
                                       ),
                                     ),
                                   Text(
@@ -336,9 +342,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                     style: TextStyle(
                                       color: isCurrentUser
                                           ? Colors.white
-                                          : Theme.of(context).brightness == Brightness.light
-                                              ? Colors.black87
-                                              : Colors.white,
+                                          : Theme.of(context).brightness ==
+                                                Brightness.light
+                                          ? Colors.black87
+                                          : Colors.white,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -352,51 +359,74 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: isCurrentUser
-                                              ? Colors.white.withOpacity(0.9)
-                                              : Theme.of(context).brightness == Brightness.light
-                                                  ? Colors.black54
-                                                  : Colors.white.withOpacity(0.8),
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.9,
+                                                )
+                                              : Theme.of(context).brightness ==
+                                                    Brightness.light
+                                              ? Colors.black54
+                                              : Colors.white.withValues(
+                                                  alpha: 0.8,
+                                                ),
                                         ),
                                       ),
                                       if (isCurrentUser) ...[
                                         const SizedBox(width: 4),
                                         // Show message status (sending, sent, delivered, read)
-                                        if (message.status == MessageStatus.sending)
+                                        if (message.status ==
+                                            MessageStatus.sending)
                                           SizedBox(
                                             width: 12,
                                             height: 12,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                Colors.white.withOpacity(0.5),
-                                              ),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white.withValues(
+                                                      alpha: 0.5,
+                                                    ),
+                                                  ),
                                             ),
                                           )
                                         else
                                           Icon(
-                                            message.status == MessageStatus.read ||
+                                            message.status ==
+                                                        MessageStatus.read ||
                                                     message.isRead
                                                 ? Icons.done_all
                                                 : Icons.done,
                                             size: 12,
-                                            color: message.isRead ||
-                                                    message.status == MessageStatus.read
+                                            color:
+                                                message.isRead ||
+                                                    message.status ==
+                                                        MessageStatus.read
                                                 ? Colors.blue
-                                                : message.status == MessageStatus.delivered
-                                                    ? Colors.green
-                                                    : Colors.white.withOpacity(0.5),
+                                                : message.status ==
+                                                      MessageStatus.delivered
+                                                ? Colors.green
+                                                : Colors.white.withValues(
+                                                    alpha: 0.5,
+                                                  ),
                                           ),
-                                        if (message.isRead && message.readAt != null) ...[
+                                        if (message.isRead &&
+                                            message.readAt != null) ...[
                                           const SizedBox(width: 4),
                                           Text(
                                             'Seen ${_formatSeenTime(message.readAt!)}',
                                             style: TextStyle(
                                               fontSize: 9,
                                               color: isCurrentUser
-                                                  ? Colors.white.withOpacity(0.8)
-                                                  : Theme.of(context).brightness == Brightness.light
-                                                      ? Colors.black54
-                                                      : Colors.white.withOpacity(0.7),
+                                                  ? Colors.white.withValues(
+                                                      alpha: 0.8,
+                                                    )
+                                                  : Theme.of(
+                                                          context,
+                                                        ).brightness ==
+                                                        Brightness.light
+                                                  ? Colors.black54
+                                                  : Colors.white.withValues(
+                                                      alpha: 0.7,
+                                                    ),
                                               fontStyle: FontStyle.italic,
                                             ),
                                           ),
@@ -424,13 +454,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border(
                 top: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),
@@ -444,7 +474,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.grey.withOpacity(0.2),
+                        color: Colors.grey.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -458,7 +488,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           vertical: 14,
                         ),
                         hintStyle: TextStyle(
-                          color: Colors.grey.withOpacity(0.6),
+                          color: Colors.grey.withValues(alpha: 0.6),
                         ),
                       ),
                       maxLines: null,
@@ -476,10 +506,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withOpacity(0.3),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -492,11 +521,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       borderRadius: BorderRadius.circular(28),
                       child: const Padding(
                         padding: EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.send,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        child: Icon(Icons.send, color: Colors.white, size: 20),
                       ),
                     ),
                   ),

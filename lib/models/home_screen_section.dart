@@ -25,7 +25,8 @@ class HomeScreenSection {
   final String title;
   final bool isVisible;
   final int order;
-  final Map<String, dynamic>? config; // Additional configuration (e.g., which list to show)
+  final Map<String, dynamic>?
+  config; // Additional configuration (e.g., which list to show)
 
   HomeScreenSection({
     required this.id,
@@ -55,13 +56,13 @@ class HomeScreenSection {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type.toString(),
-        'title': title,
-        'isVisible': isVisible,
-        'order': order,
-        'config': config,
-      };
+    'id': id,
+    'type': type.toString(),
+    'title': title,
+    'isVisible': isVisible,
+    'order': order,
+    'config': config,
+  };
 
   factory HomeScreenSection.fromJson(Map<String, dynamic> json) {
     return HomeScreenSection(
@@ -128,4 +129,3 @@ class HomeScreenSection {
     ];
   }
 }
-

@@ -81,20 +81,23 @@ class SuggestionsSection extends StatelessWidget {
         builder: (context, appState, _) {
           final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
           final theme = Theme.of(context);
-          
+
           if (isLiquidGlass) {
             final liquidGlass = theme.extension<LiquidGlassTheme>();
             final blur = liquidGlass?.blurIntensity ?? 15.0;
             final opacity = liquidGlass?.glassOpacity ?? 0.18;
             final borderOpacity = liquidGlass?.borderOpacity ?? 0.25;
-            
+
             return Container(
               width: 250,
-              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.white.withOpacity(borderOpacity),
+                  color: Colors.white.withValues(alpha: borderOpacity),
                   width: 1.5,
                 ),
               ),
@@ -104,7 +107,7 @@ class SuggestionsSection extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(opacity),
+                      color: Colors.white.withValues(alpha: opacity),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: _buildLinkCardContent(context, link),
@@ -115,7 +118,10 @@ class SuggestionsSection extends StatelessWidget {
           } else {
             return Container(
               width: 250,
-              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(12),
@@ -147,88 +153,96 @@ class SuggestionsSection extends StatelessWidget {
                 height: 120,
               ),
             ),
-                if (link.viewCount > 0)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.play_arrow, color: Colors.black, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${link.viewCount}x',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            if (link.viewCount > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-              ],
-            ),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        link.title,
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.light
-                              ? Colors.black87
-                              : Colors.white,
-                          fontSize: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.play_arrow,
+                        color: Colors.black,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${link.viewCount}x',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        // Content
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    link.title,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.black87
+                          : Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      _getIconForType(link.type),
+                      size: 12,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[600]
+                          : Colors.grey[500],
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        _getTypeLabel(link.type),
+                        style: TextStyle(
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[600]
+                              : Colors.grey[500],
+                          fontSize: 11,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          _getIconForType(link.type),
-                          size: 12,
-                          color: Theme.of(context).brightness == Brightness.light
-                              ? Colors.grey[600]
-                              : Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            _getTypeLabel(link.type),
-                            style: TextStyle(
-                              color: Theme.of(context).brightness == Brightness.light
-                                  ? Colors.grey[600]
-                                  : Colors.grey[500],
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
-              ),
+              ],
             ),
-          ],
-        );
+          ),
+        ),
+      ],
+    );
   }
 
   IconData _getIconForType(LinkType type) {
@@ -269,4 +283,3 @@ class SuggestionsSection extends StatelessWidget {
     }
   }
 }
-

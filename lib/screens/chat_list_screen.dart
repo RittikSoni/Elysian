@@ -448,7 +448,9 @@ class _ConversationTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                      fontWeight: hasUnread
+                          ? FontWeight.w500
+                          : FontWeight.normal,
                       color: hasUnread ? Colors.black87 : Colors.grey[600],
                     ),
                   ),
@@ -486,17 +488,14 @@ class _ConversationTile extends StatelessWidget {
                 color: Colors.red,
                 borderRadius: BorderRadius.circular(10),
               ),
-              constraints: const BoxConstraints(
-                minWidth: 20,
-                minHeight: 20,
-              ),
+              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
               child: Center(
                 child: Text(
                   conversation.unreadCount > 99
                       ? '99+'
                       : (conversation.unreadCount > 9
-                          ? '9+'
-                          : '${conversation.unreadCount}'),
+                            ? '9+'
+                            : '${conversation.unreadCount}'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 11,

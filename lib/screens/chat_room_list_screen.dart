@@ -105,7 +105,8 @@ class _ChatRoomListScreenState extends State<ChatRoomListScreen> {
                         final provider = context.read<ChatRoomProvider>();
                         final room = await provider.createRoom(
                           roomName: roomNameController.text.trim(),
-                          roomDescription: descriptionController.text.trim().isEmpty
+                          roomDescription:
+                              descriptionController.text.trim().isEmpty
                               ? null
                               : descriptionController.text.trim(),
                         );
@@ -121,9 +122,9 @@ class _ChatRoomListScreenState extends State<ChatRoomListScreen> {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
                         }
                       } finally {
                         if (mounted) {
@@ -148,9 +149,7 @@ class _ChatRoomListScreenState extends State<ChatRoomListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat Rooms'),
-      ),
+      appBar: AppBar(title: const Text('Chat Rooms')),
       body: Consumer<ChatRoomProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading) {
@@ -182,7 +181,11 @@ class _ChatRoomListScreenState extends State<ChatRoomListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.group_outlined, size: 64, color: Colors.grey),
+                  const Icon(
+                    Icons.group_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'No chat rooms yet',
@@ -209,7 +212,8 @@ class _ChatRoomListScreenState extends State<ChatRoomListScreen> {
             itemCount: provider.rooms.length,
             itemBuilder: (context, index) {
               final room = provider.rooms[index];
-              final isExpiringSoon = room.timeUntilExpiration.inHours < 2 &&
+              final isExpiringSoon =
+                  room.timeUntilExpiration.inHours < 2 &&
                   room.timeUntilExpiration.inMinutes > 0;
 
               return _RoomTile(
@@ -302,7 +306,9 @@ class _RoomTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${room.participantCount} participant${room.participantCount != 1 ? 's' : ''}'),
+          Text(
+            '${room.participantCount} participant${room.participantCount != 1 ? 's' : ''}',
+          ),
           if (room.lastMessage != null)
             Text(
               room.lastMessage!,
@@ -388,9 +394,9 @@ class _EmailSetupDialogState extends State<_EmailSetupDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -425,8 +431,9 @@ class _EmailSetupDialogState extends State<_EmailSetupDialog> {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter your email';
                 }
-                if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-                    .hasMatch(value.trim())) {
+                if (!RegExp(
+                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                ).hasMatch(value.trim())) {
                   return 'Please enter a valid email';
                 }
                 return null;
@@ -463,4 +470,3 @@ class _EmailSetupDialogState extends State<_EmailSetupDialog> {
     );
   }
 }
-

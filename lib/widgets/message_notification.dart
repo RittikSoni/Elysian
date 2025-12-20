@@ -38,18 +38,12 @@ class _MessageNotificationState extends State<MessageNotification>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
   }
@@ -80,7 +74,7 @@ class _MessageNotificationState extends State<MessageNotification>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -102,10 +96,7 @@ class _MessageNotificationState extends State<MessageNotification>
                       height: 48,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            Colors.blue.shade400,
-                            Colors.blue.shade600,
-                          ],
+                          colors: [Colors.blue.shade400, Colors.blue.shade600],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -230,16 +221,17 @@ class _MessageNotificationOverlayState
         return;
       }
 
-      final senderName = conversation.getOtherUserDisplayName(
+      final senderName =
+          conversation.getOtherUserDisplayName(
             widget.chatProvider.currentUserEmail!,
           ) ??
           newMessage.senderEmail.split('@').first;
 
-        setState(() {
-          _currentNotification = newMessage;
-          _currentSenderName = senderName;
-          _currentConversationId = conversationId;
-        });
+      setState(() {
+        _currentNotification = newMessage;
+        _currentSenderName = senderName;
+        _currentConversationId = conversationId;
+      });
 
       // Auto-dismiss after 5 seconds
       Future.delayed(const Duration(seconds: 5), () {
@@ -298,4 +290,3 @@ class _MessageNotificationOverlayState
     );
   }
 }
-

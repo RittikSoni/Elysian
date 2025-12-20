@@ -1,4 +1,4 @@
-// ignore_for_file: invalid_use_of_protected_member, unused_element
+// ignore_for_file: invalid_use_of_protected_member, unused_element, use_build_context_synchronously
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -165,9 +165,12 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
           // If not, trigger video change to load correct video
           // IMPORTANT: Always check against room.videoUrl to ensure we get the latest update
           // Also check widget.url as fallback for initial load
-          final currentUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+          final currentUrl =
+              _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
           if (room.videoUrl.isNotEmpty && currentUrl != room.videoUrl) {
-            debugPrint('VideoPlayer: Guest video mismatch - current: $currentUrl, room: ${room.videoUrl}');
+            debugPrint(
+              'VideoPlayer: Guest video mismatch - current: $currentUrl, room: ${room.videoUrl}',
+            );
             // Video mismatch - load the correct video
             _loadVideoFromUrl(room.videoUrl, room.videoTitle);
             return;
@@ -311,7 +314,8 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     try {
       // IMPORTANT: Prevent restarting if we're already playing the same video
       // Check both _currentVideoUrl and widget.url to handle all cases
-      final currentUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+      final currentUrl =
+          _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
       if (currentUrl == videoUrl && _controller.value.isInitialized) {
         debugPrint('VideoPlayer: Already playing $videoUrl, skipping reload');
         // Just update the title if needed
@@ -325,10 +329,10 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
         _currentVideoUrl = videoUrl;
         return;
       }
-      
+
       // Update _currentVideoUrl immediately to prevent race conditions
       _currentVideoUrl = videoUrl;
-      
+
       // Find the link in storage
       final allLinks = await StorageService.getSavedLinks();
       final link = allLinks.firstWhere(
@@ -616,7 +620,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     // IMPORTANT: Update BEFORE creating new controller to ensure joiners get the update
     final provider = Provider.of<WatchPartyProvider>(context, listen: false);
     if (provider.isHost && provider.isInRoom) {
-      debugPrint('VideoPlayer: Host changing video to ${link.url}, updating room state');
+      debugPrint(
+        'VideoPlayer: Host changing video to ${link.url}, updating room state',
+      );
       provider.updateRoomState(
         videoUrl: link.url,
         videoTitle: link.title,
@@ -710,8 +716,8 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                       // Now sync to host's position if available
                       // IMPORTANT: Use _currentVideoUrl to match the video we just loaded
                       final room = provider.currentRoom;
-                      if (room != null && 
-                          _currentVideoUrl != null && 
+                      if (room != null &&
+                          _currentVideoUrl != null &&
                           room.videoUrl == _currentVideoUrl) {
                         final duration = _controller.value.duration;
                         if (duration.inMilliseconds > 0) {
@@ -1106,7 +1112,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 10,
                         spreadRadius: 2,
                       ),
@@ -1171,7 +1177,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
+                                    color: Colors.black.withValues(alpha: 0.7),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -1190,7 +1196,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
+                                    color: Colors.black.withValues(alpha: 0.7),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -1220,7 +1226,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.7),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
@@ -1959,7 +1967,7 @@ class GestureDetectorOverlay extends StatelessWidget {
         state._showControls = !state._showControls;
       });
 
-      // TODO: Uncomment this to hide controls after a delay
+      // Uncomment this to hide controls after a delay
       // if (state._showControls) {
       //   _startHideTimer(); // Start or reset timer when controls are shown
       // } else {
@@ -2372,7 +2380,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                             horizontal: 12,
                           ),
                           color: isCurrentVideo
-                              ? Colors.amber.withOpacity(0.2)
+                              ? Colors.amber.withValues(alpha: 0.2)
                               : Colors.transparent,
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2391,7 +2399,9 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                       width: 50,
                                       height: 35,
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
