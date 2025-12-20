@@ -1,14 +1,42 @@
 import 'dart:async';
 import 'package:elysian/utils/kroute.dart';
+import 'package:elysian/utils/app_info.dart';
+import 'package:elysian/utils/app_themes.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/watch_party_global_manager.dart';
+import 'package:elysian/services/watch_party_firebase_service.dart';
+import 'package:elysian/services/chat_service.dart';
+import 'package:elysian/services/chat_room_service.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart' as sharing;
 import 'screens/screens.dart';
 
-void main() => runApp(Elysian());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize App Info
+  await AppInfo.initialize();
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp();
+    // Clean up expired rooms on app start (runs in background)
+    WatchPartyFirebaseService.cleanupExpiredRooms();
+    // Initialize chat services
+    ChatService().initialize();
+    ChatRoomService().initialize();
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+    // Continue without Firebase (will use local network fallback)
+  }
+
+  runApp(const Elysian());
+}
 
 class Elysian extends StatefulWidget {
   const Elysian({super.key});
@@ -25,6 +53,8 @@ class _ElysianState extends State<Elysian> {
     super.initState();
     _handleInitialSharedIntent();
     _handleIncomingSharedIntents();
+    // Initialize global watch party manager
+    WatchPartyGlobalManager().initialize();
   }
 
   void _handleInitialSharedIntent() async {
@@ -139,18 +169,57 @@ class _ElysianState extends State<Elysian> {
         ChangeNotifierProvider(create: (_) => LinksProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ListsProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => AppStateProvider()..initialize()),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          scaffoldBackgroundColor: Colors.black,
-          primarySwatch: Colors.blue,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ChangeNotifierProvider(create: (_) => WatchPartyProvider()),
+        ChangeNotifierProvider(
+          create: (_) => HomeScreenLayoutProvider()..initialize(),
         ),
-        title: 'Elysian',
-        navigatorKey: navigatorKey,
-        navigatorObservers: [routeObserver],
-        home: const BottomNav(),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => ChatRoomProvider()),
+      ],
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, child) {
+          final theme = AppThemes.getThemeByType(appState.themeType);
+
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.lightTheme,
+            darkTheme: AppThemes.darkTheme,
+            themeMode: appState.themeType == AppThemeType.liquidGlass
+                ? ThemeMode.dark
+                : (appState.themeType == AppThemeType.light
+                      ? ThemeMode.light
+                      : ThemeMode.dark),
+            title: 'Elysian',
+            navigatorKey: navigatorKey,
+            navigatorObservers: [routeObserver],
+            builder: (context, child) {
+              // Apply liquid glass theme if selected
+              if (appState.themeType == AppThemeType.liquidGlass) {
+                return Theme(data: theme, child: child!);
+              }
+              return child!;
+            },
+            home: FutureBuilder<bool>(
+              future: StorageService.hasCompletedOnboarding(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Scaffold(
+                    backgroundColor:
+                        appState.themeType == AppThemeType.liquidGlass
+                        ? const Color(0xFF0A0A0A)
+                        : (appState.themeType == AppThemeType.light
+                              ? Colors.white
+                              : Colors.black),
+                    body: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+                return snapshot.data == true
+                    ? const BottomNav()
+                    : const WelcomeScreen();
+              },
+            ),
+          );
+        },
       ),
     );
   }

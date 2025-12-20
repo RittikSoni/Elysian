@@ -63,7 +63,7 @@ class LinksProvider with ChangeNotifier {
 
     try {
       final links = await StorageService.getSavedLinks();
-      
+
       _cachedLinks = links;
       _cacheTimestamp = DateTime.now();
       _currentPage = 0;
@@ -84,9 +84,7 @@ class LinksProvider with ChangeNotifier {
   void _updateComputedLists() {
     if (_cachedLinks == null) return;
 
-    _favoriteLinks = _cachedLinks!
-        .where((link) => link.isFavorite)
-        .toList();
+    _favoriteLinks = _cachedLinks!.where((link) => link.isFavorite).toList();
 
     _recentLinks = _cachedLinks!
         .where((link) => link.lastViewedAt != null)
@@ -99,16 +97,18 @@ class LinksProvider with ChangeNotifier {
 
     // Smart suggestions based on view count and recency
     _suggestedLinks = _cachedLinks!
-        .where((link) => 
-            link.viewCount > 0 || 
-            (link.lastViewedAt != null && 
-             DateTime.now().difference(link.lastViewedAt!).inDays < 7))
+        .where(
+          (link) =>
+              link.viewCount > 0 ||
+              (link.lastViewedAt != null &&
+                  DateTime.now().difference(link.lastViewedAt!).inDays < 7),
+        )
         .toList();
     _suggestedLinks!.sort((a, b) {
       // Sort by view count first, then recency
       final viewDiff = b.viewCount - a.viewCount;
       if (viewDiff != 0) return viewDiff;
-      
+
       if (a.lastViewedAt == null && b.lastViewedAt == null) return 0;
       if (a.lastViewedAt == null) return 1;
       if (b.lastViewedAt == null) return -1;
@@ -120,7 +120,7 @@ class LinksProvider with ChangeNotifier {
   /// Get paginated links
   List<SavedLink> getPaginatedLinks({int? limit}) {
     if (_cachedLinks == null) return [];
-    
+
     final effectiveLimit = limit ?? (_currentPage + 1) * _pageSize;
     return _cachedLinks!.take(effectiveLimit).toList();
   }
@@ -130,23 +130,26 @@ class LinksProvider with ChangeNotifier {
     if (!_hasMore || _isLoading) return;
 
     _currentPage++;
-    _hasMore = _cachedLinks != null && 
-               (_currentPage + 1) * _pageSize < _cachedLinks!.length;
-    
+    _hasMore =
+        _cachedLinks != null &&
+        (_currentPage + 1) * _pageSize < _cachedLinks!.length;
+
     notifyListeners();
   }
 
   /// Get links by list ID
   List<SavedLink> getLinksByList(String listId) {
     if (_cachedLinks == null) return [];
-    return _cachedLinks!.where((link) => link.listIds.contains(listId)).toList();
+    return _cachedLinks!
+        .where((link) => link.listIds.contains(listId))
+        .toList();
   }
 
   /// Save a new link
   Future<void> saveLink(SavedLink link) async {
     try {
       await StorageService.saveLink(link);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         // Check if link already exists (update vs add)
@@ -162,7 +165,7 @@ class LinksProvider with ChangeNotifier {
         // Reload if cache is empty
         await loadLinks(forceRefresh: true);
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error saving link: $e');
@@ -174,14 +177,14 @@ class LinksProvider with ChangeNotifier {
   Future<void> deleteLink(String linkId) async {
     try {
       await StorageService.deleteLink(linkId);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         _cachedLinks!.removeWhere((link) => link.id == linkId);
         _cacheTimestamp = DateTime.now();
         _updateComputedLists();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error deleting link: $e');
@@ -193,14 +196,14 @@ class LinksProvider with ChangeNotifier {
   Future<void> deleteLinks(List<String> linkIds) async {
     try {
       await StorageService.deleteLinks(linkIds);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         _cachedLinks!.removeWhere((link) => linkIds.contains(link.id));
         _cacheTimestamp = DateTime.now();
         _updateComputedLists();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error deleting links: $e');
@@ -212,7 +215,7 @@ class LinksProvider with ChangeNotifier {
   Future<void> toggleFavorite(String linkId) async {
     try {
       await StorageService.toggleFavorite(linkId);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         final index = _cachedLinks!.indexWhere((l) => l.id == linkId);
@@ -224,7 +227,7 @@ class LinksProvider with ChangeNotifier {
           _updateComputedLists();
         }
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
@@ -236,7 +239,7 @@ class LinksProvider with ChangeNotifier {
   Future<void> toggleFavorites(List<String> linkIds, bool isFavorite) async {
     try {
       await StorageService.toggleFavoritesForLinks(linkIds, isFavorite);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         for (final linkId in linkIds) {
@@ -250,7 +253,7 @@ class LinksProvider with ChangeNotifier {
         _cacheTimestamp = DateTime.now();
         _updateComputedLists();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error toggling favorites: $e');
@@ -259,10 +262,13 @@ class LinksProvider with ChangeNotifier {
   }
 
   /// Move links to lists
-  Future<void> moveLinksToLists(List<String> linkIds, List<String> targetListIds) async {
+  Future<void> moveLinksToLists(
+    List<String> linkIds,
+    List<String> targetListIds,
+  ) async {
     try {
       await StorageService.moveLinksToLists(linkIds, targetListIds);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         for (final linkId in linkIds) {
@@ -276,7 +282,7 @@ class LinksProvider with ChangeNotifier {
         _cacheTimestamp = DateTime.now();
         _updateComputedLists();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error moving links: $e');
@@ -288,7 +294,7 @@ class LinksProvider with ChangeNotifier {
   Future<void> recordLinkView(String linkId) async {
     try {
       await StorageService.recordLinkView(linkId);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         final index = _cachedLinks!.indexWhere((l) => l.id == linkId);
@@ -302,7 +308,7 @@ class LinksProvider with ChangeNotifier {
           _updateComputedLists();
         }
       }
-      
+
       // Don't notify listeners for view tracking (performance)
     } catch (e) {
       debugPrint('Error recording link view: $e');
@@ -313,7 +319,7 @@ class LinksProvider with ChangeNotifier {
   Future<void> updateLinkNotes(String linkId, String? notes) async {
     try {
       await StorageService.updateLinkNotes(linkId, notes);
-      
+
       // Update cache
       if (_cachedLinks != null) {
         final index = _cachedLinks!.indexWhere((l) => l.id == linkId);
@@ -322,7 +328,7 @@ class LinksProvider with ChangeNotifier {
           _cacheTimestamp = DateTime.now();
         }
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating link notes: $e');
@@ -346,4 +352,3 @@ class LinksProvider with ChangeNotifier {
     _cacheTimestamp = null;
   }
 }
-

@@ -4,13 +4,18 @@ import 'package:http/http.dart' as http;
 
 class LinkParser {
   static LinkType? parseLinkType(String url) {
+    // Check if it's a local file path
+    if (_isLocalFilePath(url)) {
+      return LinkType.directVideo;
+    }
+
     final uri = Uri.tryParse(url);
     if (uri == null) return null;
 
     final host = uri.host.toLowerCase();
     final path = uri.path.toLowerCase();
     final scheme = uri.scheme.toLowerCase();
-    
+
     // YouTube
     if (host.contains('youtube.com') || host.contains('youtu.be')) {
       return LinkType.youtube;
@@ -40,8 +45,50 @@ class LinkParser {
     if (scheme == 'http' || scheme == 'https') {
       return LinkType.web;
     }
-    
+
     return null;
+  }
+
+  /// Check if URL is a local file path
+  static bool _isLocalFilePath(String url) {
+    // Check for common local file path patterns
+    if (url.startsWith('/') ||
+        url.startsWith('file://') ||
+        url.contains('/storage/') ||
+        url.contains('/data/') ||
+        url.contains('/Android/') ||
+        (url.contains('.') &&
+            !url.contains('://') &&
+            !url.startsWith('http'))) {
+      // Check if it has a video extension
+      final lowerUrl = url.toLowerCase();
+      const videoExtensions = [
+        '.mp4',
+        '.avi',
+        '.mkv',
+        '.mov',
+        '.wmv',
+        '.flv',
+        '.webm',
+        '.m4v',
+        '.3gp',
+        '.ts',
+        '.mts',
+        '.m2ts',
+        '.vob',
+      ];
+      for (final ext in videoExtensions) {
+        if (lowerUrl.endsWith(ext)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Check if URL is a local file (for watch party compatibility)
+  static bool isLocalFile(String url) {
+    return _isLocalFilePath(url);
   }
 
   /// Checks if URL is a direct video file
@@ -390,26 +437,26 @@ class LinkParser {
 
       if (pageResponse.statusCode == 200) {
         final html = pageResponse.body;
-        
+
         // Try to extract duration from meta tag
         final durationMatch = RegExp(
           r'"lengthSeconds":"(\d+)"',
           caseSensitive: false,
         ).firstMatch(html);
-        
+
         if (durationMatch != null) {
           final seconds = int.tryParse(durationMatch.group(1)!);
           if (seconds != null) {
             return _formatDuration(seconds);
           }
         }
-        
+
         // Alternative: try to find in videoDetails
         final videoDetailsMatch = RegExp(
           r'"videoDetails":\{[^}]*"lengthSeconds":"(\d+)"',
           caseSensitive: false,
         ).firstMatch(html);
-        
+
         if (videoDetailsMatch != null) {
           final seconds = int.tryParse(videoDetailsMatch.group(1)!);
           if (seconds != null) {
@@ -430,7 +477,9 @@ class LinkParser {
     } else if (seconds < 3600) {
       final minutes = seconds ~/ 60;
       final secs = seconds % 60;
-      return secs > 0 ? '$minutes:${secs.toString().padLeft(2, '0')}' : '${minutes}m';
+      return secs > 0
+          ? '$minutes:${secs.toString().padLeft(2, '0')}'
+          : '${minutes}m';
     } else {
       final hours = seconds ~/ 3600;
       final minutes = (seconds % 3600) ~/ 60;
@@ -513,12 +562,10 @@ class LinkParser {
           caseSensitive: false,
         ).firstMatch(html);
 
-        if (ogTitleMatch == null) {
-          ogTitleMatch = RegExp(
-            r"<meta\s+property='og:title'\s+content='([^']+)'",
-            caseSensitive: false,
-          ).firstMatch(html);
-        }
+        ogTitleMatch ??= RegExp(
+          r"<meta\s+property='og:title'\s+content='([^']+)'",
+          caseSensitive: false,
+        ).firstMatch(html);
 
         if (ogTitleMatch != null) {
           final title = ogTitleMatch.group(1)!;
@@ -552,7 +599,10 @@ class LinkParser {
   }
 
   /// Fetches enhanced metadata from URL (thumbnail, description, etc.)
-  static Future<Map<String, String?>> fetchMetadataFromUrl(String url, LinkType type) async {
+  static Future<Map<String, String?>> fetchMetadataFromUrl(
+    String url,
+    LinkType type,
+  ) async {
     final metadata = <String, String?>{
       'thumbnailUrl': null,
       'description': null,
@@ -563,7 +613,8 @@ class LinkParser {
         case LinkType.youtube:
           final videoId = extractYouTubeVideoId(url);
           if (videoId != null) {
-            metadata['thumbnailUrl'] = 'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
+            metadata['thumbnailUrl'] =
+                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg';
             // Try to fetch description from YouTube
             try {
               final response = await http
@@ -593,18 +644,16 @@ class LinkParser {
                 .timeout(const Duration(seconds: 5));
             if (response.statusCode == 200) {
               final html = response.body;
-              
+
               // Extract og:image
               RegExpMatch? ogImageMatch = RegExp(
                 r'<meta\s+property="og:image"\s+content="([^"]+)"',
                 caseSensitive: false,
               ).firstMatch(html);
-              if (ogImageMatch == null) {
-                ogImageMatch = RegExp(
-                  r"<meta\s+property='og:image'\s+content='([^']+)'",
-                  caseSensitive: false,
-                ).firstMatch(html);
-              }
+              ogImageMatch ??= RegExp(
+                r"<meta\s+property='og:image'\s+content='([^']+)'",
+                caseSensitive: false,
+              ).firstMatch(html);
               if (ogImageMatch != null) {
                 metadata['thumbnailUrl'] = ogImageMatch.group(1)?.trim();
               }
@@ -614,12 +663,10 @@ class LinkParser {
                 r'<meta\s+property="og:description"\s+content="([^"]+)"',
                 caseSensitive: false,
               ).firstMatch(html);
-              if (ogDescMatch == null) {
-                ogDescMatch = RegExp(
-                  r"<meta\s+property='og:description'\s+content='([^']+)'",
-                  caseSensitive: false,
-                ).firstMatch(html);
-              }
+              ogDescMatch ??= RegExp(
+                r"<meta\s+property='og:description'\s+content='([^']+)'",
+                caseSensitive: false,
+              ).firstMatch(html);
               if (ogDescMatch != null) {
                 metadata['description'] = ogDescMatch.group(1)?.trim();
               }
@@ -632,7 +679,9 @@ class LinkParser {
           try {
             final videoId = extractVimeoVideoId(url);
             if (videoId != null) {
-              final oEmbedUrl = Uri.parse('https://vimeo.com/api/oembed.json?url=$url');
+              final oEmbedUrl = Uri.parse(
+                'https://vimeo.com/api/oembed.json?url=$url',
+              );
               final response = await http
                   .get(oEmbedUrl)
                   .timeout(const Duration(seconds: 5));
@@ -656,18 +705,16 @@ class LinkParser {
                 .timeout(const Duration(seconds: 5));
             if (response.statusCode == 200) {
               final html = response.body;
-              
+
               // Extract og:image
               RegExpMatch? ogImageMatch = RegExp(
                 r'<meta\s+property="og:image"\s+content="([^"]+)"',
                 caseSensitive: false,
               ).firstMatch(html);
-              if (ogImageMatch == null) {
-                ogImageMatch = RegExp(
-                  r"<meta\s+property='og:image'\s+content='([^']+)'",
-                  caseSensitive: false,
-                ).firstMatch(html);
-              }
+              ogImageMatch ??= RegExp(
+                r"<meta\s+property='og:image'\s+content='([^']+)'",
+                caseSensitive: false,
+              ).firstMatch(html);
               if (ogImageMatch != null) {
                 metadata['thumbnailUrl'] = ogImageMatch.group(1)?.trim();
               }
@@ -677,12 +724,10 @@ class LinkParser {
                 r'<meta\s+property="og:description"\s+content="([^"]+)"',
                 caseSensitive: false,
               ).firstMatch(html);
-              if (ogDescMatch == null) {
-                ogDescMatch = RegExp(
-                  r"<meta\s+property='og:description'\s+content='([^']+)'",
-                  caseSensitive: false,
-                ).firstMatch(html);
-              }
+              ogDescMatch ??= RegExp(
+                r"<meta\s+property='og:description'\s+content='([^']+)'",
+                caseSensitive: false,
+              ).firstMatch(html);
               if (ogDescMatch != null) {
                 metadata['description'] = ogDescMatch.group(1)?.trim();
               } else {

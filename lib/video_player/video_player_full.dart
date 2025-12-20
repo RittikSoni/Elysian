@@ -1,4 +1,4 @@
-// ignore_for_file: invalid_use_of_protected_member, unused_element
+// ignore_for_file: invalid_use_of_protected_member, unused_element, use_build_context_synchronously
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -11,7 +11,15 @@ import 'package:elysian/utils/kroute.dart';
 import 'package:elysian/video_player/shared_video_widgets.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/watch_party_service.dart';
+import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/providers/providers.dart';
+import 'package:provider/provider.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/widgets/watch_party_room_dialog.dart';
+import 'package:elysian/widgets/watch_party_participants_overlay.dart';
+import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
+import 'package:elysian/widgets/watch_party_chat_notification.dart';
 import 'package:elysian/screens/video_detail_screen.dart';
 
 // VideoFitMode is now in shared_video_widgets.dart
@@ -24,6 +32,7 @@ class RSNewVideoPlayerScreen extends StatefulWidget {
   final List<String>? listIds; // List IDs this video belongs to
   final bool autoEnterPiP; // Auto-enter PiP mode after initialization
   final String? title; // Video title
+  final bool adsEnabled; // Enable/disable ads
 
   const RSNewVideoPlayerScreen({
     super.key,
@@ -34,6 +43,7 @@ class RSNewVideoPlayerScreen extends StatefulWidget {
     this.listIds,
     this.autoEnterPiP = false,
     this.title,
+    this.adsEnabled = false, // Default to false
   });
 
   @override
@@ -49,6 +59,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   // UI state
   bool _showControls = true;
   bool _showEpisodeList = false;
+  bool _showWatchParty = false;
   double _brightness = 0.5, _volume = 0.5;
   bool _showVolumeSlider = false;
   bool _showBrightnessSlider = false;
@@ -56,14 +67,27 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   Timer? _hideTimer;
   bool _isDisposed = false;
 
+  // WatchParty state
+  final _watchPartyService = WatchPartyService();
+  WatchPartyRoom? _watchPartyRoom;
+  Timer? _watchPartySyncTimer;
+  final List<Reaction> _activeReactions = [];
+  ChatMessage? _latestChatMessage;
+  bool _isVideoInitializing =
+      false; // Track if video is being loaded/initialized
+  DateTime? _lastSeekTime; // Track last seek to prevent rapid seeks
+  bool _isSyncing = false; // Flag to prevent concurrent sync operations
+  Duration?
+  _lastSyncedPosition; // Track last synced position to avoid unnecessary seeks
+
   // Ad state
   final List<Duration> _adPositions = [];
 
   final List<String> _adUrls = [
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    // 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
   ];
   int _nextAdIndex = 0;
   bool _inAdBreak = false;
@@ -91,10 +115,10 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     });
     _sliderHideTimer = Timer(Duration(seconds: 1, milliseconds: 500), () {
       if (!_isDisposed && mounted) {
-      setState(() {
-        _showVolumeSlider = false;
-        _showBrightnessSlider = false;
-      });
+        setState(() {
+          _showVolumeSlider = false;
+          _showBrightnessSlider = false;
+        });
       }
     });
   }
@@ -110,14 +134,436 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
     _initVolumeAndBrightness();
     _loadVideoTitle();
-    _currentVideoUrl = widget.url ?? widget.mediaUrl; // Initialize current video URL
+    _currentVideoUrl =
+        widget.url ?? widget.mediaUrl; // Initialize current video URL
     _controller = VideoPlayerController.networkUrl(
-      Uri.parse(
-        widget.mediaUrl ??
-            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      ),
+      Uri.parse(_currentVideoUrl ?? ''),
     );
     initializeVid();
+    _initWatchParty();
+  }
+
+  void _initWatchParty() {
+    _watchPartyService.onSyncMessage = (message) {
+      if (!_isDisposed && mounted && !_watchPartyService.isHost) {
+        _handleSyncMessage(message);
+      }
+    };
+
+    // Handle sync from room updates (polling) - for guests
+    _watchPartyService.onRoomUpdate = (room) {
+      if (!_isDisposed && mounted) {
+        if (!_watchPartyService.isHost && _controller.value.isInitialized) {
+          // Don't sync if video is still initializing or already syncing
+          if (_isVideoInitializing || _isSyncing) return;
+
+          // Ensure video has valid duration before syncing
+          final duration = _controller.value.duration;
+          if (duration.inMilliseconds <= 0) return;
+
+          // Check if current video URL matches room video URL
+          // If not, trigger video change to load correct video
+          // IMPORTANT: Always check against room.videoUrl to ensure we get the latest update
+          // Also check widget.url as fallback for initial load
+          final currentUrl =
+              _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+          if (room.videoUrl.isNotEmpty && currentUrl != room.videoUrl) {
+            debugPrint(
+              'VideoPlayer: Guest video mismatch - current: $currentUrl, room: ${room.videoUrl}',
+            );
+            // Video mismatch - load the correct video
+            _loadVideoFromUrl(room.videoUrl, room.videoTitle);
+            return;
+          }
+
+          // Sync play/pause state (only if state actually changed)
+          final currentIsPlaying = _controller.value.isPlaying;
+          if (room.isPlaying != currentIsPlaying) {
+            if (room.isPlaying) {
+              _controller.play();
+            } else {
+              _controller.pause();
+            }
+          }
+
+          // Sync position with position prediction for better accuracy
+          final now = DateTime.now();
+          final currentPosition = _controller.value.position;
+
+          // Calculate predicted host position based on elapsed time since last update
+          Duration predictedHostPosition = room.currentPosition;
+          if (room.isPlaying && room.positionUpdatedAt != null) {
+            final elapsedMs = now
+                .difference(room.positionUpdatedAt!)
+                .inMilliseconds;
+            predictedHostPosition = Duration(
+              milliseconds: room.currentPosition.inMilliseconds + elapsedMs,
+            );
+            // Clamp to video duration
+            if (predictedHostPosition.inMilliseconds >
+                duration.inMilliseconds) {
+              predictedHostPosition = duration;
+            }
+          }
+
+          // Only sync if:
+          // 1. Enough time has passed since last seek (1 second debounce - reduced for better sync)
+          // 2. Position difference is significant (1+ seconds - reduced threshold)
+          // 3. Video is playing OR paused (sync during pauses too for accuracy)
+          // 4. Position actually changed from last sync
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 1000) {
+            // Use predicted position if video is playing, otherwise use actual position
+            final targetPosition = room.isPlaying
+                ? predictedHostPosition
+                : room.currentPosition;
+
+            final positionDiff =
+                (targetPosition.inMilliseconds - currentPosition.inMilliseconds)
+                    .abs();
+
+            // Check if position changed significantly from last synced position
+            final lastSyncedDiff = _lastSyncedPosition != null
+                ? (targetPosition.inMilliseconds -
+                          _lastSyncedPosition!.inMilliseconds)
+                      .abs()
+                : 999999;
+
+            // Only seek if:
+            // - Difference is more than 1 second (reduced threshold for better sync)
+            // - Host position actually changed (not just polling noise)
+            // - Or if this is initial sync (lastSyncedPosition is null)
+            if ((positionDiff > 1000 && lastSyncedDiff > 200) ||
+                _lastSyncedPosition == null) {
+              _isSyncing = true;
+              // Ensure seek position is within valid range
+              final seekPosition = targetPosition.inMilliseconds.clamp(
+                0,
+                duration.inMilliseconds,
+              );
+              _controller.seekTo(Duration(milliseconds: seekPosition));
+              _lastSeekTime = now;
+              _lastSyncedPosition = targetPosition;
+
+              // Reset sync flag after a short delay
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (!_isDisposed && mounted) {
+                  _isSyncing = false;
+                }
+              });
+            } else {
+              // Update last synced position even if we don't seek
+              _lastSyncedPosition = targetPosition;
+            }
+          } else if (!room.isPlaying) {
+            // When paused, just update last synced position
+            _lastSyncedPosition = room.currentPosition;
+          }
+        }
+        // Room is managed by provider
+      }
+    };
+
+    // Chain chat callback to ensure global manager also receives it
+    final existingChatCallback = _watchPartyService.onChatMessage;
+    _watchPartyService.onChatMessage = (message) {
+      // Call existing callback first (from global manager)
+      existingChatCallback?.call(message);
+      // Then show chat notification overlay in video player
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _latestChatMessage = message;
+        });
+        // Auto-hide after animation completes
+        Future.delayed(const Duration(milliseconds: 3300), () {
+          if (!_isDisposed && mounted && _latestChatMessage?.id == message.id) {
+            setState(() {
+              _latestChatMessage = null;
+            });
+          }
+        });
+      }
+    };
+
+    _watchPartyService.onReaction = (reaction) {
+      if (!_isDisposed && mounted) {
+        setState(() {
+          _activeReactions.add(reaction);
+        });
+        // Remove reaction after animation
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!_isDisposed && mounted) {
+            setState(() {
+              _activeReactions.remove(reaction);
+            });
+          }
+        });
+      }
+    };
+
+    // Handle video changes from host
+    _watchPartyService.onVideoChange = (videoUrl, videoTitle) {
+      if (!_isDisposed && mounted && !_watchPartyService.isHost) {
+        // Guest should switch to the new video
+        _loadVideoFromUrl(videoUrl, videoTitle);
+      }
+    };
+  }
+
+  Future<void> _loadVideoFromUrl(String videoUrl, String videoTitle) async {
+    try {
+      // IMPORTANT: Prevent restarting if we're already playing the same video
+      // Check both _currentVideoUrl and widget.url to handle all cases
+      final currentUrl =
+          _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+      if (currentUrl == videoUrl && _controller.value.isInitialized) {
+        debugPrint('VideoPlayer: Already playing $videoUrl, skipping reload');
+        // Just update the title if needed
+        if (_videoTitle != videoTitle) {
+          _videoTitle = videoTitle;
+          if (mounted) {
+            setState(() {});
+          }
+        }
+        // Ensure _currentVideoUrl is set
+        _currentVideoUrl = videoUrl;
+        return;
+      }
+
+      // Update _currentVideoUrl immediately to prevent race conditions
+      _currentVideoUrl = videoUrl;
+
+      // Find the link in storage
+      final allLinks = await StorageService.getSavedLinks();
+      final link = allLinks.firstWhere(
+        (l) => l.url == videoUrl,
+        orElse: () => SavedLink(
+          id: '',
+          url: videoUrl,
+          title: videoTitle,
+          type: LinkParser.parseLinkType(videoUrl) ?? LinkType.unknown,
+          listIds: [],
+          savedAt: DateTime.now(),
+        ),
+      );
+
+      // Check if video can be played in-app
+      if (link.type.canPlayInbuilt) {
+        // Replace current video
+        await _replaceVideo(link);
+      } else {
+        // External link - show message and open externally
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: const Text(
+                'External Video',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Text(
+                'This video cannot be played in the built-in player. Opening externally...',
+                style: TextStyle(color: Colors.grey[300]),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // Open externally
+                    launchUrl(
+                      Uri.parse(videoUrl),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading video from watch party: $e');
+    }
+  }
+
+  void _handleSyncMessage(SyncMessage message) {
+    if (!_controller.value.isInitialized) return;
+
+    // Don't handle sync messages if video is still initializing or already syncing
+    if (_isVideoInitializing || _isSyncing) return;
+
+    // Ensure video has valid duration
+    final duration = _controller.value.duration;
+    if (duration.inMilliseconds <= 0) return;
+
+    // Check if message has room info and verify video URL matches
+    if (message.room != null && message.room!.videoUrl.isNotEmpty) {
+      if (widget.url != message.room!.videoUrl &&
+          _currentVideoUrl != message.room!.videoUrl) {
+        // Video mismatch - load the correct video
+        _loadVideoFromUrl(message.room!.videoUrl, message.room!.videoTitle);
+        return;
+      }
+    }
+
+    switch (message.type) {
+      case SyncMessageType.play:
+        _isSyncing = true;
+        if (message.position != null) {
+          // Ensure position is within valid range
+          final seekPosition = message.position!.inMilliseconds.clamp(
+            0,
+            duration.inMilliseconds,
+          );
+          // Add debounce to prevent rapid seeks
+          final now = DateTime.now();
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+            _controller.seekTo(Duration(milliseconds: seekPosition));
+            _lastSeekTime = now;
+            _lastSyncedPosition = message.position;
+          }
+        }
+        _controller.play();
+        // Reset sync flag after delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!_isDisposed && mounted) {
+            _isSyncing = false;
+          }
+        });
+        break;
+      case SyncMessageType.pause:
+        _controller.pause();
+        break;
+      case SyncMessageType.seek:
+        if (message.position != null) {
+          _isSyncing = true;
+          // Ensure position is within valid range
+          final seekPosition = message.position!.inMilliseconds.clamp(
+            0,
+            duration.inMilliseconds,
+          );
+          // Add debounce to prevent rapid seeks
+          final now = DateTime.now();
+          if (_lastSeekTime == null ||
+              now.difference(_lastSeekTime!).inMilliseconds > 2000) {
+            _controller.seekTo(Duration(milliseconds: seekPosition));
+            _lastSeekTime = now;
+            _lastSyncedPosition = message.position;
+          }
+          // Reset sync flag after delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!_isDisposed && mounted) {
+              _isSyncing = false;
+            }
+          });
+        }
+        break;
+      case SyncMessageType.roomUpdate:
+        // Room updates are handled by provider
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> _showWatchPartyDialog() async {
+    final room = await showDialog<WatchPartyRoom>(
+      context: context,
+      builder: (context) => WatchPartyRoomDialog(
+        videoUrl: widget.url ?? widget.mediaUrl ?? '',
+        videoTitle: _videoTitle ?? 'Video',
+        currentPosition: _controller.value.position,
+        isPlaying: _controller.value.isPlaying,
+      ),
+    );
+
+    if (room != null && mounted) {
+      setState(() {
+        _watchPartyRoom = room;
+        _showWatchParty = true;
+      });
+
+      // Start syncing if host
+      if (_watchPartyService.isHost) {
+        _startHostSync();
+      }
+    }
+  }
+
+  void _startHostSync() {
+    _watchPartySyncTimer?.cancel();
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+
+    // First update with video URL and title when sync starts
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+    if (provider.isHost && provider.isInRoom) {
+      final videoUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+      if (videoUrl.isNotEmpty) {
+        provider.updateRoomState(
+          videoUrl: videoUrl,
+          videoTitle: _videoTitle ?? widget.title ?? 'Video',
+          position: _controller.value.isInitialized
+              ? _controller.value.position
+              : Duration.zero,
+          isPlaying: _controller.value.isInitialized
+              ? _controller.value.isPlaying
+              : false,
+        );
+      }
+    }
+
+    // No longer using continuous sync - sync is now button-based
+    // Auto-sync only happens on video start or when late joiners join
+  }
+
+  /// Manual sync button handler (host only)
+  void _manualSync() {
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    if (!provider.isHost || !provider.isInRoom) return;
+    if (!_controller.value.isInitialized) return;
+
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+    final videoUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+    if (videoUrl.isEmpty) return;
+
+    provider.updateRoomState(
+      position: _controller.value.position,
+      isPlaying: _controller.value.isPlaying,
+      videoUrl: videoUrl,
+      videoTitle: _videoTitle ?? widget.title ?? 'Video',
+    );
+  }
+
+  void _syncPlayPause(bool isPlaying) {
+    if (!_watchPartyService.isInRoom) return;
+
+    if (_watchPartyService.isHost) {
+      _watchPartyService.updateRoomState(isPlaying: isPlaying);
+    } else {
+      // Guest sends command to host
+      _watchPartyService.sendSyncCommand(
+        type: isPlaying ? SyncMessageType.play : SyncMessageType.pause,
+        position: _controller.value.position,
+        isPlaying: isPlaying,
+      );
+    }
+  }
+
+  void _syncSeek(Duration position) {
+    if (!_watchPartyService.isInRoom) return;
+
+    if (_watchPartyService.isHost) {
+      _watchPartyService.updateRoomState(position: position);
+    } else {
+      // Guest sends command to host
+      _watchPartyService.sendSyncCommand(
+        type: SyncMessageType.seek,
+        position: position,
+      );
+    }
   }
 
   Future<void> _loadVideoTitle() async {
@@ -126,7 +572,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
       _videoTitle = widget.title;
       return;
     }
-    
+
     if (widget.url != null) {
       try {
         final allLinks = await StorageService.getSavedLinks();
@@ -141,32 +587,58 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   Future<void> _replaceVideo(SavedLink link) async {
     if (_isDisposed || !mounted) return;
-    
-    // Stop and dispose current controller
+
+    // Mark video as initializing
+    _isVideoInitializing = true;
+    _lastSeekTime = null;
+
+    // Stop and dispose current controller - ensure audio is stopped
     _controller.pause();
+    await Future.delayed(
+      const Duration(milliseconds: 100),
+    ); // Give time for audio to stop
     _controller.removeListener(_videoPlayerListener);
     await _controller.dispose();
-    
+    await Future.delayed(
+      const Duration(milliseconds: 100),
+    ); // Additional delay to ensure cleanup
+
     // Clear ad state
     _adController?.pause();
-    _adController?.dispose();
+    await _adController?.dispose();
     _adController = null;
     _adCountdownTimer?.cancel();
     _adPositions.clear();
     _nextAdIndex = 0;
     _inAdBreak = false;
-    
+
     // Update title and current video URL
     _videoTitle = link.title;
     _currentVideoUrl = link.url;
-    
+
+    // Update watch party room state if host
+    // IMPORTANT: Update BEFORE creating new controller to ensure joiners get the update
+    final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+    if (provider.isHost && provider.isInRoom) {
+      debugPrint(
+        'VideoPlayer: Host changing video to ${link.url}, updating room state',
+      );
+      provider.updateRoomState(
+        videoUrl: link.url,
+        videoTitle: link.title,
+        position: Duration.zero,
+        isPlaying: false,
+      );
+      // _currentVideoUrl is already set above, no need to set again
+    }
+
     // Create new controller
     _controller = VideoPlayerController.networkUrl(Uri.parse(link.url));
     _controller.addListener(_videoPlayerListener);
-    
+
     // Initialize and play
     initializeVid();
-    
+
     if (mounted) {
       setState(() {
         _showControls = true;
@@ -178,63 +650,151 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     if (_isDisposed || !mounted) return;
 
     _controller
-      ..initialize()
-          .then((_) {
-            if (_isDisposed || !mounted) return;
-        // Calculate ad positions 10%, 25, 50%, 80%
-        final totalDuration = _controller.value.duration;
+        .initialize()
+        .then((_) {
+          if (_isDisposed || !mounted) return;
+          // Calculate ad positions 10%, 25, 50%, 80%
+          final totalDuration = _controller.value.duration;
 
-            if (totalDuration.inMilliseconds > 0) {
-              if (mounted) {
-        setState(() {
-          _adPositions.addAll([
-            Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.1)
-                          .toInt(),
-            ),
-            Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.25)
-                          .toInt(),
-            ),
-            Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.5)
-                          .toInt(),
-            ),
-            Duration(
-                      milliseconds: (totalDuration.inMilliseconds * 0.8)
-                          .toInt(),
-            ),
-          ]);
+          if (totalDuration.inMilliseconds > 0) {
+            if (mounted) {
+              setState(() {
+                _adPositions.addAll([
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.1).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.25).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.5).toInt(),
+                  ),
+                  Duration(
+                    milliseconds: (totalDuration.inMilliseconds * 0.8).toInt(),
+                  ),
+                ]);
 
-                  // If initial position is provided, seek to it
-                  if (widget.initialPosition != null) {
-                    final seekPosition = Duration(
-                      milliseconds: widget.initialPosition!.inMilliseconds
-                          .clamp(0, totalDuration.inMilliseconds),
-                    );
-                    _controller.seekTo(seekPosition);
-                  }
+                // If initial position is provided, seek to it
+                if (widget.initialPosition != null) {
+                  final seekPosition = Duration(
+                    milliseconds: widget.initialPosition!.inMilliseconds.clamp(
+                      0,
+                      totalDuration.inMilliseconds,
+                    ),
+                  );
+                  _controller.seekTo(seekPosition);
+                }
 
-          _controller.play();
+                _controller.play();
 
-                  // Auto-enter PiP if requested
-                  if (widget.autoEnterPiP && mounted && !_isDisposed) {
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      if (mounted && !_isDisposed && _controller.value.isInitialized) {
-                        _enterPiPMode();
+                // Update watch party room state if host (when video initializes)
+                // IMPORTANT: Use _currentVideoUrl instead of widget.url to ensure we use the correct video
+                // This prevents reverting to old video when host changes video from content list
+                final provider = Provider.of<WatchPartyProvider>(
+                  context,
+                  listen: false,
+                );
+                if (provider.isHost &&
+                    provider.isInRoom &&
+                    _currentVideoUrl != null &&
+                    _currentVideoUrl!.isNotEmpty) {
+                  // Only update if the current video URL matches what we just initialized
+                  // This prevents race conditions where old video URL might be used
+                  provider.updateRoomState(
+                    videoUrl: _currentVideoUrl!,
+                    videoTitle: _videoTitle ?? widget.title ?? 'Video',
+                    position: Duration.zero,
+                    isPlaying: true,
+                  );
+                  // Host: mark as initialized immediately
+                  _isVideoInitializing = false;
+                } else if (!provider.isHost && provider.isInRoom) {
+                  // Guest: auto-sync to host's position for late joiners when video initializes
+                  Future.delayed(const Duration(milliseconds: 800), () {
+                    if (!_isDisposed && mounted) {
+                      _isVideoInitializing = false;
+                      // Now sync to host's position if available
+                      // IMPORTANT: Use _currentVideoUrl to match the video we just loaded
+                      final room = provider.currentRoom;
+                      if (room != null &&
+                          _currentVideoUrl != null &&
+                          room.videoUrl == _currentVideoUrl) {
+                        final duration = _controller.value.duration;
+                        if (duration.inMilliseconds > 0) {
+                          // Calculate predicted position for late joiners
+                          Duration targetPosition = room.currentPosition;
+                          if (room.isPlaying &&
+                              room.positionUpdatedAt != null) {
+                            final now = DateTime.now();
+                            final elapsedMs = now
+                                .difference(room.positionUpdatedAt!)
+                                .inMilliseconds;
+                            targetPosition = Duration(
+                              milliseconds:
+                                  (room.currentPosition.inMilliseconds +
+                                          elapsedMs)
+                                      .clamp(0, duration.inMilliseconds),
+                            );
+                          }
+
+                          final seekPosition = targetPosition.inMilliseconds
+                              .clamp(0, duration.inMilliseconds);
+                          _controller.seekTo(
+                            Duration(milliseconds: seekPosition),
+                          );
+                          if (room.isPlaying) {
+                            _controller.play();
+                          } else {
+                            _controller.pause();
+                          }
+                          _lastSeekTime = DateTime.now();
+                          _lastSyncedPosition = targetPosition;
+                        }
+                      } else if (room != null &&
+                          room.videoUrl.isNotEmpty &&
+                          room.videoUrl != widget.url &&
+                          room.videoUrl != _currentVideoUrl) {
+                        // Video URL mismatch - load the correct video
+                        _loadVideoFromUrl(room.videoUrl, room.videoTitle);
                       }
-                    });
-                  }
-                });
-              }
+                    }
+                  });
+                }
+
+                // Auto-sync on first video start (host only)
+                // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+                if (provider.isHost &&
+                    provider.isInRoom &&
+                    _currentVideoUrl != null &&
+                    _currentVideoUrl!.isNotEmpty) {
+                  provider.updateRoomState(
+                    videoUrl: _currentVideoUrl!,
+                    videoTitle: _videoTitle ?? widget.title ?? 'Video',
+                    position: _controller.value.position,
+                    isPlaying: _controller.value.isPlaying,
+                  );
+                }
+
+                // Auto-enter PiP if requested
+                if (widget.autoEnterPiP && mounted && !_isDisposed) {
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    if (mounted &&
+                        !_isDisposed &&
+                        _controller.value.isInitialized) {
+                      _enterPiPMode();
+                    }
+                  });
+                }
+              });
             }
-          })
-          .catchError((error) {
-        // Handle initialization errors
-            if (!_isDisposed && mounted) {
-        _handleVideoError(error);
-            }
-          });
+          }
+        })
+        .catchError((error) {
+          // Handle initialization errors
+          if (!_isDisposed && mounted) {
+            _handleVideoError(error);
+          }
+        });
 
     // Listen for video player errors - optimized to avoid unnecessary setState
     _controller.addListener(_videoPlayerListener);
@@ -243,13 +803,13 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   void _videoPlayerListener() {
     if (_isDisposed || !mounted) return;
 
-      if (_controller.value.hasError) {
-        _handleVideoError(_controller.value.errorDescription);
-      } else {
-        /// trigger ad break
-        _onMainVideoUpdate();
+    if (_controller.value.hasError) {
+      _handleVideoError(_controller.value.errorDescription);
+    } else {
+      /// trigger ad break
+      _onMainVideoUpdate();
       // Note: Removed setState here - UI updates via ValueListenableBuilder
-      }
+    }
   }
 
   void _handleVideoError(dynamic error) {
@@ -280,7 +840,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
               onPressed: () async {
                 Navigator.pop(context); // Close dialog
                 Navigator.pop(context); // Close video player
-                
+
                 // Open in external player
                 if (widget.onError != null) {
                   widget.onError!();
@@ -307,6 +867,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
   }
 
   void _onMainVideoUpdate() {
+    // Only trigger ads if ads are enabled
+    if (!widget.adsEnabled) return;
+
     if (!_inAdBreak &&
         _nextAdIndex < _adPositions.length &&
         _controller.value.position >= _adPositions[_nextAdIndex]) {
@@ -336,11 +899,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
             if (_isDisposed || !mounted) return;
 
             if (mounted) {
-        setState(() {
-          _adController!.play();
-          _adSecondsRemaining = 30; // Set ad duration to 30 seconds
-          // _adSecondsRemaining = _adController!.value.duration.inSeconds;
-        });
+              setState(() {
+                _adController!.play();
+                _adSecondsRemaining = 30; // Set ad duration to 30 seconds
+                // _adSecondsRemaining = _adController!.value.duration.inSeconds;
+              });
             }
 
             _adCountdownTimer = Timer.periodic(const Duration(seconds: 1), (
@@ -351,21 +914,21 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 return;
               }
               if (mounted) {
-          setState(() {
-            _adSecondsRemaining--;
-          });
+                setState(() {
+                  _adSecondsRemaining--;
+                });
               }
-          if (_adSecondsRemaining <= 0) {
-            _endAdBreak();
-          }
-        });
+              if (_adSecondsRemaining <= 0) {
+                _endAdBreak();
+              }
+            });
           })
           .catchError((error) {
             // If ad fails to load, end ad break immediately and resume video
             if (!_isDisposed && mounted) {
               _endAdBreak();
             }
-      });
+          });
 
     _nextAdIndex++;
   }
@@ -377,11 +940,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _adController = null;
 
     if (!_isDisposed && mounted) {
-    setState(() {
-      _inAdBreak = false;
-      _showControls = true;
-    });
-    _controller.play();
+      setState(() {
+        _inAdBreak = false;
+        _showControls = true;
+      });
+      _controller.play();
     }
   }
 
@@ -391,13 +954,29 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _sliderHideTimer?.cancel();
     _hideTimer?.cancel();
     _adCountdownTimer?.cancel();
+    _watchPartySyncTimer?.cancel();
+
+    // Update watch party room state if host (set video URL to empty when closing)
+    try {
+      final provider = Provider.of<WatchPartyProvider>(context, listen: false);
+      if (provider.isHost && provider.isInRoom) {
+        provider.updateRoomState(
+          videoUrl: '',
+          videoTitle: '',
+          position: Duration.zero,
+          isPlaying: false,
+        );
+      }
+    } catch (e) {
+      // Context might not be available, ignore
+    }
 
     // Only remove PiP overlay if not in PiP mode (to prevent closing PiP when route is popped)
     if (!_isInPiP) {
       _pipOverlayEntry?.remove();
       _pipOverlayEntry = null;
       _controller.removeListener(_videoPlayerListener);
-    _controller.dispose();
+      _controller.dispose();
     } else {
       // In PiP mode, keep the controller alive but remove listener
       // The overlay will handle cleanup when PiP is exited
@@ -533,7 +1112,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 10,
                         spreadRadius: 2,
                       ),
@@ -598,7 +1177,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
+                                    color: Colors.black.withValues(alpha: 0.7),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -617,7 +1196,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
+                                    color: Colors.black.withValues(alpha: 0.7),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -647,7 +1226,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.7),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
@@ -748,7 +1329,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
             SystemChrome.setPreferredOrientations([
               DeviceOrientation.portraitUp,
             ]);
-          SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.leanBack);
           }
         }
       },
@@ -756,150 +1337,230 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
         extendBodyBehindAppBar: true,
         body: SizedBox.expand(
           child: Stack(
-          children: [
-            if (_inAdBreak &&
-                _adController != null &&
-                _adController!.value.isInitialized)
+            children: [
+              if (_inAdBreak &&
+                  _adController != null &&
+                  _adController!.value.isInitialized)
                 _buildVideoPlayer(_adController!)
-            else if (!_inAdBreak && _controller.value.isInitialized)
+              else if (!_inAdBreak && _controller.value.isInitialized)
                 _buildVideoPlayer(_controller)
-            else
-              const Center(child: CircularProgressIndicator()),
+              else
+                const Center(child: CircularProgressIndicator()),
 
-            // Black overlay
-            if (_showControls)
-              const Positioned.fill(child: SharedControlsOverlay()),
-            if (_inAdBreak)
-              SharedAdCountdownOverlay(secondsRemaining: _adSecondsRemaining),
+              // Black overlay
+              if (_showControls)
+                const Positioned.fill(child: SharedControlsOverlay()),
+              if (_inAdBreak)
+                SharedAdCountdownOverlay(secondsRemaining: _adSecondsRemaining),
 
-            if (!_inAdBreak) ...[
-              SharedGestureDetectorOverlay(
-                onTap: () {
-                  if (!_isDisposed && mounted) {
-                    setState(() {
-                      _showControls = !_showControls;
-                    });
-                  }
-                },
-                onDoubleTap: (isRight) {
-                  if (!_isDisposed && mounted) {
-                    if (isRight) {
+              if (!_inAdBreak) ...[
+                SharedGestureDetectorOverlay(
+                  onTap: () {
+                    if (!_isDisposed && mounted) {
+                      setState(() {
+                        _showControls = !_showControls;
+                      });
+                    }
+                  },
+                  onDoubleTap: (isRight) {
+                    if (!_isDisposed && mounted) {
+                      if (isRight) {
+                        _controller.seekTo(
+                          _controller.value.position +
+                              const Duration(seconds: 10),
+                        );
+                      } else {
+                        _controller.seekTo(
+                          _controller.value.position -
+                              const Duration(seconds: 10),
+                        );
+                      }
+                    }
+                  },
+                  onHorizontalDrag: (delta) {
+                    if (!_isDisposed && mounted) {
                       _controller.seekTo(
                         _controller.value.position +
-                            const Duration(seconds: 10),
-                      );
-                    } else {
-                      _controller.seekTo(
-                        _controller.value.position -
-                            const Duration(seconds: 10),
+                            Duration(milliseconds: (delta * 1000).toInt()),
                       );
                     }
-                  }
-                },
-                onHorizontalDrag: (delta) {
-                  if (!_isDisposed && mounted) {
-                    _controller.seekTo(
-                      _controller.value.position +
-                          Duration(milliseconds: (delta * 1000).toInt()),
-                    );
-                  }
-                },
-                onVerticalDrag: (isRight, delta) {
-                  if (isRight) {
-                    // Volume
-                    _volume = (_volume + delta).clamp(0.0, 1.0);
-                    FlutterVolumeController.updateShowSystemUI(false);
-                    FlutterVolumeController.setVolume(_volume);
-                    _showSliderOverlay(isVolume: true);
-                  } else {
-                    // Brightness
-                    _brightness = (_brightness + delta).clamp(0.0, 1.0);
-                    ScreenBrightness.instance.setApplicationScreenBrightness(
-                      _brightness,
-                    );
-                    _showSliderOverlay(isVolume: false);
-                  }
-                },
-              ),
-              if (_showBrightnessSlider || (_showControls && !_isLocked))
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: SharedBrightnessOverlay(brightness: _brightness),
-                  ),
-                ),
-              if (_showVolumeSlider || (_showControls && !_isLocked))
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: SharedVolumeOverlay(volume: _volume),
-                  ),
-                ),
-              SharedVideoAppBar(
-                title: _videoTitle,
-                showControls: _showControls,
-                isLocked: _isLocked,
-                onLockToggle: () {
-                  if (!_isDisposed && mounted) {
-                    setState(() {
-                      _isLocked = !_isLocked;
-                    });
-                  }
-                },
-              ),
-              if (_showControls && !_isLocked)
-                ValueListenableBuilder<VideoPlayerValue>(
-                  valueListenable: _controller,
-                  builder: (context, value, child) {
-                    return SharedPlayPauseControlBar(
-                      isPlaying: value.isPlaying,
-                      onPlayPause: () {
-                        if (value.isPlaying) {
-                          _controller.pause();
-                        } else {
-                          _controller.play();
-                        }
-                      },
-                      onSkipBackward: () {
-                        if (!_isDisposed && mounted) {
-                          _controller.seekTo(
-                            _controller.value.position -
-                                const Duration(seconds: 10),
-                          );
-                        }
-                      },
-                      onSkipForward: () {
-                        if (!_isDisposed && mounted) {
-                          _controller.seekTo(
-                            _controller.value.position +
-                                const Duration(seconds: 10),
-                          );
-                        }
-                      },
-                    );
+                  },
+                  onVerticalDrag: (isRight, delta) {
+                    if (isRight) {
+                      // Volume
+                      _volume = (_volume + delta).clamp(0.0, 1.0);
+                      FlutterVolumeController.updateShowSystemUI(false);
+                      FlutterVolumeController.setVolume(_volume);
+                      _showSliderOverlay(isVolume: true);
+                    } else {
+                      // Brightness
+                      _brightness = (_brightness + delta).clamp(0.0, 1.0);
+                      ScreenBrightness.instance.setApplicationScreenBrightness(
+                        _brightness,
+                      );
+                      _showSliderOverlay(isVolume: false);
+                    }
                   },
                 ),
-              if (_showControls && !_isLocked)
-                Positioned(
-                  bottom: 0,
-                  child: ControlBar(formatTime: _formatTime),
+                if (_showBrightnessSlider || (_showControls && !_isLocked))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: SharedBrightnessOverlay(brightness: _brightness),
+                    ),
+                  ),
+                if (_showVolumeSlider || (_showControls && !_isLocked))
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: SharedVolumeOverlay(volume: _volume),
+                    ),
+                  ),
+                SharedVideoAppBar(
+                  title: _videoTitle,
+                  showControls: _showControls,
+                  isLocked: _isLocked,
+                  onLockToggle: () {
+                    if (!_isDisposed && mounted) {
+                      setState(() {
+                        _isLocked = !_isLocked;
+                      });
+                    }
+                  },
                 ),
-              if (_showControls && _showEpisodeList && !_isLocked)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: ListContentOverlay(
-                    url: _currentVideoUrl ?? widget.url ?? widget.mediaUrl,
-                    listIds: widget.listIds,
+                if (_showControls && !_isLocked)
+                  ValueListenableBuilder<VideoPlayerValue>(
+                    valueListenable: _controller,
+                    builder: (context, value, child) {
+                      return SharedPlayPauseControlBar(
+                        isPlaying: value.isPlaying,
+                        onPlayPause: () {
+                          if (value.isPlaying) {
+                            _controller.pause();
+                            _syncPlayPause(false);
+                          } else {
+                            _controller.play();
+                            _syncPlayPause(true);
+                          }
+                        },
+                        onSkipBackward: () {
+                          if (!_isDisposed && mounted) {
+                            final newPosition =
+                                _controller.value.position -
+                                const Duration(seconds: 10);
+                            _controller.seekTo(newPosition);
+                            _syncSeek(newPosition);
+                          }
+                        },
+                        onSkipForward: () {
+                          if (!_isDisposed && mounted) {
+                            final newPosition =
+                                _controller.value.position +
+                                const Duration(seconds: 10);
+                            _controller.seekTo(newPosition);
+                            _syncSeek(newPosition);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                if (_showControls && !_isLocked)
+                  Consumer<WatchPartyProvider>(
+                    builder: (context, provider, child) {
+                      return Positioned(
+                        bottom: 0,
+                        child: ControlBar(
+                          formatTime: _formatTime,
+                          onSync: provider.isHost && provider.isInRoom
+                              ? _manualSync
+                              : null,
+                        ),
+                      );
+                    },
+                  ),
+                if (_showControls && _showEpisodeList && !_isLocked)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: ListContentOverlay(
+                      url: _currentVideoUrl ?? widget.url ?? widget.mediaUrl,
+                      listIds: widget.listIds,
+                    ),
+                  ),
+                Consumer<WatchPartyProvider>(
+                  builder: (context, provider, child) {
+                    if (_showControls &&
+                        _showWatchParty &&
+                        provider.isInRoom &&
+                        !_isLocked) {
+                      return Positioned(
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        left: 0,
+                        child: WatchPartyParticipantsOverlay(
+                          room: provider.currentRoom!,
+                          isHost: provider.isHost,
+                          onClose: () {
+                            debugPrint(
+                              'WatchParty: Video player overlay onClose called',
+                            );
+                            if (mounted) {
+                              setState(() {
+                                _showWatchParty = false;
+                              });
+                            }
+                            // Don't hide the indicator - just close the overlay
+                            // The indicator should remain visible as long as we're in a room
+                          },
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                // Show active reactions on video
+                ..._activeReactions.map(
+                  (reaction) => WatchPartyReactionOverlay(
+                    reaction: reaction,
+                    onComplete: () {
+                      if (mounted) {
+                        setState(() {
+                          _activeReactions.remove(reaction);
+                        });
+                      }
+                    },
                   ),
                 ),
+                // Show chat notification overlay
+                if (_latestChatMessage != null)
+                  Positioned(
+                    top: 60,
+                    left: 0,
+                    right: 0,
+                    child: WatchPartyChatNotification(
+                      message: _latestChatMessage!,
+                      onTap: () {
+                        setState(() {
+                          _showWatchParty = true;
+                        });
+                      },
+                      onComplete: () {
+                        if (mounted) {
+                          setState(() {
+                            _latestChatMessage = null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+              ],
             ],
-                  ],
-                ),
-              ),
+          ),
+        ),
       ),
     );
   }
@@ -907,8 +1568,9 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
 class ControlBar extends StatefulWidget {
   final String Function(Duration) formatTime;
+  final VoidCallback? onSync;
 
-  const ControlBar({super.key, required this.formatTime});
+  const ControlBar({super.key, required this.formatTime, this.onSync});
 
   @override
   ControlBarState createState() => ControlBarState();
@@ -933,169 +1595,209 @@ class ControlBarState extends State<ControlBar> {
         final isInitialized =
             value.isInitialized && duration.inMilliseconds > 0;
 
-    // compute slider values
-    final maxMillis = duration.inMilliseconds.toDouble();
-    final currentMillis = _isDragging
-        ? _dragValue
+        // compute slider values
+        final maxMillis = duration.inMilliseconds.toDouble();
+        final currentMillis = _isDragging
+            ? _dragValue
             : position.inMilliseconds
                   .clamp(0, duration.inMilliseconds)
                   .toDouble();
 
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      child: Column(
-        children: [
-          // Progress + times
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                // current time
-                Text(
-                      isInitialized ? widget.formatTime(position) : '00:00:00',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(width: 5),
-
-                // slider progress bar with thumb
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 15,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 12,
-                      ),
-                      thumbColor: Colors.amber,
-                      activeTrackColor: Colors.amber,
-                      inactiveTrackColor: Colors.grey,
-                      overlayColor: Colors.amber.withValues(alpha: 0.2),
-                    ),
-                    child: Slider(
-                      min: 0,
-                      max: maxMillis > 0 ? maxMillis : 1,
-                      value: currentMillis,
-                      onChangeStart: (v) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragValue = v;
-                        });
-                      },
-                      onChanged: (v) {
-                        setState(() {
-                          _dragValue = v;
-                        });
-                      },
-                      onChangeEnd: (v) {
-                            controller.seekTo(
-                              Duration(milliseconds: v.toInt()),
-                            );
-                        setState(() {
-                          _isDragging = false;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 5),
-                // total time
-                Text(
-                      isInitialized ? widget.formatTime(duration) : '00:00:00',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
-          Padding(
-            padding: const EdgeInsets.only(left: 18.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // speed menu...
-                PopupMenuButton<double>(
-                  color: Colors.black,
-                      initialValue: value.playbackSpeed,
-                  onSelected: (s) => controller.setPlaybackSpeed(s),
-                  itemBuilder: (_) {
-                    const textStyle = TextStyle(
-                      fontSize: 15,
-                      color: Colors.white,
-                    );
-                    return const [
-                      PopupMenuItem(
-                        value: 0.5,
-                        child: Text("0.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.0,
-                        child: Text("1.0x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 1.5,
-                        child: Text("1.5x", style: textStyle),
-                      ),
-                      PopupMenuItem(
-                        value: 2.0,
-                        child: Text("2.0x", style: textStyle),
-                      ),
-                    ];
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.speed, color: Colors.white),
-                      const SizedBox(width: 5),
-                      const Text(
-                        "Speed ",
-                        style: TextStyle(color: Colors.white, fontSize: 15),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                            "(${value.playbackSpeed}x)",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // episode, settings, PiP, fullscreen...
-                Row(
+        return SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: Column(
+            children: [
+              // Progress + times
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
                   children: [
-                    TextButton.icon(
-                      icon: Icon(
-                        Icons.playlist_play,
-                        color: state._showEpisodeList
-                            ? Colors.amber
-                            : Colors.white,
+                    // current time
+                    Text(
+                      isInitialized ? widget.formatTime(position) : '00:00:00',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      label: Text(
-                        "List Content",
-                        style: TextStyle(
-                          color: state._showEpisodeList
-                              ? Colors.amber
-                              : Colors.white,
+                    ),
+                    const SizedBox(width: 5),
+
+                    // slider progress bar with thumb
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 15,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 12,
+                          ),
+                          thumbColor: Colors.amber,
+                          activeTrackColor: Colors.amber,
+                          inactiveTrackColor: Colors.grey,
+                          overlayColor: Colors.amber.withValues(alpha: 0.2),
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: maxMillis > 0 ? maxMillis : 1,
+                          value: currentMillis,
+                          onChangeStart: (v) {
+                            setState(() {
+                              _isDragging = true;
+                              _dragValue = v;
+                            });
+                          },
+                          onChanged: (v) {
+                            setState(() {
+                              _dragValue = v;
+                            });
+                          },
+                          onChangeEnd: (v) {
+                            final seekPosition = Duration(
+                              milliseconds: v.toInt(),
+                            );
+                            controller.seekTo(seekPosition);
+                            state._syncSeek(seekPosition);
+                            setState(() {
+                              _isDragging = false;
+                            });
+                          },
                         ),
                       ),
+                    ),
+
+                    const SizedBox(width: 5),
+                    // total time
+                    Text(
+                      isInitialized ? widget.formatTime(duration) : '00:00:00',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // the rest of your controls (speed, episode, fullscreen, etc.) unchanged...
+              Padding(
+                padding: const EdgeInsets.only(left: 18.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Sync button (host only in watch party)
+                    if (widget.onSync != null)
+                      IconButton(
+                        onPressed: widget.onSync,
+                        icon: const Icon(Icons.sync, color: Colors.amber),
+                        tooltip: 'Sync time for all participants',
+                      ),
+                    // speed menu...
+                    PopupMenuButton<double>(
+                      color: Colors.black,
+                      initialValue: value.playbackSpeed,
+                      onSelected: (s) => controller.setPlaybackSpeed(s),
+                      itemBuilder: (_) {
+                        const textStyle = TextStyle(
+                          fontSize: 15,
+                          color: Colors.white,
+                        );
+                        return const [
+                          PopupMenuItem(
+                            value: 0.5,
+                            child: Text("0.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.0,
+                            child: Text("1.0x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 1.5,
+                            child: Text("1.5x", style: textStyle),
+                          ),
+                          PopupMenuItem(
+                            value: 2.0,
+                            child: Text("2.0x", style: textStyle),
+                          ),
+                        ];
+                      },
+                      child: Row(
+                        children: [
+                          Icon(Icons.speed, color: Colors.white),
+                          const SizedBox(width: 5),
+                          const Text(
+                            "Speed ",
+                            style: TextStyle(color: Colors.white, fontSize: 15),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "(${value.playbackSpeed}x)",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // episode, settings, PiP, fullscreen...
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          icon: Icon(
+                            Icons.playlist_play,
+                            color: state._showEpisodeList
+                                ? Colors.amber
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            "List Content",
+                            style: TextStyle(
+                              color: state._showEpisodeList
+                                  ? Colors.amber
+                                  : Colors.white,
+                            ),
+                          ),
                           onPressed: () {
                             if (state.mounted) {
                               state.setState(
                                 () => state._showEpisodeList = true,
                               );
+                            }
+                          },
+                        ),
+                        TextButton.icon(
+                          icon: Icon(
+                            Icons.people,
+                            color: state._watchPartyRoom != null
+                                ? Colors.amber
+                                : Colors.white,
+                          ),
+                          label: Text(
+                            "Watch Party",
+                            style: TextStyle(
+                              color: state._watchPartyRoom != null
+                                  ? Colors.amber
+                                  : Colors.white,
+                            ),
+                          ),
+                          onPressed: () {
+                            if (state.mounted) {
+                              final provider = Provider.of<WatchPartyProvider>(
+                                context,
+                                listen: false,
+                              );
+                              if (provider.isInRoom) {
+                                state.setState(
+                                  () => state._showWatchParty = true,
+                                );
+                              } else {
+                                state._showWatchPartyDialog();
+                              }
                             }
                           },
                         ),
@@ -1191,8 +1893,8 @@ class ControlBarState extends State<ControlBar> {
                               ),
                             ),
                           ],
-                    ),
-                    IconButton(
+                        ),
+                        IconButton(
                           onPressed: () {
                             if (state._isInPiP) {
                               state._exitPiPMode();
@@ -1200,36 +1902,36 @@ class ControlBarState extends State<ControlBar> {
                               state._enterPiPMode();
                             }
                           },
-                      icon: Icon(
+                          icon: Icon(
                             state._isInPiP
                                 ? Icons.picture_in_picture_outlined
                                 : Icons.picture_in_picture_alt_rounded,
                             color: state._isInPiP ? Colors.amber : Colors.white,
                           ),
                           tooltip: state._isInPiP ? 'Exit PiP' : 'Enter PiP',
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.fullscreen_exit,
-                        color: Colors.white,
-                      ),
-                      onPressed: () {
-                        SystemChrome.setPreferredOrientations([
-                          DeviceOrientation.portraitUp,
-                        ]);
-                        SystemChrome.setEnabledSystemUIMode(
-                          SystemUiMode.leanBack,
-                        );
-                        Navigator.pop(context);
-                      },
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.fullscreen_exit,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            SystemChrome.setPreferredOrientations([
+                              DeviceOrientation.portraitUp,
+                            ]);
+                            SystemChrome.setEnabledSystemUIMode(
+                              SystemUiMode.leanBack,
+                            );
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
@@ -1252,9 +1954,9 @@ class GestureDetectorOverlay extends StatelessWidget {
 
       state._hideTimer = Timer(Duration(seconds: 3), () {
         if (!state._isDisposed && state.mounted) {
-        state.setState(() {
-          state._showControls = false;
-        });
+          state.setState(() {
+            state._showControls = false;
+          });
         }
       });
     }
@@ -1265,7 +1967,7 @@ class GestureDetectorOverlay extends StatelessWidget {
         state._showControls = !state._showControls;
       });
 
-      // TODO: Uncomment this to hide controls after a delay
+      // Uncomment this to hide controls after a delay
       // if (state._showControls) {
       //   _startHideTimer(); // Start or reset timer when controls are shown
       // } else {
@@ -1277,20 +1979,20 @@ class GestureDetectorOverlay extends StatelessWidget {
       onTap: toggleControls,
       onDoubleTapDown: (d) {
         if (state._isDisposed || !state.mounted) return;
-          final width = MediaQuery.of(context).size.width;
-          final isRight = d.localPosition.dx > width / 2;
+        final width = MediaQuery.of(context).size.width;
+        final isRight = d.localPosition.dx > width / 2;
 
-          if (isRight) {
-            // Skip forward 10 seconds
-            state._controller.seekTo(
-              state._controller.value.position + Duration(seconds: 10),
-            );
-          } else {
-            // Skip backward 10 seconds
-            state._controller.seekTo(
-              state._controller.value.position - Duration(seconds: 10),
-            );
-          }
+        if (isRight) {
+          // Skip forward 10 seconds
+          state._controller.seekTo(
+            state._controller.value.position + Duration(seconds: 10),
+          );
+        } else {
+          // Skip backward 10 seconds
+          state._controller.seekTo(
+            state._controller.value.position - Duration(seconds: 10),
+          );
+        }
       },
       onHorizontalDragUpdate: (d) {
         if (state._isDisposed || !state.mounted) return;
@@ -1352,9 +2054,9 @@ class PlayPauseControlBar extends StatelessWidget {
                   icon: Icon(Icons.replay_10_rounded, color: Colors.white),
                   onPressed: () {
                     if (!state._isDisposed && state.mounted) {
-                    controller.seekTo(
-                      controller.value.position - const Duration(seconds: 10),
-                    );
+                      controller.seekTo(
+                        controller.value.position - const Duration(seconds: 10),
+                      );
                     }
                   },
                 ),
@@ -1388,10 +2090,10 @@ class PlayPauseControlBar extends StatelessWidget {
                   icon: Icon(Icons.forward_10_rounded, color: Colors.white),
                   onPressed: () {
                     if (!state._isDisposed && state.mounted) {
-                    state._controller.seekTo(
+                      state._controller.seekTo(
                         state._controller.value.position +
                             Duration(seconds: 10),
-                    );
+                      );
                     }
                   },
                 ),
@@ -1408,11 +2110,7 @@ class ListContentOverlay extends StatefulWidget {
   final String? url;
   final List<String>? listIds;
 
-  const ListContentOverlay({
-    super.key,
-    this.url,
-    this.listIds,
-  });
+  const ListContentOverlay({super.key, this.url, this.listIds});
 
   @override
   State<ListContentOverlay> createState() => _ListContentOverlayState();
@@ -1437,7 +2135,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
     try {
       // Get all lists
       final allLists = await StorageService.getUserLists();
-      
+
       // Get list IDs for current video
       List<String> targetListIds = widget.listIds ?? [];
       if (targetListIds.isEmpty && widget.url != null) {
@@ -1451,14 +2149,14 @@ class _ListContentOverlayState extends State<ListContentOverlay>
           targetListIds = [StorageService.defaultListId];
         }
       }
-      
+
       if (targetListIds.isEmpty) {
         targetListIds = [StorageService.defaultListId];
       }
 
       // Show ALL lists, not just those containing this video
       _lists = allLists;
-      
+
       // Find the index of the first list that contains this video (for default selection)
       // Prioritize the primary list (first in targetListIds)
       int defaultTabIndex = 0;
@@ -1521,8 +2219,9 @@ class _ListContentOverlayState extends State<ListContentOverlay>
   }
 
   void _playVideo(SavedLink link) {
-    final state = context.findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
-    
+    final state = context
+        .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+
     // If it's a video that can play in the same player, replace the current video
     if (link.type.canPlayInbuilt) {
       state._replaceVideo(link);
@@ -1533,17 +2232,16 @@ class _ListContentOverlayState extends State<ListContentOverlay>
       // For other types, navigate to detail page
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => VideoDetailScreen(link: link),
-        ),
+        MaterialPageRoute(builder: (context) => VideoDetailScreen(link: link)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = context.findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
-    
+    final state = context
+        .findAncestorStateOfType<_RSNewVideoPlayerScreenState>()!;
+
     if (_isLoading) {
       return Container(
         width: MediaQuery.of(context).size.width / 2,
@@ -1611,7 +2309,7 @@ class _ListContentOverlayState extends State<ListContentOverlay>
               ],
             ),
           ),
-          
+
           // Tab Bar
           if (_tabController != null)
             TabBar(
@@ -1650,12 +2348,13 @@ class _ListContentOverlayState extends State<ListContentOverlay>
               }).toList(),
               indicator: const BoxDecoration(),
             ),
-          
+
           const SizedBox(height: 5),
-          
+
           // Videos List
           Expanded(
-            child: _listVideos.isEmpty || _selectedTabIndex >= _listVideos.length
+            child:
+                _listVideos.isEmpty || _selectedTabIndex >= _listVideos.length
                 ? const Center(
                     child: Text(
                       'No videos in this list',
@@ -1666,15 +2365,23 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                     itemCount: _listVideos[_selectedTabIndex].length,
                     itemBuilder: (context, index) {
                       final video = _listVideos[_selectedTabIndex][index];
-                      final isCurrentVideo = widget.url != null &&
-                          video.url == widget.url;
-                      
+                      final isCurrentVideo =
+                          widget.url != null && video.url == widget.url;
+
                       return GestureDetector(
                         onTap: () => _playVideo(video),
                         child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 0),
-                          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 12),
-                          color: isCurrentVideo ? Colors.amber.withOpacity(0.2) : Colors.transparent,
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 0,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 12,
+                          ),
+                          color: isCurrentVideo
+                              ? Colors.amber.withValues(alpha: 0.2)
+                              : Colors.transparent,
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1692,7 +2399,9 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                       width: 50,
                                       height: 35,
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
@@ -1709,7 +2418,8 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                 child: Padding(
                                   padding: const EdgeInsets.only(left: 8.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: [
                                       Text(
@@ -1724,7 +2434,8 @@ class _ListContentOverlayState extends State<ListContentOverlay>
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      if (video.description != null && video.description!.isNotEmpty) ...[
+                                      if (video.description != null &&
+                                          video.description!.isNotEmpty) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           video.description!,

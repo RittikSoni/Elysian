@@ -47,19 +47,19 @@ class _MultiListPickerState extends State<MultiListPicker> {
   Future<void> _loadLists() async {
     setState(() => _isLoading = true);
     final lists = await StorageService.getUserLists();
-    
+
     // Sort lists: selected ones first, then alphabetically
     lists.sort((a, b) {
       final aSelected = _selectedListIds.contains(a.id);
       final bSelected = _selectedListIds.contains(b.id);
-      
+
       if (aSelected && !bSelected) return -1;
       if (!aSelected && bSelected) return 1;
-      
+
       // Both selected or both not selected - sort alphabetically
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
-    
+
     setState(() {
       _lists = lists;
       _isLoading = false;
@@ -76,18 +76,18 @@ class _MultiListPickerState extends State<MultiListPicker> {
       } else {
         _selectedListIds.add(listId);
       }
-      
+
       // Re-sort with selected lists on top
       _lists.sort((a, b) {
         final aSelected = _selectedListIds.contains(a.id);
         final bSelected = _selectedListIds.contains(b.id);
-        
+
         if (aSelected && !bSelected) return -1;
         if (!aSelected && bSelected) return 1;
-        
+
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
-      
+
       widget.onSelectionChanged(List<String>.from(_selectedListIds));
     });
   }
@@ -100,10 +100,7 @@ class _MultiListPickerState extends State<MultiListPicker> {
 
     if (_lists.isEmpty) {
       return const Center(
-        child: Text(
-          'No lists available',
-          style: TextStyle(color: Colors.grey),
-        ),
+        child: Text('No lists available', style: TextStyle(color: Colors.grey)),
       );
     }
 
@@ -142,4 +139,3 @@ class _MultiListPickerState extends State<MultiListPicker> {
     );
   }
 }
-

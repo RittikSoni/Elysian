@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:io';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/providers/providers.dart';
@@ -25,7 +27,7 @@ class SavedLinksScreen extends StatefulWidget {
 class _SavedLinksScreenState extends State<SavedLinksScreen> {
   List<SavedLink> _savedLinks = [];
   List<SavedLink> _filteredLinks = [];
-  Set<String> _selectedLinkIds = {};
+  final Set<String> _selectedLinkIds = {};
   bool _isLoading = true;
   bool _isSelectionMode = false;
   String? _selectedListId;
@@ -674,7 +676,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                           isFavorite = value;
                         });
                       },
-                      activeColor: Colors.amber,
+                      activeThumbColor: Colors.amber,
                     ),
                   ],
                 ),
@@ -1092,9 +1094,16 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
   Future<void> _shareLink(SavedLink link) async {
     final shareText = '${link.title}\n${link.url}';
     if (link.description != null && link.description!.isNotEmpty) {
-      await Share.share('$shareText\n\n${link.description}');
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: link.title,
+          text: '$shareText\n\n${link.description}',
+        ),
+      );
     } else {
-      await Share.share(shareText);
+      await SharePlus.instance.share(
+        ShareParams(subject: link.title, text: shareText),
+      );
     }
   }
 
@@ -1484,7 +1493,7 @@ class _SavedLinksScreenState extends State<SavedLinksScreen> {
                   },
                   child: Card(
                     color: isSelected
-                        ? Colors.blue.withOpacity(0.2)
+                        ? Colors.blue.withValues(alpha: 0.2)
                         : Colors.grey[900],
                     margin: const EdgeInsets.only(bottom: 12),
                     child: InkWell(
