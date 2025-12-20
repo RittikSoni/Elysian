@@ -47,7 +47,7 @@ class ListsProvider with ChangeNotifier {
 
     try {
       final lists = await StorageService.getUserLists();
-      
+
       _cachedLists = lists;
       _cacheTimestamp = DateTime.now();
       _isInitialized = true;
@@ -77,7 +77,7 @@ class ListsProvider with ChangeNotifier {
         name,
         description: description,
       );
-      
+
       // Update cache
       if (_cachedLists != null) {
         _cachedLists!.add(newList);
@@ -86,7 +86,7 @@ class ListsProvider with ChangeNotifier {
         // Reload if cache is empty
         await loadLists(forceRefresh: true);
       }
-      
+
       notifyListeners();
       return newList;
     } catch (e) {
@@ -99,13 +99,13 @@ class ListsProvider with ChangeNotifier {
   Future<void> deleteList(String listId) async {
     try {
       await StorageService.deleteUserList(listId);
-      
+
       // Update cache
       if (_cachedLists != null) {
         _cachedLists!.removeWhere((list) => list.id == listId);
         _cacheTimestamp = DateTime.now();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error deleting list: $e');
@@ -131,4 +131,3 @@ class ListsProvider with ChangeNotifier {
     _cacheTimestamp = null;
   }
 }
-

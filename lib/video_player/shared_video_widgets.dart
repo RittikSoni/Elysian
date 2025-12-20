@@ -177,7 +177,8 @@ class SharedVideoAppBar extends StatelessWidget {
               children: [
                 if (showControls && !isLocked)
                   IconButton(
-                    onPressed: onBackPressed ??
+                    onPressed:
+                        onBackPressed ??
                         () {
                           SystemChrome.setPreferredOrientations([
                             DeviceOrientation.portraitUp,
@@ -270,7 +271,10 @@ class SharedPlayPauseControlBar extends StatelessWidget {
                 width: iconSize,
                 height: iconSize,
                 child: IconButton(
-                  icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                  icon: const Icon(
+                    Icons.replay_10_rounded,
+                    color: Colors.white,
+                  ),
                   onPressed: onSkipBackward,
                 ),
               ),
@@ -289,7 +293,10 @@ class SharedPlayPauseControlBar extends StatelessWidget {
                 width: iconSize,
                 height: iconSize,
                 child: IconButton(
-                  icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                  icon: const Icon(
+                    Icons.forward_10_rounded,
+                    color: Colors.white,
+                  ),
                   onPressed: onSkipForward,
                 ),
               ),
@@ -352,4 +359,3 @@ String sharedFormatTime(Duration position) {
   final seconds = position.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$hours:$minutes:$seconds';
 }
-

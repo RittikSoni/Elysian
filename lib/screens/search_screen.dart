@@ -1,14 +1,18 @@
+import 'dart:ui';
 import 'package:elysian/data/data.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/utils/app_themes.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
 
 class SearchScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
-  
+
   const SearchScreen({super.key, this.onNavigateToTab});
 
   @override
@@ -73,26 +77,25 @@ class SearchScreenState extends State<SearchScreen> {
     await _loadRecentSearches();
 
     // Search content
-    final allContent = [
-      ...previews,
-      ...myList,
-      ...originals,
-      ...trending,
-    ];
+    final allContent = [...previews, ...myList, ...originals, ...trending];
     final contentResults = allContent
-        .where((content) =>
-            content.name.toLowerCase().contains(query) ||
-            content.description.toLowerCase().contains(query))
+        .where(
+          (content) =>
+              content.name.toLowerCase().contains(query) ||
+              content.description.toLowerCase().contains(query),
+        )
         .toList();
 
     // Search saved links (including notes)
     final allLinks = await StorageService.getSavedLinks();
     final linkResults = allLinks
-        .where((link) =>
-            link.title.toLowerCase().contains(query) ||
-            (link.description?.toLowerCase().contains(query) ?? false) ||
-            (link.notes?.toLowerCase().contains(query) ?? false) ||
-            link.url.toLowerCase().contains(query))
+        .where(
+          (link) =>
+              link.title.toLowerCase().contains(query) ||
+              (link.description?.toLowerCase().contains(query) ?? false) ||
+              (link.notes?.toLowerCase().contains(query) ?? false) ||
+              link.url.toLowerCase().contains(query),
+        )
         .toList();
 
     if (mounted) {
@@ -127,7 +130,7 @@ class SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final isDesktop = Responsive.isDesktop(context);
     final maxWidth = _getMaxWidth(context);
-    
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
@@ -154,16 +157,25 @@ class SearchScreenState extends State<SearchScreen> {
                     builder: (context, value, child) {
                       return TextField(
                         controller: _searchController,
-                        style: const TextStyle(color: Colors.white, fontSize: 16.0),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16.0,
+                        ),
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: Colors.grey[900],
                           hintText: 'Search for a show, movie, genre, etc.',
                           hintStyle: TextStyle(color: Colors.grey[600]),
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Colors.grey,
+                          ),
                           suffixIcon: value.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear, color: Colors.grey),
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Colors.grey,
+                                  ),
                                   onPressed: () {
                                     _searchController.clear();
                                   },
@@ -241,7 +253,9 @@ class SearchScreenState extends State<SearchScreen> {
                                     decoration: BoxDecoration(
                                       color: Colors.grey[800],
                                       borderRadius: BorderRadius.circular(4.0),
-                                      border: Border.all(color: Colors.grey[700]!),
+                                      border: Border.all(
+                                        color: Colors.grey[700]!,
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -281,7 +295,9 @@ class SearchScreenState extends State<SearchScreen> {
                           spacing: 10.0,
                           runSpacing: 10.0,
                           children: [
-                            ...previews.take(isDesktop ? 12 : 6).map(
+                            ...previews
+                                .take(isDesktop ? 12 : 6)
+                                .map(
                                   (content) => _SearchChip(content: content),
                                 ),
                           ],
@@ -373,12 +389,13 @@ class SearchScreenState extends State<SearchScreen> {
                           GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: _getCrossAxisCount(context),
-                              childAspectRatio: 0.7,
-                              crossAxisSpacing: 10.0,
-                              mainAxisSpacing: 10.0,
-                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: _getCrossAxisCount(context),
+                                  childAspectRatio: 0.7,
+                                  crossAxisSpacing: 10.0,
+                                  mainAxisSpacing: 10.0,
+                                ),
                             itemCount: _contentResults.length,
                             itemBuilder: (context, index) {
                               final content = _contentResults[index];
@@ -405,9 +422,7 @@ class SearchScreenState extends State<SearchScreen> {
                 ]),
               ),
             ),
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: 20.0),
-          ),
+          SliverPadding(padding: EdgeInsets.only(bottom: 20.0)),
         ],
       ),
     );
@@ -425,72 +440,117 @@ class SearchScreenState extends State<SearchScreen> {
           linkId: link.id, // Pass linkId to track views
         );
       },
-      child: Container(
-        width: isDesktop ? 300 : 250,
-        margin: const EdgeInsets.only(right: 12.0),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Row(
-          children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8.0),
-                bottomLeft: Radius.circular(8.0),
-              ),
-              child: ThumbnailImage(
-                link: link,
-                width: 120,
-                height: 200,
-              ),
-            ),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      link.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (link.description != null) ...[
-                      const SizedBox(height: 8.0),
-                      Text(
-                        link.description!,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12.0,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 8.0),
-                    Text(
-                      _getLinkTypeLabel(link.type),
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 11.0,
-                      ),
-                    ),
-                  ],
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, _) {
+          final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
+          final theme = Theme.of(context);
+
+          if (isLiquidGlass) {
+            final liquidGlass = theme.extension<LiquidGlassTheme>();
+            final blur = liquidGlass?.blurIntensity ?? 15.0;
+            final opacity = liquidGlass?.glassOpacity ?? 0.18;
+            final borderOpacity = liquidGlass?.borderOpacity ?? 0.25;
+
+            return Container(
+              width: isDesktop ? 300 : 250,
+              margin: const EdgeInsets.only(right: 12.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8.0),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: borderOpacity),
+                  width: 1.5,
                 ),
               ),
-            ),
-          ],
-        ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: opacity),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: _buildLinkCardContent(link, isDesktop),
+                  ),
+                ),
+              ),
+            );
+          } else {
+            return Container(
+              width: isDesktop ? 300 : 250,
+              margin: const EdgeInsets.only(right: 12.0),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: _buildLinkCardContent(link, isDesktop),
+            );
+          }
+        },
       ),
+    );
+  }
+
+  Widget _buildLinkCardContent(SavedLink link, bool isDesktop) {
+    return Row(
+      children: [
+        // Thumbnail
+        ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(8.0),
+            bottomLeft: Radius.circular(8.0),
+          ),
+          child: ThumbnailImage(link: link, width: 120, height: 200),
+        ),
+        // Content
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  link.title,
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Colors.black87
+                        : Colors.white,
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (link.description != null) ...[
+                  const SizedBox(height: 8.0),
+                  Text(
+                    link.description!,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[700]
+                          : Colors.grey[400],
+                      fontSize: 12.0,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 8.0),
+                Text(
+                  _getLinkTypeLabel(link.type),
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Colors.grey[600]
+                        : Colors.grey[500],
+                    fontSize: 11.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -534,13 +594,9 @@ class _SearchChip extends StatelessWidget {
         ),
         child: Text(
           content.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14.0,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 14.0),
         ),
       ),
     );
   }
 }
-

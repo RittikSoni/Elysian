@@ -40,15 +40,20 @@ class _MobileContentHeader extends StatelessWidget {
             ),
           ),
         ),
-        Container(
-          height: 500,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.black, Colors.transparent],
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-            ),
-          ),
+        Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            return Container(
+              height: 500,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.colorScheme.surface, Colors.transparent],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
+            );
+          },
         ),
         Positioned(
           bottom: 110,
@@ -95,62 +100,113 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _videoController =
         VideoPlayerController.networkUrl(
             Uri.parse(widget.featuredContent.videoUrl),
           )
-          ..initialize().then(
-            (_) => setState(() {
-              _videoController.setVolume(0);
-              _videoController.play();
-            }),
-          );
+          ..initialize()
+              .then((_) {
+                if (mounted) {
+                  setState(() {
+                    if (_videoController.value.isInitialized) {
+                      _videoController.setVolume(0);
+                      _videoController.play();
+                    }
+                  });
+                }
+              })
+              .catchError((error) {
+                debugPrint('Error initializing video controller: $error');
+              });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    routeObserver.subscribe(this, ModalRoute.of(context)!);
-  }
-
-  @override
-  void didPushNext() {
-    _videoController.pause();
-  }
-
-  @override
-  void didPopNext() {
-    if (_videoController.value.isInitialized) {
-      _videoController.play();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
     }
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      _videoController.pause();
-    } else if (state == AppLifecycleState.resumed) {
-      // only resume if the route is still active
-      final ModalRoute<dynamic>? route = ModalRoute.of(context);
-      if (route?.isCurrent == true && _videoController.value.isInitialized) {
-        _videoController.play();
+  void didPushNext() {
+    if (mounted && _videoController.value.isInitialized) {
+      try {
+        _videoController.pause();
+      } catch (e) {
+        // Controller might be disposed, ignore
+        debugPrint('Error pausing video in didPushNext: $e');
       }
     }
   }
 
   @override
+  void didPopNext() {
+    if (mounted && _videoController.value.isInitialized) {
+      try {
+        _videoController.play();
+      } catch (e) {
+        // Controller might be disposed, ignore
+        debugPrint('Error playing video in didPopNext: $e');
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted || !_videoController.value.isInitialized) return;
+
+    try {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive) {
+        _videoController.pause();
+      } else if (state == AppLifecycleState.resumed) {
+        // only resume if the route is still active
+        final ModalRoute<dynamic>? route = ModalRoute.of(context);
+        if (route?.isCurrent == true && mounted) {
+          _videoController.play();
+        }
+      }
+    } catch (e) {
+      // Controller might be disposed, ignore
+      debugPrint('Error in didChangeAppLifecycleState: $e');
+    }
+  }
+
+  @override
   void dispose() {
-    _videoController.dispose();
+    routeObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      if (_videoController.value.isInitialized) {
+        _videoController.pause();
+      }
+      _videoController.dispose();
+    } catch (e) {
+      // Controller might already be disposed, ignore
+      debugPrint('Error disposing video controller: $e');
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _videoController.value.isPlaying
-          ? _videoController.pause()
-          : _videoController.play(),
+      onTap: () {
+        if (mounted && _videoController.value.isInitialized) {
+          try {
+            if (_videoController.value.isPlaying) {
+              _videoController.pause();
+            } else {
+              _videoController.play();
+            }
+          } catch (e) {
+            debugPrint('Error toggling video playback: $e');
+          }
+        }
+      },
       child: Stack(
         alignment: Alignment.bottomLeft,
         children: [
@@ -179,15 +235,20 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader>
               ),
             ),
           ),
-          Container(
-            height: 500,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.black, Colors.transparent],
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              return Container(
+                height: 500,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [theme.colorScheme.surface, Colors.transparent],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              );
+            },
           ),
           Positioned(
             left: 60,

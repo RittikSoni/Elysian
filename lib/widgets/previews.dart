@@ -21,8 +21,8 @@ class _PreviewsState extends State<Previews> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
             widget.title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
