@@ -649,7 +649,8 @@ class WatchPartyService {
 
             // If video changed, notify listeners
             // This is critical for guests to navigate when host starts a video
-            if (videoChanged && updatedRoom.videoUrl.isNotEmpty) {
+            // IMPORTANT: Only trigger if video URL actually changed (not just title)
+            if (videoChanged && updatedRoom.videoUrl.isNotEmpty && updatedRoom.videoUrl != previousVideoUrl) {
               debugPrint(
                 'WatchPartyService: Video changed from "$previousVideoUrl" to "${updatedRoom.videoUrl}"',
               );
@@ -683,11 +684,24 @@ class WatchPartyService {
           } else {
             _isConnected = false;
             _connectionError = 'Server error (${response.statusCode})';
+            // If server returns 404, host likely ended the room
+            if (response.statusCode == 404) {
+              debugPrint('WatchPartyService: Server returned 404 - host likely ended room');
+              // Clear room state to indicate room ended
+              _currentRoom = null;
+              _isConnected = false;
+              _connectionError = 'Host ended the watch party';
+              // Stop polling
+              _syncTimer?.cancel();
+              _syncTimer = null;
+            }
           }
         } on SocketException catch (e) {
           _isConnected = false;
           _connectionError = 'Connection lost: ${e.message}';
           debugPrint('Polling error: $e');
+          // If connection is lost and we can't reconnect after a few attempts, room likely ended
+          // This will be handled by the provider checking connection state
         } on TimeoutException {
           _isConnected = false;
           _connectionError = 'Connection timeout';

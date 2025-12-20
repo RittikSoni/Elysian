@@ -6,6 +6,7 @@ import 'package:elysian/services/watch_party_firebase_service.dart';
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/auth_service.dart';
 import 'package:elysian/services/link_parser.dart';
 import 'package:elysian/video_player/yt_full.dart';
 import 'package:elysian/video_player/video_player_full.dart';
@@ -18,6 +19,7 @@ import 'dart:async';
 class WatchPartyProvider with ChangeNotifier {
   final WatchPartyService _watchPartyService = WatchPartyService();
   final WatchPartyFirebaseService _firebaseService = WatchPartyFirebaseService();
+  final AuthService _authService = AuthService();
   
   // Use Firebase if available, otherwise fall back to local
   bool _useFirebase = false;
@@ -35,6 +37,8 @@ class WatchPartyProvider with ChangeNotifier {
   ChatMessage? _latestChatNotification;
   Reaction? _latestReactionNotification;
   String? _roomEndedMessage; // Message when host ends party
+  String? _lastNavigatedVideoUrl; // Track last navigated video to prevent duplicate navigations
+  DateTime? _lastNavigationTime; // Track when last navigation occurred
   
   // Global overlay for notifications
   OverlayEntry? _notificationOverlay;
@@ -148,6 +152,12 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Handle room ended (host ended party)
   void _handleRoomEnded(String reason) {
+    // Prevent duplicate handling
+    if (_currentRoom == null && _roomEndedMessage != null) {
+      debugPrint('WatchPartyProvider: Room already ended, ignoring duplicate call');
+      return;
+    }
+    
     _roomEndedMessage = reason;
     _currentRoom = null;
     _isConnected = false;
@@ -156,8 +166,14 @@ class WatchPartyProvider with ChangeNotifier {
     _recentReactions.clear();
     _latestChatNotification = null;
     _latestReactionNotification = null;
+    _lastNavigatedVideoUrl = null;
+    _lastNavigationTime = null;
     _removeGlobalNotification();
     _hideIndicatorOverlay();
+    
+    // Reset mode flag
+    _useFirebase = false;
+    
     notifyListeners();
     
     // Show notification dialog after a short delay to ensure UI is ready
@@ -284,6 +300,14 @@ class WatchPartyProvider with ChangeNotifier {
     } else {
       _isConnected = _watchPartyService.isConnected;
       _connectionError = _watchPartyService.connectionError;
+      
+      // IMPORTANT: For local mode, if connection is lost and room is null, host likely ended the room
+      if (!_isConnected && _watchPartyService.currentRoom == null && _currentRoom != null) {
+        // Host ended the room - handle it similar to Firebase
+        debugPrint('WatchPartyProvider: Local mode - host ended room (connection lost)');
+        _handleRoomEnded(_connectionError ?? 'Host ended the watch party');
+        return; // Don't process further updates
+      }
     }
     
     // IMPORTANT: Forward Firebase updates to local service callback
@@ -301,20 +325,20 @@ class WatchPartyProvider with ChangeNotifier {
     
     notifyListeners();
     
-    // If video changed and we're not in a video player, navigate
-    // IMPORTANT: Only guests should navigate - hosts are already in the video player
-    // Use a delay to ensure context is available and avoid race conditions
+    // IMPORTANT: Don't navigate when video changes if we're already in a video player
+    // The video player will handle the video change via onRoomUpdate callback
+    // Only navigate if we're NOT in a video player (e.g., user is on home screen)
     if (videoChanged && room.videoUrl.isNotEmpty && !isHost) {
       Future.delayed(const Duration(milliseconds: 200), () {
-        // Check if we're already viewing this video - prevent infinite loop
-        if (_isInVideoPlayer() && _currentRoom?.videoUrl == room.videoUrl) {
-          debugPrint('WatchPartyProvider: Already in video player for ${room.videoUrl}, skipping navigation');
+        // If we're already in a video player, don't navigate - let the player handle it
+        if (_isInVideoPlayer()) {
+          debugPrint('WatchPartyProvider: Already in video player, player will handle video change. Skipping navigation.');
           return;
         }
         
-        // Only navigate if we're not already in a video player
+        // Only navigate if we're NOT in a video player
         if (!_isInVideoPlayer() && _currentRoom?.videoUrl == room.videoUrl) {
-          debugPrint('WatchPartyProvider: Navigating guest to video ${room.videoUrl}');
+          debugPrint('WatchPartyProvider: Not in video player, navigating guest to video ${room.videoUrl}');
           _navigateToVideo(room.videoUrl, room.videoTitle);
         }
       });
@@ -473,6 +497,16 @@ class WatchPartyProvider with ChangeNotifier {
       return;
     }
     
+    // Prevent duplicate navigations to the same video within a short time window
+    final now = DateTime.now();
+    if (_lastNavigatedVideoUrl == videoUrl && _lastNavigationTime != null) {
+      final timeSinceLastNav = now.difference(_lastNavigationTime!);
+      if (timeSinceLastNav.inSeconds < 3) {
+        debugPrint('WatchPartyProvider: Duplicate navigation prevented (same video within ${timeSinceLastNav.inSeconds}s)');
+        return;
+      }
+    }
+    
     // Double-check that the video URL matches the current room's video URL
     // This prevents navigation with stale/wrong video URLs
     if (_currentRoom != null && _currentRoom!.videoUrl != videoUrl) {
@@ -485,6 +519,10 @@ class WatchPartyProvider with ChangeNotifier {
       debugPrint('WatchPartyProvider: Already in video player, skipping navigation to $videoUrl');
       return;
     }
+    
+    // Mark that we're navigating to prevent duplicate calls
+    _lastNavigatedVideoUrl = videoUrl;
+    _lastNavigationTime = now;
     
     try {
       final allLinks = await StorageService.getSavedLinks();
@@ -500,8 +538,10 @@ class WatchPartyProvider with ChangeNotifier {
         ),
       );
 
+      // IMPORTANT: Use pushReplacement instead of push to replace current video player
+      // This prevents stacking multiple video players when host changes video
       if (link.type == LinkType.youtube) {
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => YTFull(
@@ -512,7 +552,7 @@ class WatchPartyProvider with ChangeNotifier {
           ),
         );
       } else if (link.type.canPlayInbuilt) {
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => RSNewVideoPlayerScreen(
@@ -753,6 +793,20 @@ class WatchPartyProvider with ChangeNotifier {
     Duration? initialPosition,
     bool? initialPlaying,
   }) async {
+    // Check if user is authenticated
+    final isSignedIn = await _authService.checkSignInStatus();
+    if (!isSignedIn) {
+      throw Exception('Please sign in to create a watch party. Authentication is required for watch party features.');
+    }
+    
+    // IMPORTANT: Ensure we're not already in a room before creating a new one
+    if (_currentRoom != null) {
+      debugPrint('WatchPartyProvider: Already in a room, leaving first...');
+      await leaveRoom();
+      // Wait a bit for cleanup to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    
     // Use Firebase only if explicitly requested (useOnline=true)
     // If useOnline=false, always use local network regardless of Firebase availability
     // If useOnline is not specified (default false), use Firebase if available, otherwise local
@@ -770,6 +824,10 @@ class WatchPartyProvider with ChangeNotifier {
         _currentRoom = room;
         // Force update to use Firebase service
         _useFirebase = true;
+        
+        // Re-initialize callbacks to ensure they're set up correctly for Firebase mode
+        _initializeCallbacks();
+        
         _isConnected = _firebaseService.isConnected;
         _connectionError = _firebaseService.connectionError;
         _updateIndicatorOverlay();
@@ -788,6 +846,10 @@ class WatchPartyProvider with ChangeNotifier {
         debugPrint('WatchPartyProvider: Creating local network room');
         // IMPORTANT: Force use of local service, not Firebase
         _useFirebase = false;
+        
+        // Re-initialize callbacks to ensure they're set up correctly for local mode
+        _initializeCallbacks();
+        
         final room = await _watchPartyService.createRoom(
           hostName: participantName,
           videoUrl: videoUrl ?? '',
@@ -833,10 +895,28 @@ class WatchPartyProvider with ChangeNotifier {
     int hostPort,
     String roomCode,
   ) async {
+    // Check if user is authenticated
+    final isSignedIn = await _authService.checkSignInStatus();
+    if (!isSignedIn) {
+      throw Exception('Please sign in to join a watch party. Authentication is required for watch party features.');
+    }
+    
+    // IMPORTANT: Ensure we're not already in a room before joining a new one
+    if (_currentRoom != null) {
+      debugPrint('WatchPartyProvider: Already in a room, leaving first...');
+      await leaveRoom();
+      // Wait a bit for cleanup to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    
     try {
       // IMPORTANT: Force use of local service, not Firebase
       _useFirebase = false;
       debugPrint('WatchPartyProvider: Joining local network room, _useFirebase set to false');
+      
+      // Re-initialize callbacks to ensure they're set up correctly for local mode
+      _initializeCallbacks();
+      
       final room = await _watchPartyService.joinRoom(
         hostIp: hostIp,
         hostPort: hostPort,
@@ -862,11 +942,32 @@ class WatchPartyProvider with ChangeNotifier {
     String participantName,
     String roomCode,
   ) async {
+    // Check if user is authenticated
+    final isSignedIn = await _authService.checkSignInStatus();
+    if (!isSignedIn) {
+      throw Exception('Please sign in to join a watch party. Authentication is required for watch party features.');
+    }
+    
+    // IMPORTANT: Ensure we're not already in a room before joining a new one
+    if (_currentRoom != null) {
+      debugPrint('WatchPartyProvider: Already in a room, leaving first...');
+      await leaveRoom();
+      // Wait a bit for cleanup to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    
     try {
       if (roomCode.isEmpty) {
         _connectionError = 'Room code is required';
         return null;
       }
+      
+      // IMPORTANT: Force use of Firebase service for online mode
+      _useFirebase = true;
+      debugPrint('WatchPartyProvider: Joining online room, _useFirebase set to true');
+      
+      // Re-initialize callbacks to ensure they're set up correctly for Firebase mode
+      _initializeCallbacks();
       
       final room = await _firebaseService.joinRoom(
         participantName: participantName,
@@ -895,6 +996,7 @@ class WatchPartyProvider with ChangeNotifier {
   Future<void> leaveRoom() async {
     debugPrint('WatchPartyProvider: leaveRoom() called, useFirebase: $_useFirebase');
     final wasHost = isHost;
+    final wasUsingFirebase = _useFirebase;
     
     // Hide indicator immediately before leaving to prevent it from showing again
     _hideIndicatorOverlay();
@@ -924,7 +1026,13 @@ class WatchPartyProvider with ChangeNotifier {
     _latestChatNotification = null;
     _latestReactionNotification = null;
     _roomEndedMessage = null;
+    _lastNavigatedVideoUrl = null; // Reset navigation tracking
+    _lastNavigationTime = null;
     _removeGlobalNotification();
+    
+    // IMPORTANT: Reset mode flag after leaving to ensure clean state for next room
+    // This prevents issues when switching between local and online modes
+    _useFirebase = false;
     
     // Ensure indicator is hidden (call again to be safe)
     _hideIndicatorOverlay();
@@ -941,7 +1049,7 @@ class WatchPartyProvider with ChangeNotifier {
     });
     
     // If host left, show confirmation
-    if (wasHost && _useFirebase) {
+    if (wasHost && wasUsingFirebase) {
       debugPrint('Host left watch party - all participants will be notified');
     }
     
@@ -950,25 +1058,61 @@ class WatchPartyProvider with ChangeNotifier {
   
   /// Send chat message
   Future<void> sendChatMessage(String message) async {
+    // Validate we're in a room and have participant ID
+    if (!isInRoom || _currentRoom == null) {
+      debugPrint('WatchPartyProvider: Cannot send chat - not in a room');
+      return;
+    }
+    
+    final participantId = currentParticipantId;
+    if (participantId == null || participantId.isEmpty) {
+      debugPrint('WatchPartyProvider: Cannot send chat - no participant ID');
+      return;
+    }
+    
     debugPrint('WatchPartyProvider: sendChatMessage called, useFirebase: $_useFirebase');
     debugPrint('WatchPartyProvider: isInRoom: $isInRoom, currentRoom: ${_currentRoom != null}');
-    if (_useFirebase) {
-      await _firebaseService.sendChatMessage(message);
-    } else {
-      debugPrint('WatchPartyProvider: Calling local service sendChatMessage');
-      await _watchPartyService.sendChatMessage(message);
+    
+    try {
+      if (_useFirebase) {
+        await _firebaseService.sendChatMessage(message);
+      } else {
+        debugPrint('WatchPartyProvider: Calling local service sendChatMessage');
+        await _watchPartyService.sendChatMessage(message);
+      }
+    } catch (e) {
+      debugPrint('WatchPartyProvider: Error sending chat message: $e');
+      // Don't throw, just log the error
     }
   }
   
   /// Send reaction
   Future<void> sendReaction(ReactionType type) async {
+    // Validate we're in a room and have participant ID
+    if (!isInRoom || _currentRoom == null) {
+      debugPrint('WatchPartyProvider: Cannot send reaction - not in a room');
+      return;
+    }
+    
+    final participantId = currentParticipantId;
+    if (participantId == null || participantId.isEmpty) {
+      debugPrint('WatchPartyProvider: Cannot send reaction - no participant ID');
+      return;
+    }
+    
     debugPrint('WatchPartyProvider: sendReaction called with $type, useFirebase: $_useFirebase');
     debugPrint('WatchPartyProvider: isInRoom: $isInRoom, currentRoom: ${_currentRoom != null}');
-    if (_useFirebase) {
-      await _firebaseService.sendReaction(type);
-    } else {
-      debugPrint('WatchPartyProvider: Calling local service sendReaction');
-      await _watchPartyService.sendReaction(type);
+    
+    try {
+      if (_useFirebase) {
+        await _firebaseService.sendReaction(type);
+      } else {
+        debugPrint('WatchPartyProvider: Calling local service sendReaction');
+        await _watchPartyService.sendReaction(type);
+      }
+    } catch (e) {
+      debugPrint('WatchPartyProvider: Error sending reaction: $e');
+      // Don't throw, just log the error
     }
   }
   
@@ -979,20 +1123,31 @@ class WatchPartyProvider with ChangeNotifier {
     String? videoUrl,
     String? videoTitle,
   }) {
-    if (_useFirebase) {
-      _firebaseService.updateRoomState(
-        position: position,
-        isPlaying: isPlaying,
-        videoUrl: videoUrl,
-        videoTitle: videoTitle,
-      );
-    } else {
-      _watchPartyService.updateRoomState(
-        position: position,
-        isPlaying: isPlaying,
-        videoUrl: videoUrl,
-        videoTitle: videoTitle,
-      );
+    // Validate we're in a room and are the host
+    if (!isInRoom || !isHost || _currentRoom == null) {
+      debugPrint('WatchPartyProvider: Cannot update room state - not host or not in room');
+      return;
+    }
+    
+    try {
+      if (_useFirebase) {
+        _firebaseService.updateRoomState(
+          position: position,
+          isPlaying: isPlaying,
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+        );
+      } else {
+        _watchPartyService.updateRoomState(
+          position: position,
+          isPlaying: isPlaying,
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+        );
+      }
+    } catch (e) {
+      debugPrint('WatchPartyProvider: Error updating room state: $e');
+      // Don't throw, just log the error
     }
   }
   

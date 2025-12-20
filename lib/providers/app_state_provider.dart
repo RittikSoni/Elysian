@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/utils/app_themes.dart';
 
 /// Global app state provider for preferences and settings
 class AppStateProvider with ChangeNotifier {
@@ -14,6 +15,8 @@ class AppStateProvider with ChangeNotifier {
   // Theme preference
   bool? _isDarkMode;
   bool _isLoadingTheme = false;
+  AppThemeType? _themeType;
+  bool _isLoadingThemeType = false;
 
   // Getters
   bool get isInbuiltPlayer => _isInbuiltPlayer ?? true;
@@ -22,6 +25,8 @@ class AppStateProvider with ChangeNotifier {
   bool get isLoadingRecentSearches => _isLoadingRecentSearches;
   bool get isDarkMode => _isDarkMode ?? true; // Default to dark mode
   bool get isLoadingTheme => _isLoadingTheme;
+  AppThemeType get themeType => _themeType ?? AppThemeType.dark;
+  bool get isLoadingThemeType => _isLoadingThemeType;
 
   /// Initialize app state
   Future<void> initialize() async {
@@ -29,6 +34,7 @@ class AppStateProvider with ChangeNotifier {
       _loadPlayerPreference(),
       _loadRecentSearches(),
       _loadThemePreference(),
+      _loadThemeType(),
     ]);
   }
 
@@ -128,6 +134,43 @@ class AppStateProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error setting theme preference: $e');
+      rethrow;
+    }
+  }
+
+  /// Load theme type
+  Future<void> _loadThemeType() async {
+    if (_isLoadingThemeType) return;
+    
+    _isLoadingThemeType = true;
+    notifyListeners();
+
+    try {
+      final themeTypeStr = await StorageService.getThemeType();
+      _themeType = AppThemeType.values.firstWhere(
+        (e) => e.toString().split('.').last == themeTypeStr,
+        orElse: () => AppThemeType.dark,
+      );
+    } catch (e) {
+      debugPrint('Error loading theme type: $e');
+      _themeType = AppThemeType.dark;
+    } finally {
+      _isLoadingThemeType = false;
+      notifyListeners();
+    }
+  }
+
+  /// Set theme type
+  Future<void> setThemeType(AppThemeType type) async {
+    try {
+      await StorageService.setThemeType(type.toString().split('.').last);
+      _themeType = type;
+      // Also update legacy dark mode for compatibility
+      _isDarkMode = type != AppThemeType.light;
+      await StorageService.setThemePreference(_isDarkMode!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error setting theme type: $e');
       rethrow;
     }
   }

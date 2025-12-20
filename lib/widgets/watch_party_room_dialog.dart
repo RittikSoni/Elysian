@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:provider/provider.dart';
@@ -116,9 +117,47 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
         _isCreating = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error creating room: $e')));
+        // Check if it's an authentication error - close dialog and show alert
+        final errorMessage = e.toString();
+        if (errorMessage.contains('sign in') || errorMessage.contains('Authentication')) {
+          Navigator.of(context).pop(); // Close the dialog first
+          // Show alert dialog after dialog closes
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        'Authentication Required',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  content: Text(
+                    errorMessage,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          });
+        } else {
+          // For other errors, show snackbar (dialog will still be open)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error creating room: $e')));
+        }
       }
     }
   }
@@ -206,9 +245,47 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error joining room: $e')));
+        // Check if it's an authentication error - close dialog and show alert
+        final errorMessage = e.toString();
+        if (errorMessage.contains('sign in') || errorMessage.contains('Authentication')) {
+          Navigator.of(context).pop(); // Close the dialog first
+          // Show alert dialog after dialog closes
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        'Authentication Required',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  content: Text(
+                    errorMessage,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          });
+        } else {
+          // For other errors, show snackbar (dialog will still be open)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error joining room: $e')));
+        }
       }
     } finally {
       if (mounted) {
@@ -220,10 +297,41 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
   }
 
   void _copyToClipboard(String text) {
+    if (text.isEmpty) return;
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Copied to clipboard!')));
+  }
+  
+  Future<void> _scanQRCode() async {
+    // Show QR scanner dialog
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _QRScannerDialog(),
+    );
+    
+    if (result != null && result.isNotEmpty) {
+      // Parse QR code data - format: "elysian_wp:ROOM_CODE" or just "ROOM_CODE"
+      String roomCode = result;
+      if (result.startsWith('elysian_wp:')) {
+        roomCode = result.substring('elysian_wp:'.length);
+      }
+      
+      if (roomCode.length == 6 && roomCode.contains(RegExp(r'^[0-9]+$'))) {
+        _roomCodeController.text = roomCode;
+      } else {
+        // Invalid format, show error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid QR code format. Please scan a valid Watch Party QR code.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -597,6 +705,11 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Colors.amber),
                   ),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner, color: Colors.amber),
+                    onPressed: _scanQRCode,
+                    tooltip: 'Scan QR Code',
+                  ),
                 ),
                 style: const TextStyle(color: Colors.white),
                 keyboardType: TextInputType.number,
@@ -779,14 +892,25 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
                       style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      _createdRoom!.roomCode ?? 'N/A',
-                      style: const TextStyle(
-                        color: Colors.amber,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _createdRoom!.roomCode ?? 'N/A',
+                          style: const TextStyle(
+                            color: Colors.amber,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: const Icon(Icons.copy, color: Colors.amber),
+                          onPressed: () => _copyToClipboard(_createdRoom!.roomCode ?? ''),
+                          tooltip: 'Copy room code',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1001,6 +1125,150 @@ class _WatchPartyRoomDialogState extends State<WatchPartyRoomDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// QR Scanner Dialog
+class _QRScannerDialog extends StatefulWidget {
+  @override
+  State<_QRScannerDialog> createState() => _QRScannerDialogState();
+}
+
+class _QRScannerDialogState extends State<_QRScannerDialog> {
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+  );
+  bool _isScanning = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleBarcode(BarcodeCapture barcodeCapture) {
+    if (!_isScanning) return;
+    
+    final barcodes = barcodeCapture.barcodes;
+    if (barcodes.isEmpty) return;
+    
+    final barcode = barcodes.first;
+    if (barcode.rawValue == null) return;
+    
+    setState(() {
+      _isScanning = false;
+    });
+    
+    // Parse QR code data
+    String qrData = barcode.rawValue!;
+    String? roomCode;
+    
+    if (qrData.startsWith('elysian_wp:')) {
+      roomCode = qrData.substring('elysian_wp:'.length);
+    } else if (qrData.length == 6 && qrData.contains(RegExp(r'^[0-9]+$'))) {
+      // Direct room code
+      roomCode = qrData;
+    }
+    
+    if (roomCode != null && roomCode.length == 6) {
+      Navigator.of(context).pop(roomCode);
+    } else {
+      // Invalid format
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid QR code. Please scan a valid Watch Party QR code.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      // Resume scanning
+      setState(() {
+        _isScanning = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Scan QR Code',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.grey),
+            // Scanner
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: MobileScanner(
+                      controller: _controller,
+                      onDetect: _handleBarcode,
+                    ),
+                  ),
+                  // Scanning overlay
+                  if (_isScanning)
+                    Center(
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.amber,
+                            width: 3,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Instructions
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Point your camera at the Watch Party QR code',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
         ),
       ),
     );

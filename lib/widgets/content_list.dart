@@ -46,15 +46,19 @@ class ContentList extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 if (title == 'My List')
                   IconButton(
-                    icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                    icon: Icon(
+                      Icons.add,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: 20,
+                    ),
                     onPressed: () => _showAddToLinkDialog(context),
                     tooltip: 'Add Link to List',
                   ),

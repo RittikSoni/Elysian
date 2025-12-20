@@ -4,8 +4,11 @@ import 'package:elysian/utils/app_info.dart';
 import 'package:elysian/utils/app_themes.dart';
 import 'package:elysian/widgets/list_selection_dialog.dart';
 import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/services/storage_service.dart';
 import 'package:elysian/services/watch_party_global_manager.dart';
 import 'package:elysian/services/watch_party_firebase_service.dart';
+import 'package:elysian/services/chat_service.dart';
+import 'package:elysian/services/chat_room_service.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +27,9 @@ void main() async {
     await Firebase.initializeApp();
     // Clean up expired rooms on app start (runs in background)
     WatchPartyFirebaseService.cleanupExpiredRooms();
+    // Initialize chat services
+    ChatService().initialize();
+    ChatRoomService().initialize();
   } catch (e) {
     debugPrint('Firebase initialization error: $e');
     // Continue without Firebase (will use local network fallback)
@@ -164,18 +170,54 @@ class _ElysianState extends State<Elysian> {
         ChangeNotifierProvider(create: (_) => ListsProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => AppStateProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => WatchPartyProvider()),
+        ChangeNotifierProvider(
+          create: (_) => HomeScreenLayoutProvider()..initialize(),
+        ),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => ChatRoomProvider()),
       ],
       child: Consumer<AppStateProvider>(
         builder: (context, appState, child) {
+          final theme = AppThemes.getThemeByType(appState.themeType);
+
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: AppThemes.lightTheme,
             darkTheme: AppThemes.darkTheme,
-            themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            themeMode: appState.themeType == AppThemeType.liquidGlass
+                ? ThemeMode.dark
+                : (appState.themeType == AppThemeType.light
+                      ? ThemeMode.light
+                      : ThemeMode.dark),
             title: 'Elysian',
             navigatorKey: navigatorKey,
             navigatorObservers: [routeObserver],
-            home: const BottomNav(),
+            builder: (context, child) {
+              // Apply liquid glass theme if selected
+              if (appState.themeType == AppThemeType.liquidGlass) {
+                return Theme(data: theme, child: child!);
+              }
+              return child!;
+            },
+            home: FutureBuilder<bool>(
+              future: StorageService.hasCompletedOnboarding(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Scaffold(
+                    backgroundColor:
+                        appState.themeType == AppThemeType.liquidGlass
+                        ? const Color(0xFF0A0A0A)
+                        : (appState.themeType == AppThemeType.light
+                              ? Colors.white
+                              : Colors.black),
+                    body: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+                return snapshot.data == true
+                    ? const BottomNav()
+                    : const WelcomeScreen();
+              },
+            ),
           );
         },
       ),

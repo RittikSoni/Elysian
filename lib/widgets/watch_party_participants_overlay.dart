@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:elysian/models/watch_party_models.dart';
+import 'package:elysian/models/models.dart';
 import 'package:elysian/widgets/watch_party_chat_overlay.dart';
 import 'package:elysian/widgets/watch_party_reaction_overlay.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/link_parser.dart';
+import 'package:elysian/video_player/yt_full.dart';
+import 'package:elysian/video_player/video_player_full.dart';
 import 'package:provider/provider.dart';
 
 class WatchPartyParticipantsOverlay extends StatefulWidget {
@@ -247,35 +252,129 @@ class _WatchPartyParticipantsOverlayState
             // Action buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _showChat = true;
-                        });
-                      },
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Chat'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Consumer<WatchPartyProvider>(
-                      builder: (context, provider, child) {
-                        return ReactionPicker(
-                          onReactionSelected: (type) {
-                            provider.sendReaction(type);
-                          },
+                  // Go to Video button (for joiners only, if video URL is available)
+                  Consumer<WatchPartyProvider>(
+                    builder: (context, provider, child) {
+                      // Only show for joiners (not hosts) and if video URL is available
+                      if (!widget.isHost && widget.room.videoUrl.isNotEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                // Close the dialog first
+                                if (widget.onClose != null) {
+                                  widget.onClose!();
+                                }
+                                
+                                // Wait a bit for dialog to close
+                                await Future.delayed(const Duration(milliseconds: 200));
+                                
+                                // Navigate to video using the provider's navigation
+                                // Access the provider's internal navigation method via a helper
+                                final watchPartyProvider = Provider.of<WatchPartyProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                
+                                // Check if we're still in the room and have a valid video URL
+                                if (watchPartyProvider.currentRoom != null && 
+                                    watchPartyProvider.currentRoom!.videoUrl == widget.room.videoUrl) {
+                                  // Use a direct navigation approach since we can't access private methods
+                                  // The provider will handle navigation when room state is checked
+                                  // For now, we'll manually trigger navigation by checking room state
+                                  final navigator = Navigator.of(context, rootNavigator: true);
+                                  
+                                  // Import necessary services
+                                  try {
+                                    final allLinks = await StorageService.getSavedLinks();
+                                    final link = allLinks.firstWhere(
+                                      (l) => l.url == widget.room.videoUrl,
+                                      orElse: () => SavedLink(
+                                        id: '',
+                                        url: widget.room.videoUrl,
+                                        title: widget.room.videoTitle,
+                                        type: LinkParser.parseLinkType(widget.room.videoUrl) ?? LinkType.unknown,
+                                        listIds: [],
+                                        savedAt: DateTime.now(),
+                                      ),
+                                    );
+
+                                    if (link.type == LinkType.youtube) {
+                                      navigator.push(
+                                        MaterialPageRoute(
+                                          builder: (context) => YTFull(
+                                            url: link.url,
+                                            title: link.title.isNotEmpty ? link.title : widget.room.videoTitle,
+                                            listIds: link.listIds,
+                                          ),
+                                        ),
+                                      );
+                                    } else if (link.type.canPlayInbuilt) {
+                                      navigator.push(
+                                        MaterialPageRoute(
+                                          builder: (context) => RSNewVideoPlayerScreen(
+                                            url: link.url,
+                                            title: link.title.isNotEmpty ? link.title : widget.room.videoTitle,
+                                            listIds: link.listIds,
+                                            adsEnabled: false,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint('Error navigating to video: $e');
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Go to Video'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
                         );
-                      },
-                    ),
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _showChat = true;
+                            });
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('Chat'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Consumer<WatchPartyProvider>(
+                          builder: (context, provider, child) {
+                            return ReactionPicker(
+                              onReactionSelected: (type) {
+                                provider.sendReaction(type);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

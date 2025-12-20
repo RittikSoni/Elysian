@@ -163,9 +163,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
           // Check if current video URL matches room video URL
           // If not, trigger video change to load correct video
-          if (room.videoUrl.isNotEmpty &&
-              widget.url != room.videoUrl &&
-              _currentVideoUrl != room.videoUrl) {
+          // IMPORTANT: Always check against room.videoUrl to ensure we get the latest update
+          // Also check widget.url as fallback for initial load
+          final currentUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+          if (room.videoUrl.isNotEmpty && currentUrl != room.videoUrl) {
+            debugPrint('VideoPlayer: Guest video mismatch - current: $currentUrl, room: ${room.videoUrl}');
             // Video mismatch - load the correct video
             _loadVideoFromUrl(room.videoUrl, room.videoTitle);
             return;
@@ -307,6 +309,26 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
 
   Future<void> _loadVideoFromUrl(String videoUrl, String videoTitle) async {
     try {
+      // IMPORTANT: Prevent restarting if we're already playing the same video
+      // Check both _currentVideoUrl and widget.url to handle all cases
+      final currentUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+      if (currentUrl == videoUrl && _controller.value.isInitialized) {
+        debugPrint('VideoPlayer: Already playing $videoUrl, skipping reload');
+        // Just update the title if needed
+        if (_videoTitle != videoTitle) {
+          _videoTitle = videoTitle;
+          if (mounted) {
+            setState(() {});
+          }
+        }
+        // Ensure _currentVideoUrl is set
+        _currentVideoUrl = videoUrl;
+        return;
+      }
+      
+      // Update _currentVideoUrl immediately to prevent race conditions
+      _currentVideoUrl = videoUrl;
+      
       // Find the link in storage
       final allLinks = await StorageService.getSavedLinks();
       final link = allLinks.firstWhere(
@@ -472,17 +494,21 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     final provider = Provider.of<WatchPartyProvider>(context, listen: false);
 
     // First update with video URL and title when sync starts
-    if (provider.isHost && provider.isInRoom && widget.url != null) {
-      provider.updateRoomState(
-        videoUrl: widget.url!,
-        videoTitle: _videoTitle ?? widget.title ?? 'Video',
-        position: _controller.value.isInitialized
-            ? _controller.value.position
-            : Duration.zero,
-        isPlaying: _controller.value.isInitialized
-            ? _controller.value.isPlaying
-            : false,
-      );
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+    if (provider.isHost && provider.isInRoom) {
+      final videoUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+      if (videoUrl.isNotEmpty) {
+        provider.updateRoomState(
+          videoUrl: videoUrl,
+          videoTitle: _videoTitle ?? widget.title ?? 'Video',
+          position: _controller.value.isInitialized
+              ? _controller.value.position
+              : Duration.zero,
+          isPlaying: _controller.value.isInitialized
+              ? _controller.value.isPlaying
+              : false,
+        );
+      }
     }
 
     // No longer using continuous sync - sync is now button-based
@@ -495,11 +521,15 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     if (!provider.isHost || !provider.isInRoom) return;
     if (!_controller.value.isInitialized) return;
 
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+    final videoUrl = _currentVideoUrl ?? widget.url ?? widget.mediaUrl ?? '';
+    if (videoUrl.isEmpty) return;
+
     provider.updateRoomState(
       position: _controller.value.position,
       isPlaying: _controller.value.isPlaying,
-      videoUrl: widget.url,
-      videoTitle: _videoTitle ?? widget.title,
+      videoUrl: videoUrl,
+      videoTitle: _videoTitle ?? widget.title ?? 'Video',
     );
   }
 
@@ -583,14 +613,17 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
     _currentVideoUrl = link.url;
 
     // Update watch party room state if host
+    // IMPORTANT: Update BEFORE creating new controller to ensure joiners get the update
     final provider = Provider.of<WatchPartyProvider>(context, listen: false);
     if (provider.isHost && provider.isInRoom) {
+      debugPrint('VideoPlayer: Host changing video to ${link.url}, updating room state');
       provider.updateRoomState(
         videoUrl: link.url,
         videoTitle: link.title,
         position: Duration.zero,
         isPlaying: false,
       );
+      // _currentVideoUrl is already set above, no need to set again
     }
 
     // Create new controller
@@ -649,15 +682,20 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 _controller.play();
 
                 // Update watch party room state if host (when video initializes)
+                // IMPORTANT: Use _currentVideoUrl instead of widget.url to ensure we use the correct video
+                // This prevents reverting to old video when host changes video from content list
                 final provider = Provider.of<WatchPartyProvider>(
                   context,
                   listen: false,
                 );
                 if (provider.isHost &&
                     provider.isInRoom &&
-                    widget.url != null) {
+                    _currentVideoUrl != null &&
+                    _currentVideoUrl!.isNotEmpty) {
+                  // Only update if the current video URL matches what we just initialized
+                  // This prevents race conditions where old video URL might be used
                   provider.updateRoomState(
-                    videoUrl: widget.url!,
+                    videoUrl: _currentVideoUrl!,
                     videoTitle: _videoTitle ?? widget.title ?? 'Video',
                     position: Duration.zero,
                     isPlaying: true,
@@ -670,10 +708,11 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                     if (!_isDisposed && mounted) {
                       _isVideoInitializing = false;
                       // Now sync to host's position if available
+                      // IMPORTANT: Use _currentVideoUrl to match the video we just loaded
                       final room = provider.currentRoom;
-                      if (room != null &&
-                          (room.videoUrl == widget.url ||
-                              room.videoUrl == _currentVideoUrl)) {
+                      if (room != null && 
+                          _currentVideoUrl != null && 
+                          room.videoUrl == _currentVideoUrl) {
                         final duration = _controller.value.duration;
                         if (duration.inMilliseconds > 0) {
                           // Calculate predicted position for late joiners
@@ -717,11 +756,13 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                 }
 
                 // Auto-sync on first video start (host only)
+                // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
                 if (provider.isHost &&
                     provider.isInRoom &&
-                    widget.url != null) {
+                    _currentVideoUrl != null &&
+                    _currentVideoUrl!.isNotEmpty) {
                   provider.updateRoomState(
-                    videoUrl: widget.url!,
+                    videoUrl: _currentVideoUrl!,
                     videoTitle: _videoTitle ?? widget.title ?? 'Video',
                     position: _controller.value.position,
                     isPlaying: _controller.value.isPlaying,

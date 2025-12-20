@@ -9,6 +9,11 @@ class StorageService {
   static const String _playerPreferenceKey = 'player_preference'; // 'inbuilt' or 'external'
   static const String _recentSearchesKey = 'recent_searches';
   static const String _themePreferenceKey = 'theme_preference'; // 'dark' or 'light'
+  static const String _homeScreenLayoutKey = 'home_screen_layout';
+  static const String _hasCompletedOnboardingKey = 'has_completed_onboarding';
+  static const String _userEmailKey = 'user_email';
+  static const String _userDisplayNameKey = 'user_display_name';
+  static const String _userSignedOutKey = 'user_signed_out';
   static const int _maxRecentSearches = 10;
 
   // Saved Links
@@ -220,6 +225,19 @@ class StorageService {
   }
 
   // Theme Preference
+  static const String _themeTypeKey = 'theme_type'; // 'light', 'dark', 'liquidGlass'
+  
+  static Future<String> getThemeType() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_themeTypeKey) ?? 'dark'; // Default to dark
+  }
+
+  static Future<void> setThemeType(String themeType) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeTypeKey, themeType);
+  }
+
+  // Legacy support - keep for backward compatibility
   static Future<bool> isDarkMode() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_themePreferenceKey) ?? true; // Default to dark mode
@@ -384,6 +402,123 @@ class StorageService {
     }
   }
 
+  /// Export a single list with its links in a shareable format
+  static Future<String> exportListForSharing(String listId) async {
+    final list = (await getUserLists()).firstWhere(
+      (l) => l.id == listId,
+      orElse: () => throw Exception('List not found'),
+    );
+    
+    final links = await getSavedLinksByList(listId);
+    
+    final shareData = {
+      'type': 'elysian_list',
+      'version': '1.0',
+      'list': {
+        'name': list.name,
+        'description': list.description,
+        'itemCount': links.length,
+      },
+      'links': links.map((l) => {
+        'url': l.url,
+        'title': l.title,
+        'description': l.description,
+        'type': l.type.toString(),
+        'thumbnailUrl': l.thumbnailUrl,
+        'duration': l.duration,
+      }).toList(),
+      'exportedAt': DateTime.now().toIso8601String(),
+    };
+    
+    return jsonEncode(shareData);
+  }
+
+  /// Import a shared list
+  static Future<UserList> importSharedList(String jsonData) async {
+    final data = jsonDecode(jsonData) as Map<String, dynamic>;
+    
+    // Validate format
+    if (data['type'] != 'elysian_list') {
+      throw Exception('Invalid list format');
+    }
+    
+    final listData = data['list'] as Map<String, dynamic>;
+    final linksData = data['links'] as List;
+    
+    // Check if list with same name exists
+    final existingLists = await getUserLists();
+    final listName = listData['name'] as String;
+    var finalListName = listName;
+    var counter = 1;
+    
+    while (existingLists.any((l) => l.name.toLowerCase() == finalListName.toLowerCase())) {
+      finalListName = '$listName (${counter})';
+      counter++;
+    }
+    
+    // Create new list
+    final newList = await createUserList(
+      finalListName,
+      description: listData['description'] as String?,
+    );
+    
+    // Import links
+    final existingLinks = await getSavedLinks();
+    final existingUrls = existingLinks.map((l) => l.url).toSet();
+    
+    for (final linkData in linksData) {
+      final url = linkData['url'] as String;
+      
+      // Skip if link already exists
+      if (existingUrls.contains(url)) {
+        // Add to this list if not already in it
+        final existingLink = existingLinks.firstWhere((l) => l.url == url);
+        if (!existingLink.listIds.contains(newList.id)) {
+          final updatedLink = SavedLink(
+            id: existingLink.id,
+            url: existingLink.url,
+            title: existingLink.title,
+            thumbnailUrl: existingLink.thumbnailUrl,
+            customThumbnailPath: existingLink.customThumbnailPath,
+            description: existingLink.description,
+            type: existingLink.type,
+            listIds: [...existingLink.listIds, newList.id],
+            savedAt: existingLink.savedAt,
+            isFavorite: existingLink.isFavorite,
+            notes: existingLink.notes,
+            lastViewedAt: existingLink.lastViewedAt,
+            viewCount: existingLink.viewCount,
+            duration: existingLink.duration,
+          );
+          await saveLink(updatedLink);
+        }
+        continue;
+      }
+      
+      // Create new link
+      final linkType = LinkType.values.firstWhere(
+        (t) => t.toString() == linkData['type'],
+        orElse: () => LinkType.unknown,
+      );
+      
+      final newLink = SavedLink(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        url: url,
+        title: linkData['title'] as String? ?? 'Untitled',
+        thumbnailUrl: linkData['thumbnailUrl'] as String?,
+        description: linkData['description'] as String?,
+        type: linkType,
+        listIds: [newList.id],
+        savedAt: DateTime.now(),
+        duration: linkData['duration'] as String?,
+      );
+      
+      await saveLink(newLink);
+    }
+    
+    return newList;
+  }
+
   // Statistics
   static Future<Map<String, dynamic>> getStatistics() async {
     final allLinks = await getSavedLinks();
@@ -482,6 +617,112 @@ class StorageService {
     }
     
     return unique.values.take(limit).toList();
+  }
+
+  // Home Screen Layout
+  static Future<void> saveHomeScreenLayout(List<HomeScreenSection> sections) async {
+    final prefs = await SharedPreferences.getInstance();
+    final sectionsJson = sections.map((s) => jsonEncode(s.toJson())).toList();
+    await prefs.setStringList(_homeScreenLayoutKey, sectionsJson);
+  }
+
+  static Future<List<HomeScreenSection>> getHomeScreenLayout() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sectionsJson = prefs.getStringList(_homeScreenLayoutKey);
+    
+    if (sectionsJson == null || sectionsJson.isEmpty) {
+      // Return default layout
+      return HomeScreenSection.getDefaultSections();
+    }
+    
+    try {
+      return sectionsJson
+          .map((json) => HomeScreenSection.fromJson(jsonDecode(json) as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+    } catch (e) {
+      // If parsing fails, return default layout
+      return HomeScreenSection.getDefaultSections();
+    }
+  }
+
+  // Reset/Delete All Data
+  static Future<void> resetAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Clear all app data
+    await prefs.remove(_savedLinksKey);
+    await prefs.remove(_userListsKey);
+    await prefs.remove(_recentSearchesKey);
+    await prefs.remove(_homeScreenLayoutKey);
+    
+    // Clear user authentication data
+    await prefs.remove(_userEmailKey);
+    await prefs.remove(_userDisplayNameKey);
+    await prefs.remove(_userSignedOutKey);
+    
+    // Note: We keep theme and player preferences as they are user settings
+    // If you want to reset everything including settings, uncomment below:
+    // await prefs.remove(_themePreferenceKey);
+    // await prefs.remove(_playerPreferenceKey);
+    
+    // Clear all keys (nuclear option - removes everything)
+    // await prefs.clear();
+  }
+
+  // Onboarding
+  static Future<bool> hasCompletedOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_hasCompletedOnboardingKey) ?? false;
+  }
+
+  static Future<void> setHasCompletedOnboarding(bool completed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_hasCompletedOnboardingKey, completed);
+  }
+
+  // Chat User Email
+  static Future<String?> getUserEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userEmailKey);
+  }
+
+  static Future<void> setUserEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) {
+      // Remove the key if email is empty (sign-out)
+      await prefs.remove(_userEmailKey);
+    } else {
+      await prefs.setString(_userEmailKey, trimmedEmail.toLowerCase());
+    }
+  }
+
+  static Future<String?> getUserDisplayName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userDisplayNameKey);
+  }
+
+  static Future<void> setUserDisplayName(String displayName) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmedName = displayName.trim();
+    if (trimmedName.isEmpty) {
+      // Remove the key if display name is empty (sign-out)
+      await prefs.remove(_userDisplayNameKey);
+    } else {
+      await prefs.setString(_userDisplayNameKey, trimmedName);
+    }
+  }
+
+  // User Sign-Out State (to prevent auto-restore after explicit sign-out)
+  static Future<bool> getUserSignedOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_userSignedOutKey) ?? false;
+  }
+
+  static Future<void> setUserSignedOut(bool signedOut) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_userSignedOutKey, signedOut);
   }
 }
 

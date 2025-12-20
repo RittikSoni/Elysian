@@ -403,9 +403,10 @@ class WatchPartyFirebaseService {
         // This prevents infinite loops when video starts playing
         if (onVideoChange != null && room.videoUrl.isNotEmpty) {
           // Only trigger if video URL actually changed (not just position/playing state)
-          if (previousVideoUrl != null && previousVideoUrl != room.videoUrl) {
+          // Also trigger if previousVideoUrl is null (first time loading)
+          if (previousVideoUrl == null || previousVideoUrl != room.videoUrl) {
             debugPrint(
-              'WatchPartyFirebaseService: Video changed from $previousVideoUrl to ${room.videoUrl}',
+              'WatchPartyFirebaseService: Video changed from ${previousVideoUrl ?? "null"} to ${room.videoUrl}',
             );
             onVideoChange?.call(room.videoUrl, room.videoTitle);
           }
@@ -726,9 +727,11 @@ class WatchPartyFirebaseService {
     _roomRef = null;
     _currentRoomId = null;
     _currentParticipantId = null;
+    _currentParticipantName = null;
     _isHost = false;
     _isConnected = false;
     _connectionError = null;
+    _lastKnownRoom = null;
 
     // Reset optimization tracking
     _lastSentPosition = null;

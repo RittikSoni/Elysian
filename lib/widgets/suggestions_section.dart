@@ -1,7 +1,11 @@
+import 'dart:ui';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/utils/app_themes.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class SuggestionsSection extends StatelessWidget {
   final List<SavedLink> suggestedLinks;
@@ -73,31 +77,76 @@ class SuggestionsSection extends StatelessWidget {
         );
         onRefresh?.call();
       },
-      child: Container(
-        width: 250,
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Thumbnail
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                  child: ThumbnailImage(
-                    link: link,
-                    width: double.infinity,
-                    height: 120,
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, _) {
+          final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
+          final theme = Theme.of(context);
+          
+          if (isLiquidGlass) {
+            final liquidGlass = theme.extension<LiquidGlassTheme>();
+            final blur = liquidGlass?.blurIntensity ?? 15.0;
+            final opacity = liquidGlass?.glassOpacity ?? 0.18;
+            final borderOpacity = liquidGlass?.borderOpacity ?? 0.25;
+            
+            return Container(
+              width: 250,
+              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(borderOpacity),
+                  width: 1.5,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(opacity),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildLinkCardContent(context, link),
                   ),
                 ),
+              ),
+            );
+          } else {
+            return Container(
+              width: 250,
+              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _buildLinkCardContent(context, link),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildLinkCardContent(BuildContext context, SavedLink link) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Thumbnail
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: ThumbnailImage(
+                link: link,
+                width: double.infinity,
+                height: 120,
+              ),
+            ),
                 if (link.viewCount > 0)
                   Positioned(
                     top: 8,
@@ -138,8 +187,10 @@ class SuggestionsSection extends StatelessWidget {
                     Flexible(
                       child: Text(
                         link.title,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.light
+                              ? Colors.black87
+                              : Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -153,14 +204,18 @@ class SuggestionsSection extends StatelessWidget {
                         Icon(
                           _getIconForType(link.type),
                           size: 12,
-                          color: Colors.grey[500],
+                          color: Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[600]
+                              : Colors.grey[500],
                         ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             _getTypeLabel(link.type),
                             style: TextStyle(
-                              color: Colors.grey[500],
+                              color: Theme.of(context).brightness == Brightness.light
+                                  ? Colors.grey[600]
+                                  : Colors.grey[500],
                               fontSize: 11,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -173,9 +228,7 @@ class SuggestionsSection extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
+        );
   }
 
   IconData _getIconForType(LinkType type) {

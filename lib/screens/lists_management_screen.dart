@@ -2,10 +2,12 @@ import 'package:elysian/models/models.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/screens/saved_links_screen.dart';
 import 'package:elysian/services/storage_service.dart';
+import 'package:elysian/services/export_import_service.dart';
 import 'package:elysian/widgets/add_link_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ListsManagementScreen extends StatefulWidget {
   const ListsManagementScreen({super.key});
@@ -296,27 +298,177 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
         return;
       }
 
-      final shareText = StringBuffer();
-      shareText.writeln('${list.name}');
-      if (list.description != null && list.description!.isNotEmpty) {
-        shareText.writeln(list.description);
-      }
-      shareText.writeln('\nLinks (${links.length}):\n');
-      
-      for (var link in links) {
-        shareText.writeln('${link.title}');
-        shareText.writeln(link.url);
-        if (link.description != null && link.description!.isNotEmpty) {
-          shareText.writeln(link.description);
-        }
-        shareText.writeln('');
+      // Show loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
       }
 
-      await Share.share(shareText.toString());
+      // Export list to file
+      final filePath = await ExportImportService.exportListToFile(list.id);
+      
+      // Close loading
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      if (filePath == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error creating export file'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Share the file
+      final shared = await ExportImportService.shareListFile(filePath, list.name);
+      
+      if (!shared && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error sharing file'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sharing list: $e')),
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing list: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importList() async {
+    debugPrint('Import List: Button pressed, function called');
+    
+    // Show immediate feedback that button was pressed
+    if (!mounted) return;
+    
+    try {
+      debugPrint('Import List: Starting file picker...');
+      
+      // Pick file using file_picker
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        dialogTitle: 'Select Elysian List File (.elysian)',
+        allowMultiple: false,
       );
+
+      debugPrint('Import List: File picker result: ${result != null}');
+
+      if (result == null || result.files.isEmpty) {
+        debugPrint('Import List: User cancelled or no file selected');
+        return; // User cancelled
+      }
+
+      final filePath = result.files.single.path;
+      debugPrint('Import List: Selected file path: $filePath');
+      
+      if (filePath == null) {
+        debugPrint('Import List: File path is null');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: Could not access file'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Validate file format before importing
+      debugPrint('Import List: Validating file format...');
+      final isValid = await ExportImportService.isValidElysianFile(filePath);
+      debugPrint('Import List: File is valid: $isValid');
+      
+      if (!isValid) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid file format. Please select a valid .elysian list file.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      debugPrint('Import List: Starting import...');
+      // Import the list
+      final importResult = await ExportImportService.importListFromFile(filePath);
+      debugPrint('Import List: Import result - success: ${importResult.success}, error: ${importResult.error}');
+      
+      // Close loading
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Refresh providers
+      debugPrint('Import List: Refreshing providers...');
+      final listsProvider = context.read<ListsProvider>();
+      final linksProvider = context.read<LinksProvider>();
+      await Future.wait([
+        listsProvider.loadLists(forceRefresh: true),
+        linksProvider.loadLinks(forceRefresh: true),
+      ]);
+
+      if (mounted) {
+        if (importResult.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(importResult.message ?? 'List imported successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(importResult.error ?? 'Error importing list'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Import List: Exception caught: $e');
+      debugPrint('Import List: Stack trace: $stackTrace');
+      if (context.mounted) {
+        // Close loading if still open
+        try {
+          Navigator.pop(context);
+        } catch (_) {
+          // Dialog might not be open
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error importing list: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -394,6 +546,14 @@ class _ListsManagementScreenState extends State<ListsManagementScreen> {
             icon: const Icon(Icons.link, color: Colors.white),
             onPressed: _showAddLinkDialog,
             tooltip: 'Add Link',
+          ),
+          IconButton(
+            icon: const Icon(Icons.download, color: Colors.white),
+            onPressed: () {
+              debugPrint('Import List button pressed');
+              _importList();
+            },
+            tooltip: 'Import List',
           ),
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),

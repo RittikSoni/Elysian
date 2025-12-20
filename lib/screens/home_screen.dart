@@ -1,11 +1,13 @@
 import 'package:elysian/data/data.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:elysian/models/models.dart';
+import 'package:elysian/models/home_screen_section.dart';
 import 'package:elysian/widgets/saved_links_list.dart';
-import 'package:elysian/widgets/user_lists_widget.dart';
-import 'package:elysian/widgets/list_content_section.dart';
 import 'package:elysian/widgets/favorites_section.dart';
 import 'package:elysian/widgets/recent_activity_section.dart';
 import 'package:elysian/widgets/suggestions_section.dart';
+import 'package:elysian/widgets/user_list_section_widget.dart';
+import 'package:elysian/widgets/custom_featured_header.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
@@ -41,12 +43,16 @@ class HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final linksProvider = context.read<LinksProvider>();
       final listsProvider = context.read<ListsProvider>();
+      final layoutProvider = context.read<HomeScreenLayoutProvider>();
       
       if (!linksProvider.isInitialized) {
         linksProvider.initialize();
       }
       if (!listsProvider.isInitialized) {
         listsProvider.initialize();
+      }
+      if (!layoutProvider.isInitialized) {
+        layoutProvider.initialize();
       }
     });
   }
@@ -59,7 +65,6 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Use Consumer widgets for selective rebuilds (performance optimization)
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
@@ -69,143 +74,20 @@ class HomeScreenState extends State<HomeScreen> {
           onNavigateToTab: widget.onNavigateToTab,
         ),
       ),
-      body: CustomScrollView(
+      body: Consumer<HomeScreenLayoutProvider>(
+        builder: (context, layoutProvider, child) {
+          if (layoutProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final visibleSections = layoutProvider.visibleSections;
+
+          return CustomScrollView(
         controller: _scrollController,
         slivers: [
-          SliverToBoxAdapter(
-            child: ContentHeader(featuredContent: sintelContent),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.only(top: 0),
-            sliver: SliverToBoxAdapter(
-              child: Previews(
-                key: const PageStorageKey('previews'),
-                title: 'previews',
-                contentList: previews,
-              ),
-            ),
-          ),
-          // User Lists - only rebuilds when lists change
-          Consumer<ListsProvider>(
-            builder: (context, listsProvider, child) {
-              return SliverToBoxAdapter(
-                key: const PageStorageKey('userLists'),
-                child: UserListsWidget(
-                  onRefresh: () => listsProvider.loadLists(forceRefresh: true),
-                ),
-              );
-            },
-          ),
-          // Favorites Section - only rebuilds when favorites change
-          Consumer<LinksProvider>(
-            builder: (context, linksProvider, child) {
-              return SliverToBoxAdapter(
-                key: const PageStorageKey('favorites'),
-                child: FavoritesSection(
-                  favoriteLinks: linksProvider.favoriteLinks,
-                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
-                ),
-              );
-            },
-          ),
-          // Recent Activity - only rebuilds when recent links change
-          Consumer<LinksProvider>(
-            builder: (context, linksProvider, child) {
-              return SliverToBoxAdapter(
-                key: const PageStorageKey('recentActivity'),
-                child: RecentActivitySection(
-                  recentLinks: linksProvider.recentLinks.take(10).toList(),
-                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
-                ),
-              );
-            },
-          ),
-          // Smart Suggestions - only rebuilds when suggestions change
-          Consumer<LinksProvider>(
-            builder: (context, linksProvider, child) {
-              return SliverToBoxAdapter(
-                key: const PageStorageKey('suggestions'),
-                child: SuggestionsSection(
-                  suggestedLinks: linksProvider.suggestedLinks.take(10).toList(),
-                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
-                ),
-              );
-            },
-          ),
-          // Separate sections for each list - optimized with Consumer
-          Consumer2<LinksProvider, ListsProvider>(
-            builder: (context, linksProvider, listsProvider, child) {
-              final userLists = listsProvider.allLists;
-              final allLinks = linksProvider.allLinks;
-              
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final list = userLists[index];
-                    final listLinks = allLinks
-                        .where((link) => link.listIds.contains(list.id))
-                        .toList();
-                    if (listLinks.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return ListContentSection(
-                      key: PageStorageKey('list_${list.id}'),
-                      list: list,
-                      links: listLinks,
-                      onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
-                    );
-                  },
-                  childCount: userLists.length,
-                ),
-              );
-            },
-          ),
-          // All Saved Links - only rebuilds when links change
-          Consumer<LinksProvider>(
-            builder: (context, linksProvider, child) {
-              final savedLinks = linksProvider.allLinks;
-              if (savedLinks.isEmpty) {
-                return const SliverToBoxAdapter(child: SizedBox.shrink());
-              }
-              return SliverToBoxAdapter(
-                key: const PageStorageKey('savedLinks'),
-                child: SavedLinksList(
-                  savedLinks: savedLinks,
-                  title: 'All Saved Links',
-                  onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
-                  enableSwipeActions: false, // Disable swipe for horizontal scrolling
-                ),
-              );
-            },
-          ),
-          SliverToBoxAdapter(
-            key: PageStorageKey('mylist'),
-            child: ContentList(
-              title: 'My List',
-              contentList: myList,
-              isOriginals: false,
-            ),
-          ),
-          SliverToBoxAdapter(
-            key: PageStorageKey('originals'),
-            child: ContentList(
-              title: 'Netflix Originals',
-              contentList: originals,
-              isOriginals: true,
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: 20.0),
-            sliver: SliverToBoxAdapter(
-              child: ContentList(
-                key: PageStorageKey('trending'),
-                title: 'Trending',
-                contentList: trending,
-                isOriginals: false,
-              ),
-            ),
-          ),
-          // Tagline
+              // Build sections dynamically based on layout configuration
+              ...visibleSections.map((section) => _buildSection(section)),
+              // Tagline (always at the end)
           SliverToBoxAdapter(
             child: Builder(
               builder: (context) {
@@ -227,10 +109,149 @@ class HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SliverPadding(
-            padding: EdgeInsets.only(bottom: 20.0),
-          ),
-        ],
+                padding: const EdgeInsets.only(bottom: 20.0),
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildSection(HomeScreenSection section) {
+    switch (section.type) {
+      case HomeSectionType.header:
+        return _buildHeaderSection(section);
+
+      case HomeSectionType.userList:
+        return _buildUserListSection(section);
+
+      case HomeSectionType.favorites:
+        return Consumer<LinksProvider>(
+          builder: (context, linksProvider, child) {
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: FavoritesSection(
+                favoriteLinks: linksProvider.favoriteLinks,
+                onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+              ),
+            );
+          },
+        );
+
+      case HomeSectionType.recentActivity:
+        return Consumer<LinksProvider>(
+          builder: (context, linksProvider, child) {
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: RecentActivitySection(
+                recentLinks: linksProvider.recentLinks.take(10).toList(),
+                onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+              ),
+            );
+          },
+        );
+
+      case HomeSectionType.suggestions:
+        return Consumer<LinksProvider>(
+          builder: (context, linksProvider, child) {
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: SuggestionsSection(
+                suggestedLinks: linksProvider.suggestedLinks.take(10).toList(),
+                onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+              ),
+            );
+          },
+        );
+
+      case HomeSectionType.savedLinks:
+        return Consumer<LinksProvider>(
+          builder: (context, linksProvider, child) {
+            final savedLinks = linksProvider.allLinks;
+            if (savedLinks.isEmpty) {
+              return const SliverToBoxAdapter(child: SizedBox.shrink());
+            }
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: SavedLinksList(
+                savedLinks: savedLinks,
+                title: section.title,
+                onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+                enableSwipeActions: false,
+              ),
+            );
+          },
+        );
+    }
+  }
+
+  Widget _buildHeaderSection(HomeScreenSection section) {
+    final linkId = section.config?['linkId'] as String?;
+    
+    if (linkId != null) {
+      return Consumer<LinksProvider>(
+        builder: (context, linksProvider, child) {
+          try {
+            final link = linksProvider.allLinks.firstWhere(
+              (l) => l.id == linkId,
+            );
+            
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: CustomFeaturedHeader(savedLink: link),
+            );
+          } catch (e) {
+            // Link not found, fallback to default
+            return SliverToBoxAdapter(
+              key: PageStorageKey(section.id),
+              child: ContentHeader(featuredContent: sintelContent),
+            );
+          }
+        },
+      );
+    }
+    
+    // Default featured content
+    return SliverToBoxAdapter(
+      key: PageStorageKey(section.id),
+      child: ContentHeader(featuredContent: sintelContent),
+    );
+  }
+
+  Widget _buildUserListSection(HomeScreenSection section) {
+    final listId = section.config?['listId'] as String?;
+    if (listId == null) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    final layoutStyle = section.layoutStyle;
+
+    return Consumer2<LinksProvider, ListsProvider>(
+      builder: (context, linksProvider, listsProvider, child) {
+        final list = listsProvider.getListById(listId);
+        if (list == null) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        final listLinks = linksProvider.allLinks
+            .where((link) => link.listIds.contains(listId))
+            .toList();
+
+        if (listLinks.isEmpty) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        return SliverToBoxAdapter(
+          key: PageStorageKey(section.id),
+          child: UserListSectionWidget(
+            list: list,
+            links: listLinks,
+            layoutStyle: layoutStyle,
+            onRefresh: () => linksProvider.loadLinks(forceRefresh: true),
+          ),
+        );
+      },
     );
   }
 }

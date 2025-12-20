@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:elysian/assets.dart';
 import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
@@ -10,6 +11,7 @@ import 'package:elysian/widgets/widgets.dart';
 import 'package:elysian/widgets/watch_party_room_dialog.dart';
 import 'package:elysian/widgets/watch_party_participants_overlay.dart';
 import 'package:elysian/providers/providers.dart';
+import 'package:elysian/utils/app_themes.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -26,15 +28,64 @@ class CustomAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
-      color: Colors.black.withValues(
-        alpha: (scrollOffset / 350).clamp(0, 1).toDouble(),
-      ),
-      child: Responsive(
-        mobile: _MobileCustomAppBar(onNavigateToTab: onNavigateToTab),
-        desktop: _DesktopCustomAppBar(onNavigateToTab: onNavigateToTab),
-      ),
+    return Consumer<AppStateProvider>(
+      builder: (context, appState, _) {
+        final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
+        final isLight = appState.themeType == AppThemeType.light;
+        final theme = Theme.of(context);
+        final liquidGlass = theme.extension<LiquidGlassTheme>();
+        
+        final scrollAlpha = (scrollOffset / 350).clamp(0, 1).toDouble();
+        
+        Widget appBarContent = Responsive(
+          mobile: _MobileCustomAppBar(onNavigateToTab: onNavigateToTab),
+          desktop: _DesktopCustomAppBar(onNavigateToTab: onNavigateToTab),
+        );
+
+        if (isLiquidGlass) {
+          // Apply glass effect
+          final blur = liquidGlass?.blurIntensity ?? 15.0;
+          final opacity = liquidGlass?.glassOpacity ?? 0.18;
+          final border = liquidGlass?.borderOpacity ?? 0.25;
+          
+          return ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(opacity * (0.3 + scrollAlpha * 0.7)),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withOpacity(border),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                child: appBarContent,
+              ),
+            ),
+          );
+        } else if (isLight) {
+          // Light mode - light background with opacity
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
+            color: Colors.white.withValues(
+              alpha: scrollAlpha,
+            ),
+            child: appBarContent,
+          );
+        } else {
+          // Dark mode
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
+            color: Colors.black.withValues(
+              alpha: scrollAlpha,
+            ),
+            child: appBarContent,
+          );
+        }
+      },
     );
   }
 }

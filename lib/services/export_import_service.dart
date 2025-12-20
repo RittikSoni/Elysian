@@ -203,6 +203,99 @@ class ExportImportService {
       return false;
     }
   }
+
+  /// Export a single list to a file
+  static Future<String?> exportListToFile(String listId) async {
+    try {
+      // Get list export data
+      final jsonData = await StorageService.exportListForSharing(listId);
+      
+      // Create file content with magic header and obfuscated data
+      final fileContent = _createFileContent(jsonData);
+      
+      // Get temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'elysian_list_$timestamp$_fileExtension';
+      final filePath = '${tempDir.path}/$fileName';
+      
+      // Write file
+      final file = File(filePath);
+      await file.writeAsBytes(fileContent);
+      
+      debugPrint('List export file created: $filePath');
+      return filePath;
+    } catch (e) {
+      debugPrint('Error exporting list to file: $e');
+      return null;
+    }
+  }
+
+  /// Share a list file
+  static Future<bool> shareListFile(String filePath, String listName) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        debugPrint('List export file does not exist: $filePath');
+        return false;
+      }
+
+      final xFile = XFile(filePath);
+      await Share.shareXFiles([xFile], text: 'Elysian List: $listName');
+      return true;
+    } catch (e) {
+      debugPrint('Error sharing list file: $e');
+      return false;
+    }
+  }
+
+  /// Import a list from a file
+  static Future<ImportResult> importListFromFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return ImportResult(
+          success: false,
+          error: 'File does not exist',
+        );
+      }
+
+      // Read file bytes
+      final fileBytes = await file.readAsBytes();
+      
+      // Verify and extract data
+      final jsonData = _extractFileContent(fileBytes);
+      if (jsonData == null) {
+        return ImportResult(
+          success: false,
+          error: 'Invalid file format. This is not a valid Elysian list file.',
+        );
+      }
+
+      // Parse and validate it's a list file
+      final data = jsonDecode(jsonData) as Map<String, dynamic>;
+      if (data['type'] != 'elysian_list') {
+        return ImportResult(
+          success: false,
+          error: 'Invalid file format. This is not a valid Elysian list file.',
+        );
+      }
+
+      // Import list
+      final importedList = await StorageService.importSharedList(jsonData);
+      
+      return ImportResult(
+        success: true,
+        message: 'List "${importedList.name}" imported successfully!',
+      );
+    } catch (e) {
+      debugPrint('Error importing list from file: $e');
+      return ImportResult(
+        success: false,
+        error: 'Error importing list: $e',
+      );
+    }
+  }
 }
 
 /// Result of import operation

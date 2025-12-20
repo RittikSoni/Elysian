@@ -56,6 +56,7 @@ class _YTFullState extends State<YTFull> {
 
   final bool _isPlayerReady = false;
   bool _wasPlayerReady = false; // Track if player was ready before
+  String _currentVideoUrl = ''; // Track current video URL to prevent reverting to old video
 
   final List<String> _ids = [
     // 'QdBZY2fkU-0',
@@ -164,6 +165,8 @@ class _YTFullState extends State<YTFull> {
         hideControls: true,
       ),
     )..addListener(listener);
+    // Initialize current video URL
+    _currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
     initializeVid();
     _initWatchParty();
   }
@@ -188,8 +191,13 @@ class _YTFullState extends State<YTFull> {
 
           // Check if current video URL matches room video URL
           // If not, trigger video change to load correct video
-          final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
-          if (room.videoUrl.isNotEmpty && currentVideoUrl != room.videoUrl) {
+          // IMPORTANT: Check against room.videoUrl to ensure we get the latest update
+          final currentVideoId = _controller.metadata.videoId;
+          final roomVideoId = LinkParser.extractYouTubeVideoId(room.videoUrl);
+          if (room.videoUrl.isNotEmpty && 
+              roomVideoId != null && 
+              currentVideoId != roomVideoId) {
+            debugPrint('YTPlayer: Guest video mismatch - current: $currentVideoId, room: $roomVideoId');
             // Video mismatch - load the correct video
             _loadVideoFromUrl(room.videoUrl, room.videoTitle);
             return;
@@ -331,6 +339,17 @@ class _YTFullState extends State<YTFull> {
 
   Future<void> _loadVideoFromUrl(String videoUrl, String videoTitle) async {
     try {
+      // IMPORTANT: Prevent restarting if we're already playing the same video
+      final currentVideoUrl = widget.url ?? widget.mediaUrl ?? '';
+      if (currentVideoUrl == videoUrl && _controller.value.isReady) {
+        debugPrint('WatchParty: Already playing $videoUrl, skipping reload');
+        // Just update the title if needed
+        if (mounted) {
+          setState(() {});
+        }
+        return;
+      }
+      
       // Mark video as initializing
       _isVideoInitializing = true;
       _lastSeekTime = null;
@@ -340,6 +359,11 @@ class _YTFullState extends State<YTFull> {
       // Extract YouTube video ID
       final videoId = LinkParser.extractYouTubeVideoId(videoUrl);
       if (videoId != null) {
+        // Update _currentVideoUrl immediately to prevent race conditions
+        _currentVideoUrl = videoUrl;
+        _isVideoInitializing = true;
+        _wasPlayerReady = false; // Reset ready flag for new video
+        
         // Load the new video
         _controller.load(videoId);
         if (mounted) {
@@ -505,19 +529,24 @@ class _YTFullState extends State<YTFull> {
     final provider = Provider.of<WatchPartyProvider>(context, listen: false);
 
     // First update with video URL and title when sync starts
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
     if (provider.isHost && provider.isInRoom) {
-      final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+      final videoUrl = _currentVideoUrl.isNotEmpty 
+          ? _currentVideoUrl 
+          : (widget.url ?? widget.mediaUrl ?? '');
       final videoTitle = widget.title ?? 'YouTube Video';
-      provider.updateRoomState(
-        videoUrl: videoUrl,
-        videoTitle: videoTitle,
-        position: _controller.value.isReady
-            ? _controller.value.position
-            : Duration.zero,
-        isPlaying: _controller.value.isReady
-            ? _controller.value.isPlaying
-            : false,
-      );
+      if (videoUrl.isNotEmpty) {
+        provider.updateRoomState(
+          videoUrl: videoUrl,
+          videoTitle: videoTitle,
+          position: _controller.value.isReady
+              ? _controller.value.position
+              : Duration.zero,
+          isPlaying: _controller.value.isReady
+              ? _controller.value.isPlaying
+              : false,
+        );
+      }
     }
 
     // No longer using continuous sync - sync is now button-based
@@ -530,8 +559,14 @@ class _YTFullState extends State<YTFull> {
     if (!provider.isHost || !provider.isInRoom) return;
     if (!_controller.value.isReady) return;
 
-    final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+    // IMPORTANT: Use _currentVideoUrl instead of widget.url to prevent reverting to old video
+    final videoUrl = _currentVideoUrl.isNotEmpty 
+        ? _currentVideoUrl 
+        : (widget.url ?? widget.mediaUrl ?? '');
     final videoTitle = widget.title ?? 'YouTube Video';
+    
+    if (videoUrl.isEmpty) return;
+    
     provider.updateRoomState(
       position: _controller.value.position,
       isPlaying: _controller.value.isPlaying,
@@ -575,7 +610,11 @@ class _YTFullState extends State<YTFull> {
       _wasPlayerReady = true;
       final provider = Provider.of<WatchPartyProvider>(context, listen: false);
       if (provider.isHost && provider.isInRoom) {
-        final videoUrl = widget.url ?? widget.mediaUrl ?? '';
+        // IMPORTANT: Use _currentVideoUrl instead of widget.url to ensure we use the correct video
+        // This prevents reverting to old video when host changes video from content list
+        final videoUrl = _currentVideoUrl.isNotEmpty 
+            ? _currentVideoUrl 
+            : (widget.url ?? widget.mediaUrl ?? '');
         final videoTitle = widget.title ?? 'YouTube Video';
         provider.updateRoomState(
           videoUrl: videoUrl,
@@ -1852,7 +1891,12 @@ class _ListContentOverlayState extends State<ListContentOverlay>
         }
 
         // Update watch party room state if host
+        // IMPORTANT: Update BEFORE loading new video to ensure joiners get the update
         if (state._watchPartyService.isHost && state._watchPartyRoom != null) {
+          debugPrint('YTPlayer: Host changing video to ${link.url}, updating room state');
+          // Update current video URL immediately
+          state._currentVideoUrl = link.url;
+          state._wasPlayerReady = false; // Reset ready flag for new video
           state._watchPartyService.updateRoomState(
             videoUrl: link.url,
             videoTitle: link.title.isNotEmpty ? link.title : 'YouTube Video',

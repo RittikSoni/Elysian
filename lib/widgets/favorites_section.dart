@@ -1,7 +1,11 @@
+import 'dart:ui';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/services/link_handler.dart';
 import 'package:elysian/widgets/thumbnail_image.dart';
+import 'package:elysian/utils/app_themes.dart';
+import 'package:elysian/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class FavoritesSection extends StatelessWidget {
   final List<SavedLink> favoriteLinks;
@@ -82,98 +86,150 @@ class FavoritesSection extends StatelessWidget {
         );
         onRefresh?.call();
       },
-      child: Container(
-        width: 250,
-        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Thumbnail with favorite badge
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                  child: ThumbnailImage(
-                    link: link,
-                    width: double.infinity,
-                    height: 120,
-                  ),
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, _) {
+          final isLiquidGlass = appState.themeType == AppThemeType.liquidGlass;
+          final theme = Theme.of(context);
+          
+          if (isLiquidGlass) {
+            final liquidGlass = theme.extension<LiquidGlassTheme>();
+            final blur = liquidGlass?.blurIntensity ?? 15.0;
+            final opacity = liquidGlass?.glassOpacity ?? 0.18;
+            final borderOpacity = liquidGlass?.borderOpacity ?? 0.25;
+            
+            return Container(
+              width: 250,
+              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(borderOpacity * 1.5),
+                  width: 1.5,
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
                   child: Container(
-                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.amber,
-                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(opacity),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.star,
-                      color: Colors.black,
-                      size: 16,
-                    ),
+                    child: _buildLinkCardContent(context, link),
                   ),
                 ),
-              ],
+              ),
+            );
+          } else {
+            return Container(
+              width: 250,
+              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.amber.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: _buildLinkCardContent(context, link),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildLinkCardContent(BuildContext context, SavedLink link) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Thumbnail with favorite badge
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: ThumbnailImage(
+                link: link,
+                width: double.infinity,
+                height: 120,
+              ),
             ),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        link.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          _getIconForType(link.type),
-                          size: 12,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            _getTypeLabel(link.type),
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.amber,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.star,
+                  color: Colors.black,
+                  size: 16,
                 ),
               ),
             ),
           ],
         ),
-      ),
+        // Content
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    link.title,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.black87
+                          : Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      _getIconForType(link.type),
+                      size: 12,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[600]
+                          : Colors.grey[500],
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        _getTypeLabel(link.type),
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[600]
+                              : Colors.grey[500],
+                          fontSize: 11,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

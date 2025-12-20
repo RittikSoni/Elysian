@@ -105,7 +105,11 @@ class _SmallVideoPlayerState extends State<SmallVideoPlayer> {
     } else if (_youtubeController != null) {
       setState(() {
         _isMuted = !_isMuted;
-        _youtubeController!.mute();
+        if (_isMuted) {
+          _youtubeController!.mute();
+        } else {
+          _youtubeController!.unMute();
+        }
       });
     }
   }
