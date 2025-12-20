@@ -13,7 +13,7 @@ class AppInfo {
   static String get appName => _packageInfo?.appName ?? 'Elysian';
 
   /// Get app version
-  static String get version => _packageInfo?.version ?? '1.0.0';
+  static String get version => _packageInfo?.version ?? '0.0.1';
 
   /// Get build number
   static String get buildNumber => _packageInfo?.buildNumber ?? '1';
