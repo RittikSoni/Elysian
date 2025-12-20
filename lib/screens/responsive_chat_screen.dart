@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:elysian/widgets/custom_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/providers/chat_provider.dart';
@@ -14,7 +15,9 @@ import 'package:intl/intl.dart';
 /// Mobile: Shows list, navigates to conversation
 /// Desktop/Tablet: Shows list and conversation side-by-side
 class ResponsiveChatScreen extends StatefulWidget {
-  const ResponsiveChatScreen({super.key});
+  const ResponsiveChatScreen({super.key, required this.onNavigateToTab});
+
+  final dynamic Function(int)? onNavigateToTab;
 
   @override
   State<ResponsiveChatScreen> createState() => _ResponsiveChatScreenState();
@@ -63,7 +66,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
       );
       final otherUserDisplayName =
           conversation.getOtherUserDisplayName(provider.currentUserEmail!) ??
-              otherUserEmail.split('@').first;
+          otherUserEmail.split('@').first;
 
       Navigator.push(
         context,
@@ -94,6 +97,13 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
     return MessageNotificationOverlay(
       chatProvider: chatProvider,
       child: Scaffold(
+        appBar: PreferredSize(
+          preferredSize: Size(MediaQuery.of(context).size.width, 50),
+          child: CustomAppBar(
+            scrollOffset: 0,
+            onNavigateToTab: widget.onNavigateToTab,
+          ),
+        ),
         body: isDesktop
             ? _buildDesktopLayout(chatProvider)
             : _buildMobileLayout(chatProvider),
@@ -111,10 +121,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             border: Border(
-              right: BorderSide(
-                color: Colors.grey.withOpacity(0.2),
-                width: 1,
-              ),
+              right: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
             ),
           ),
           child: _ConversationList(
@@ -186,7 +193,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
     );
     final otherUserDisplayName =
         conversation.getOtherUserDisplayName(provider.currentUserEmail!) ??
-            otherUserEmail.split('@').first;
+        otherUserEmail.split('@').first;
 
     return Column(
       children: [
@@ -196,10 +203,7 @@ class _ResponsiveChatScreenState extends State<ResponsiveChatScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             border: Border(
-              bottom: BorderSide(
-                color: Colors.grey.withOpacity(0.2),
-                width: 1,
-              ),
+              bottom: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
             ),
           ),
           child: Row(
@@ -333,10 +337,7 @@ class _ConversationList extends StatelessWidget {
         backgroundColor: theme.scaffoldBackgroundColor,
         title: const Text(
           'Chat',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
           if (currentUserEmail != null) ...[
@@ -504,10 +505,7 @@ class _ConversationList extends StatelessWidget {
             const SizedBox(height: 24),
             const Text(
               'Sign in to start chatting',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
@@ -558,10 +556,7 @@ class _ConversationList extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Start a new conversation to begin chatting',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.withOpacity(0.5),
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.withOpacity(0.5)),
           ),
         ],
       ),
@@ -599,7 +594,7 @@ class _ConversationTile extends StatelessWidget {
     final otherUserEmail = conversation.getOtherUserEmail(currentUserEmail);
     final otherUserDisplayName =
         conversation.getOtherUserDisplayName(currentUserEmail) ??
-            otherUserEmail.split('@').first;
+        otherUserEmail.split('@').first;
 
     return InkWell(
       onTap: onTap,
@@ -683,7 +678,8 @@ class _ConversationTile extends StatelessWidget {
                           _formatTime(conversation.lastMessageAt!),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).brightness == Brightness.light
+                            color:
+                                Theme.of(context).brightness == Brightness.light
                                 ? Colors.grey[600]
                                 : Colors.grey[400],
                             fontWeight: conversation.unreadCount > 0
@@ -697,15 +693,16 @@ class _ConversationTile extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child:                         Text(
+                        child: Text(
                           conversation.lastMessage ?? 'No messages yet',
                           style: TextStyle(
                             fontSize: 14,
                             color: conversation.unreadCount > 0
                                 ? theme.colorScheme.onSurface
-                                : Theme.of(context).brightness == Brightness.light
-                                    ? Colors.grey[700]
-                                    : Colors.grey[400],
+                                : Theme.of(context).brightness ==
+                                      Brightness.light
+                                ? Colors.grey[700]
+                                : Colors.grey[400],
                             fontWeight: conversation.unreadCount > 0
                                 ? FontWeight.w500
                                 : FontWeight.normal,
@@ -771,17 +768,12 @@ class _SignInDialog extends StatelessWidget {
 
     return AlertDialog(
       backgroundColor: Colors.grey[900],
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Row(
         children: [
           Icon(Icons.chat, color: Colors.amber),
           SizedBox(width: 8),
-          Text(
-            'Sign In to Chat',
-            style: TextStyle(color: Colors.white),
-          ),
+          Text('Sign In to Chat', style: TextStyle(color: Colors.white)),
         ],
       ),
       content: const Text(
@@ -800,9 +792,9 @@ class _SignInDialog extends StatelessWidget {
               await chatProvider.signInWithGoogle();
             } catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Sign in failed: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Sign in failed: $e')));
               }
             }
           },
@@ -816,4 +808,3 @@ class _SignInDialog extends StatelessWidget {
     );
   }
 }
-

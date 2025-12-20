@@ -2,12 +2,6 @@ import 'package:elysian/data/data.dart';
 import 'package:elysian/providers/providers.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/models/home_screen_section.dart';
-import 'package:elysian/widgets/saved_links_list.dart';
-import 'package:elysian/widgets/favorites_section.dart';
-import 'package:elysian/widgets/recent_activity_section.dart';
-import 'package:elysian/widgets/suggestions_section.dart';
-import 'package:elysian/widgets/user_list_section_widget.dart';
-import 'package:elysian/widgets/custom_featured_header.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:elysian/widgets/widgets.dart';
@@ -38,13 +32,13 @@ class HomeScreenState extends State<HomeScreen> {
           });
         }
       });
-    
+
     // Initialize providers if not already initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final linksProvider = context.read<LinksProvider>();
       final listsProvider = context.read<ListsProvider>();
       final layoutProvider = context.read<HomeScreenLayoutProvider>();
-      
+
       if (!linksProvider.isInitialized) {
         linksProvider.initialize();
       }
@@ -83,34 +77,32 @@ class HomeScreenState extends State<HomeScreen> {
           final visibleSections = layoutProvider.visibleSections;
 
           return CustomScrollView(
-        controller: _scrollController,
-        slivers: [
+            controller: _scrollController,
+            slivers: [
               // Build sections dynamically based on layout configuration
               ...visibleSections.map((section) => _buildSection(section)),
               // Tagline (always at the end)
-          SliverToBoxAdapter(
-            child: Builder(
-              builder: (context) {
-                final theme = Theme.of(context);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20.0),
-                  child: Center(
-                    child: Text(
-                      'Made with ❤️ in India',
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
+              SliverToBoxAdapter(
+                child: Builder(
+                  builder: (context) {
+                    final theme = Theme.of(context);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(
+                        child: Text(
+                          'Made with ❤️ in India',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          SliverPadding(
-                padding: const EdgeInsets.only(bottom: 20.0),
+                    );
+                  },
+                ),
               ),
+              SliverPadding(padding: const EdgeInsets.only(bottom: 20.0)),
             ],
           );
         },
@@ -188,7 +180,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeaderSection(HomeScreenSection section) {
     final linkId = section.config?['linkId'] as String?;
-    
+
     if (linkId != null) {
       return Consumer<LinksProvider>(
         builder: (context, linksProvider, child) {
@@ -196,7 +188,7 @@ class HomeScreenState extends State<HomeScreen> {
             final link = linksProvider.allLinks.firstWhere(
               (l) => l.id == linkId,
             );
-            
+
             return SliverToBoxAdapter(
               key: PageStorageKey(section.id),
               child: CustomFeaturedHeader(savedLink: link),
@@ -211,7 +203,7 @@ class HomeScreenState extends State<HomeScreen> {
         },
       );
     }
-    
+
     // Default featured content
     return SliverToBoxAdapter(
       key: PageStorageKey(section.id),

@@ -2,11 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 /// Theme types
-enum AppThemeType {
-  light,
-  dark,
-  liquidGlass,
-}
+enum AppThemeType { light, dark, liquidGlass }
 
 /// App theme configurations
 class AppThemes {
@@ -21,12 +17,10 @@ class AppThemes {
         primary: Colors.amber,
         secondary: Colors.amber,
         surface: Color(0xFF1A1A1A),
-        background: Colors.black,
         error: Colors.red,
         onPrimary: Colors.black,
         onSecondary: Colors.black,
         onSurface: Colors.white,
-        onBackground: Colors.white,
         onError: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
@@ -49,18 +43,13 @@ class AppThemes {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         titleTextStyle: const TextStyle(
           color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
-        contentTextStyle: TextStyle(
-          color: Colors.grey[300],
-          fontSize: 14,
-        ),
+        contentTextStyle: TextStyle(color: Colors.grey[300], fontSize: 14),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -106,12 +95,16 @@ class AppThemes {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: const Color(0xFFFAFAFA), // Slightly off-white for better contrast
+      scaffoldBackgroundColor: const Color(
+        0xFFFAFAFA,
+      ), // Slightly off-white for better contrast
       primaryColor: Colors.amber,
       colorScheme: const ColorScheme.light(
         primary: Colors.amber,
         secondary: Colors.amber,
-        surface: Color(0xFFF0F0F0), // Slightly darker for better card visibility
+        surface: Color(
+          0xFFF0F0F0,
+        ), // Slightly darker for better card visibility
         background: Color(0xFFFAFAFA),
         error: Colors.red,
         onPrimary: Colors.black,
@@ -141,9 +134,7 @@ class AppThemes {
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         titleTextStyle: const TextStyle(
           color: Color(0xFF1A1A1A),
           fontSize: 20,
@@ -203,13 +194,11 @@ class AppThemes {
       colorScheme: const ColorScheme.dark(
         primary: Colors.amber,
         secondary: Color(0xFF00D9F5),
-        surface: Color(0x40FFFFFF), // Increased opacity for better visibility
-        background: Color(0xFF0A0A0A),
+        surface: Color(0x40FFFFFF),
         error: Colors.red,
         onPrimary: Colors.black,
         onSecondary: Colors.black,
-        onSurface: Colors.white, // Full opacity for readability
-        onBackground: Colors.white,
+        onSurface: Colors.white,
         onError: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
@@ -228,17 +217,19 @@ class AppThemes {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: Colors.white.withOpacity(0.25), // Increased border visibility
+            color: Colors.white.withOpacity(
+              0.25,
+            ), // Increased border visibility
             width: 1.5, // Slightly thicker border
           ),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white.withOpacity(0.2), // Increased from 0.1 to 0.2
+        backgroundColor: Colors.white.withOpacity(
+          0.2,
+        ), // Increased from 0.1 to 0.2
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         titleTextStyle: const TextStyle(
           color: Colors.white, // Full opacity
           fontSize: 20,
@@ -251,11 +242,15 @@ class AppThemes {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withOpacity(0.15), // Increased from 0.05 to 0.15
+        fillColor: Colors.white.withOpacity(
+          0.15,
+        ), // Increased from 0.05 to 0.15
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.25), // Increased border visibility
+            color: Colors.white.withOpacity(
+              0.25,
+            ), // Increased border visibility
             width: 1.5,
           ),
         ),
@@ -268,13 +263,12 @@ class AppThemes {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(
-            color: Colors.amber,
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: Colors.amber, width: 2),
         ),
         labelStyle: const TextStyle(color: Colors.white), // Full opacity
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)), // Better visibility
+        hintStyle: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+        ), // Better visibility
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(color: Colors.white),
@@ -288,10 +282,14 @@ class AppThemes {
         titleSmall: TextStyle(color: Colors.white),
         bodyLarge: TextStyle(color: Colors.white), // Full opacity
         bodyMedium: TextStyle(color: Colors.white), // Full opacity
-        bodySmall: TextStyle(color: Colors.white), // Full opacity instead of 0.8
+        bodySmall: TextStyle(
+          color: Colors.white,
+        ), // Full opacity instead of 0.8
         labelLarge: TextStyle(color: Colors.white),
         labelMedium: TextStyle(color: Colors.white),
-        labelSmall: TextStyle(color: Colors.white), // Full opacity instead of 0.8
+        labelSmall: TextStyle(
+          color: Colors.white,
+        ), // Full opacity instead of 0.8
       ),
       visualDensity: VisualDensity.adaptivePlatformDensity,
       extensions: [
@@ -421,4 +419,3 @@ class GlassContainer extends StatelessWidget {
     );
   }
 }
-

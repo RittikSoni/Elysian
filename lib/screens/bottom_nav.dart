@@ -46,6 +46,7 @@ class BottomNavState extends State<BottomNav> {
       ),
       ResponsiveChatScreen(
         key: PageStorageKey('chatListScreen'),
+        onNavigateToTab: _changeTab,
       ),
       LocalVideosScreen(
         key: PageStorageKey('localVideosScreen'),
@@ -62,16 +63,13 @@ class BottomNavState extends State<BottomNav> {
         final themeType = appState.themeType;
         final isLiquidGlass = themeType == AppThemeType.liquidGlass;
         final isLight = themeType == AppThemeType.light;
-        
+
         Widget bottomNav = !Responsive.isDesktop(context)
             ? _buildBottomNav(context, themeType, isLiquidGlass, isLight)
             : const SizedBox.shrink();
 
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
-          ),
+          body: IndexedStack(index: _currentIndex, children: screens),
           bottomNavigationBar: bottomNav,
         );
       },
@@ -86,12 +84,12 @@ class BottomNavState extends State<BottomNav> {
   ) {
     final theme = Theme.of(context);
     final liquidGlass = theme.extension<LiquidGlassTheme>();
-    
+
     // Determine colors based on theme
     Color backgroundColor;
     Color selectedColor;
     Color unselectedColor;
-    
+
     if (isLiquidGlass) {
       // Glass effect for liquid glass mode
       backgroundColor = Colors.transparent;
@@ -113,31 +111,34 @@ class BottomNavState extends State<BottomNav> {
       type: BottomNavigationBarType.fixed,
       backgroundColor: backgroundColor,
       elevation: isLiquidGlass ? 0 : 8,
-      items: const {
-        'Home': Icons.home,
-        'Search': Icons.search,
-        'Chat': Icons.chat_bubble_outline,
-        'Local Videos': Icons.video_library,
-        'More': Icons.menu,
-      }
-          .map(
-            (title, icon) => MapEntry(
-              title,
-              BottomNavigationBarItem(
-                icon: Icon(icon, size: 30.0),
-                label: title,
-              ),
-            ),
-          )
-          .values
-          .toList(),
+      items:
+          const {
+                'Home': Icons.home,
+                'Search': Icons.search,
+                'Chat': Icons.chat_bubble_outline,
+                'Local Videos': Icons.video_library,
+                'More': Icons.menu,
+              }
+              .map(
+                (title, icon) => MapEntry(
+                  title,
+                  BottomNavigationBarItem(
+                    icon: Icon(icon, size: 30.0),
+                    label: title,
+                  ),
+                ),
+              )
+              .values
+              .toList(),
       currentIndex: _currentIndex,
       selectedItemColor: selectedColor,
       selectedFontSize: 11.0,
       unselectedFontSize: 11.0,
       unselectedItemColor: unselectedColor,
       onTap: (index) {
-        debugPrint('BottomNav: Tab tapped, index: $index, current: $_currentIndex');
+        debugPrint(
+          'BottomNav: Tab tapped, index: $index, current: $_currentIndex',
+        );
         if (mounted) {
           setState(() {
             _currentIndex = index;

@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:elysian/assets.dart';
-import 'package:elysian/models/watch_party_models.dart';
 import 'package:elysian/models/models.dart';
 import 'package:elysian/screens/lists_management_screen.dart';
 import 'package:elysian/services/storage_service.dart';
@@ -14,7 +13,6 @@ import 'package:elysian/providers/providers.dart';
 import 'package:elysian/utils/app_themes.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 
 class CustomAppBar extends StatelessWidget {
   final double scrollOffset;
@@ -34,9 +32,9 @@ class CustomAppBar extends StatelessWidget {
         final isLight = appState.themeType == AppThemeType.light;
         final theme = Theme.of(context);
         final liquidGlass = theme.extension<LiquidGlassTheme>();
-        
+
         final scrollAlpha = (scrollOffset / 350).clamp(0, 1).toDouble();
-        
+
         Widget appBarContent = Responsive(
           mobile: _MobileCustomAppBar(onNavigateToTab: onNavigateToTab),
           desktop: _DesktopCustomAppBar(onNavigateToTab: onNavigateToTab),
@@ -47,14 +45,19 @@ class CustomAppBar extends StatelessWidget {
           final blur = liquidGlass?.blurIntensity ?? 15.0;
           final opacity = liquidGlass?.glassOpacity ?? 0.18;
           final border = liquidGlass?.borderOpacity ?? 0.25;
-          
+
           return ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10.0,
+                  horizontal: 24.0,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(opacity * (0.3 + scrollAlpha * 0.7)),
+                  color: Colors.white.withOpacity(
+                    opacity * (0.3 + scrollAlpha * 0.7),
+                  ),
                   border: Border(
                     bottom: BorderSide(
                       color: Colors.white.withOpacity(border),
@@ -69,19 +72,21 @@ class CustomAppBar extends StatelessWidget {
         } else if (isLight) {
           // Light mode - light background with opacity
           return Container(
-            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
-            color: Colors.white.withValues(
-              alpha: scrollAlpha,
+            padding: const EdgeInsets.symmetric(
+              vertical: 10.0,
+              horizontal: 24.0,
             ),
+            color: Colors.white.withValues(alpha: scrollAlpha),
             child: appBarContent,
           );
         } else {
           // Dark mode
           return Container(
-            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 24.0),
-            color: Colors.black.withValues(
-              alpha: scrollAlpha,
+            padding: const EdgeInsets.symmetric(
+              vertical: 10.0,
+              horizontal: 24.0,
             ),
+            color: Colors.black.withValues(alpha: scrollAlpha),
             child: appBarContent,
           );
         }
@@ -109,8 +114,12 @@ class _MobileCustomAppBar extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _AppBarButton(onTap: () {}, title: 'TV Shows'),
-                _AppBarButton(onTap: () {}, title: 'Movies'),
+                _AppBarButton(
+                  onTap: () {
+                    onNavigateToTab?.call(2);
+                  },
+                  title: 'Chat',
+                ),
                 _AppBarButton(
                   onTap: () {
                     Navigator.push(
@@ -128,9 +137,9 @@ class _MobileCustomAppBar extends StatelessWidget {
           IconButton(
             padding: EdgeInsets.zero,
             onPressed: () => _showWatchPartyDialog(context),
-            icon: const Icon(Icons.people),
+            icon: const Icon(Icons.celebration),
             iconSize: 28.0,
-            color: Colors.amber,
+
             tooltip: 'Watch Party',
           ),
         ],
@@ -162,8 +171,7 @@ class _DesktopCustomAppBar extends StatelessWidget {
                   onTap: () => onNavigateToTab?.call(0),
                   title: 'Home',
                 ),
-                _AppBarButton(onTap: () {}, title: 'TV Shows'),
-                _AppBarButton(onTap: () {}, title: 'Movies'),
+
                 _AppBarButton(
                   onTap: () {
                     Navigator.push(
@@ -174,10 +182,6 @@ class _DesktopCustomAppBar extends StatelessWidget {
                     );
                   },
                   title: 'My List',
-                ),
-                _AppBarButton(
-                  onTap: () => onNavigateToTab?.call(2),
-                  title: 'Latest',
                 ),
               ],
             ),
@@ -194,29 +198,32 @@ class _DesktopCustomAppBar extends StatelessWidget {
                   iconSize: 28.0,
                   color: Colors.white,
                 ),
-                _AppBarButton(onTap: () {}, title: 'KIDS'),
-                _AppBarButton(onTap: () {}, title: 'DVD'),
+
                 IconButton(
                   padding: EdgeInsets.zero,
-                  onPressed: () {},
-                  icon: const Icon(Icons.card_giftcard),
+                  onPressed: () {
+                    onNavigateToTab?.call(2);
+                  },
+                  icon: const Icon(Icons.chat_bubble),
                   iconSize: 28.0,
                   color: Colors.white,
                 ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () {},
-                  icon: const Icon(Icons.notifications),
-                  iconSize: 28.0,
-                  color: Colors.white,
-                ),
+
                 IconButton(
                   padding: EdgeInsets.zero,
                   onPressed: () => _showWatchPartyDialog(context),
-                  icon: const Icon(Icons.people),
+                  icon: const Icon(Icons.celebration),
                   iconSize: 28.0,
-                  color: Colors.amber,
                   tooltip: 'Watch Party',
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    onNavigateToTab?.call(4);
+                  },
+                  icon: const Icon(Icons.person),
+                  iconSize: 28.0,
+                  color: Colors.white,
                 ),
               ],
             ),

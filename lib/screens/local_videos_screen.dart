@@ -28,7 +28,7 @@ class LocalVideo {
 
 class LocalVideosScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
-  
+
   const LocalVideosScreen({super.key, this.onNavigateToTab});
 
   @override
@@ -70,12 +70,12 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
 
     try {
       PermissionStatus status = PermissionStatus.denied;
-      
+
       if (Platform.isAndroid) {
         // For Android 13+ (API 33+), use READ_MEDIA_VIDEO
         // For older versions, use READ_EXTERNAL_STORAGE
         final androidInfo = await Permission.videos.status;
-        
+
         if (androidInfo.isGranted) {
           status = PermissionStatus.granted;
         } else {
@@ -93,7 +93,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
         // iOS - use photos permission
         status = await Permission.photos.request();
       }
-      
+
       if (status.isGranted || status.isLimited) {
         setState(() {
           _hasPermission = true;
@@ -102,7 +102,8 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
       } else {
         setState(() {
           _hasPermission = false;
-          _errorMessage = 'Storage permission is required to scan for videos. Please grant permission in settings.';
+          _errorMessage =
+              'Storage permission is required to scan for videos. Please grant permission in settings.';
         });
       }
     } catch (e) {
@@ -127,20 +128,21 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
 
     try {
       final List<LocalVideo> videos = [];
-      
+
       // Get common video directories
       final directories = await _getVideoDirectories();
-      
+
       if (directories.isEmpty) {
         setState(() {
-          _errorMessage = 'No video directories found. Make sure you have videos on your device.';
+          _errorMessage =
+              'No video directories found. Make sure you have videos on your device.';
           _isScanning = false;
         });
         return;
       }
-      
+
       debugPrint('Scanning ${directories.length} directories for videos...');
-      
+
       for (final directory in directories) {
         if (await directory.exists()) {
           await _scanDirectory(directory, videos);
@@ -152,7 +154,9 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
       debugPrint('Total videos found: ${videos.length}');
 
       // Sort by name
-      videos.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      videos.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
 
       setState(() {
         _videos = videos;
@@ -161,7 +165,8 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
 
       if (videos.isEmpty) {
         setState(() {
-          _errorMessage = 'No videos found in scanned directories. Try placing videos in Movies, Download, or DCIM folders.';
+          _errorMessage =
+              'No videos found in scanned directories. Try placing videos in Movies, Download, or DCIM folders.';
         });
       } else {
         // Generate thumbnails in background
@@ -179,7 +184,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
 
   Future<List<Directory>> _getVideoDirectories() async {
     final List<Directory> directories = [];
-    
+
     try {
       if (Platform.isAndroid) {
         // Android - scan common video directories
@@ -195,7 +200,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
               rootPath += '${parts[i]}/';
             }
           }
-          
+
           // Common video directories on Android
           final commonDirs = [
             '/storage/emulated/0/Movies',
@@ -209,7 +214,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
             '$rootPath/Pictures',
             '$rootPath/Videos',
           ];
-          
+
           for (final dirPath in commonDirs) {
             final dir = Directory(dirPath);
             if (await dir.exists()) {
@@ -217,7 +222,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
               debugPrint('Found directory: $dirPath');
             }
           }
-          
+
           // Also try the parent directory approach
           final parent = externalStorage.parent;
           final parentDirs = [
@@ -227,7 +232,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
             Directory('${parent.path}/Pictures'),
             Directory('${parent.path}/Videos'),
           ];
-          
+
           for (final dir in parentDirs) {
             if (await dir.exists() && !directories.contains(dir)) {
               directories.add(dir);
@@ -254,7 +259,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
         debugPrint('Directory does not exist: ${dir.path}');
         return;
       }
-      
+
       int count = 0;
       await for (final entity in dir.list(recursive: true)) {
         if (entity is File) {
@@ -293,8 +298,19 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
 
   bool _isVideoFile(String extension) {
     const videoExtensions = [
-      'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm',
-      'm4v', '3gp', 'ts', 'mts', 'm2ts', 'vob'
+      'mp4',
+      'avi',
+      'mkv',
+      'mov',
+      'wmv',
+      'flv',
+      'webm',
+      'm4v',
+      '3gp',
+      'ts',
+      'mts',
+      'm2ts',
+      'vob',
     ];
     return videoExtensions.contains(extension);
   }
@@ -311,7 +327,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
             quality: 75,
             timeMs: 1000,
           );
-          
+
           if (mounted && thumbnail != null) {
             setState(() {
               video.thumbnailPath = thumbnail;
@@ -325,22 +341,18 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
     }
   }
 
-
   void _playVideo(LocalVideo video) {
     Navigator.push(
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             RSNewVideoPlayerScreen(
-          mediaUrl: video.path,
-          title: video.name,
-          url: video.path,
-        ),
+              mediaUrl: video.path,
+              title: video.name,
+              url: video.path,
+            ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
+          return FadeTransition(opacity: animation, child: child);
         },
         transitionDuration: const Duration(milliseconds: 200),
       ),
@@ -370,7 +382,7 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -386,7 +398,11 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(top: 100.0, left: 20.0, right: 20.0),
+              padding: const EdgeInsets.only(
+                top: 100.0,
+                left: 20.0,
+                right: 20.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -476,40 +492,40 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                           fontSize: 16.0,
                         ),
                       ),
-                  const SizedBox(height: 32.0),
-                  ElevatedButton(
-                    onPressed: _checkPermissionsAndScan,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32.0,
-                        vertical: 16.0,
-                      ),
-                    ),
-                    child: const Text(
-                      'Grant Permission',
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (Platform.isAndroid) ...[
-                    const SizedBox(height: 16.0),
-                    TextButton(
-                      onPressed: () async {
-                        await openAppSettings();
-                      },
-                      child: Text(
-                        'Open Settings',
-                        style: TextStyle(
-                          color: Colors.amber,
-                          fontSize: 14.0,
+                      const SizedBox(height: 32.0),
+                      ElevatedButton(
+                        onPressed: _checkPermissionsAndScan,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32.0,
+                            vertical: 16.0,
+                          ),
+                        ),
+                        child: const Text(
+                          'Grant Permission',
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      if (Platform.isAndroid) ...[
+                        const SizedBox(height: 16.0),
+                        TextButton(
+                          onPressed: () async {
+                            await openAppSettings();
+                          },
+                          child: Text(
+                            'Open Settings',
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontSize: 14.0,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -576,19 +592,16 @@ class _LocalVideosScreenState extends State<LocalVideosScreen> {
                   mainAxisSpacing: 16.0,
                   childAspectRatio: 0.7,
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final video = _videos[index];
-                    return _VideoCard(
-                      video: video,
-                      theme: theme,
-                      isDark: isDark,
-                      onTap: () => _playVideo(video),
-                      onWatchParty: () => _startWatchParty(video),
-                    );
-                  },
-                  childCount: _videos.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final video = _videos[index];
+                  return _VideoCard(
+                    video: video,
+                    theme: theme,
+                    isDark: isDark,
+                    onTap: () => _playVideo(video),
+                    onWatchParty: () => _startWatchParty(video),
+                  );
+                }, childCount: _videos.length),
               ),
             ),
         ],
@@ -645,7 +658,9 @@ class _VideoCard extends StatelessWidget {
             // Thumbnail
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -680,52 +695,49 @@ class _VideoCard extends StatelessWidget {
                             color: Colors.white,
                             size: 48,
                             shadows: [
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 8,
-                              ),
+                              Shadow(color: Colors.black54, blurRadius: 8),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          // const SizedBox(height: 8),
                           // Watch party button
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                onWatchParty();
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(
-                                      Icons.people,
-                                      color: Colors.black,
-                                      size: 16,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Watch Party',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+                          // Material(
+                          //   color: Colors.transparent,
+                          //   child: InkWell(
+                          //     onTap: () {
+                          //       onWatchParty();
+                          //     },
+                          //     borderRadius: BorderRadius.circular(20),
+                          //     child: Container(
+                          //       padding: const EdgeInsets.symmetric(
+                          //         horizontal: 12,
+                          //         vertical: 6,
+                          //       ),
+                          //       decoration: BoxDecoration(
+                          //         color: Colors.amber.withOpacity(0.9),
+                          //         borderRadius: BorderRadius.circular(20),
+                          //       ),
+                          //       child: Row(
+                          //         mainAxisSize: MainAxisSize.min,
+                          //         children: const [
+                          //           Icon(
+                          //             Icons.people,
+                          //             color: Colors.black,
+                          //             size: 16,
+                          //           ),
+                          //           SizedBox(width: 4),
+                          //           Text(
+                          //             'Watch Party',
+                          //             style: TextStyle(
+                          //               color: Colors.black,
+                          //               fontSize: 12,
+                          //               fontWeight: FontWeight.bold,
+                          //             ),
+                          //           ),
+                          //         ],
+                          //       ),
+                          //     ),
+                          //   ),
+                          // ),
                         ],
                       ),
                     ),
@@ -780,4 +792,3 @@ class _VideoCard extends StatelessWidget {
     );
   }
 }
-

@@ -40,15 +40,20 @@ class _MobileContentHeader extends StatelessWidget {
             ),
           ),
         ),
-        Container(
-          height: 500,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.black, Colors.transparent],
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-            ),
-          ),
+        Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            return Container(
+              height: 500,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.colorScheme.surface, Colors.transparent],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
+            );
+          },
         ),
         Positioned(
           bottom: 110,
@@ -230,15 +235,20 @@ class _DesktopContentHeaderState extends State<_DesktopContentHeader>
               ),
             ),
           ),
-          Container(
-            height: 500,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.black, Colors.transparent],
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              return Container(
+                height: 500,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [theme.colorScheme.surface, Colors.transparent],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              );
+            },
           ),
           Positioned(
             left: 60,
