@@ -181,8 +181,6 @@ class LinkHandler {
   /// Opens link in external application
   static Future<void> _openExternally(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

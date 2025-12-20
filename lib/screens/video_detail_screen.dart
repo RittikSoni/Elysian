@@ -335,9 +335,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
             title: widget.link.title,
             onError: () async {
               final uri = Uri.parse(widget.link.url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
             },
           ),
         ),
@@ -382,9 +380,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
             autoEnterPiP: true,
             onError: () async {
               final uri = Uri.parse(widget.link.url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
             },
           ),
         ),
@@ -394,9 +390,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   Future<void> _openExternally() async {
     final uri = Uri.parse(widget.link.url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -925,9 +919,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       return GestureDetector(
         onTap: () async {
           final uri = Uri.parse(widget.link.url);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
         },
         child: Stack(
           fit: StackFit.expand,

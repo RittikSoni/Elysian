@@ -198,7 +198,7 @@ class AboutScreen extends StatelessWidget {
                         Icon(Icons.code, color: Colors.amber, size: 24),
                         const SizedBox(width: 12),
                         Text(
-                          'Developer',
+                          '',
                           style: TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontSize: 18,
@@ -210,26 +210,26 @@ class AboutScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _InfoRow(
                       icon: Icons.business,
-                      label: 'Developer',
-                      value: 'Kingrittik',
+                      label: 'Made with ❤️ in',
+                      value: 'Delhi, India',
                       theme: theme,
                     ),
                     const SizedBox(height: 12),
                     _InfoRow(
                       icon: Icons.email_outlined,
                       label: 'Email',
-                      value: 'support@elysian.app',
+                      value: 'contact.kingrittik@gmail.com',
                       theme: theme,
-                      onTap: () => _launchEmail('support@elysian.app'),
+                      onTap: () => _launchEmail('contact.kingrittik@gmail.com'),
                     ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.language,
-                      label: 'Website',
-                      value: 'www.elysian.app',
-                      theme: theme,
-                      onTap: () => _launchUrl('https://www.elysian.app'),
-                    ),
+                    // const SizedBox(height: 12),
+                    // _InfoRow(
+                    //   icon: Icons.language,
+                    //   label: 'Website',
+                    //   value: 'www.elysian.app',
+                    //   theme: theme,
+                    //   onTap: () => _launchUrl('https://www.elysian.app'),
+                    // ),
                   ],
                 ),
               ),
@@ -238,40 +238,39 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Legal & Links
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  _LinkButton(
-                    icon: Icons.description,
-                    title: 'Terms of Service',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchUrl('https://www.elysian.app/terms'),
-                  ),
-                  const SizedBox(height: 12),
-                  _LinkButton(
-                    icon: Icons.privacy_tip,
-                    title: 'Privacy Policy',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchUrl('https://www.elysian.app/privacy'),
-                  ),
-                  const SizedBox(height: 12),
-                  _LinkButton(
-                    icon: Icons.bug_report,
-                    title: 'Report a Bug',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchEmail(
-                      'support@elysian.app',
-                      subject: 'Bug Report',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(horizontal: 24),
+            //   child: Column(
+            //     children: [
+            //       _LinkButton(
+            //         icon: Icons.description,
+            //         title: 'Terms of Service',
+            //         theme: theme,
+            //         isDark: isDark,
+            //         onTap: () => _launchUrl(''),
+            //       ),
+            //       const SizedBox(height: 12),
+            //       _LinkButton(
+            //         icon: Icons.privacy_tip,
+            //         title: 'Privacy Policy',
+            //         theme: theme,
+            //         isDark: isDark,
+            //         onTap: () => _launchUrl(''),
+            //       ),
+            //       const SizedBox(height: 12),
+            //       _LinkButton(
+            //         icon: Icons.bug_report,
+            //         title: 'Report a Bug',
+            //         theme: theme,
+            //         isDark: isDark,
+            //         onTap: () => _launchEmail(
+            //           'contact.kingrittik@gmail.com',
+            //           subject: 'Bug Report',
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
             const SizedBox(height: 32),
 
             // Copyright
@@ -295,9 +294,7 @@ class AboutScreen extends StatelessWidget {
   Future<void> _launchUrl(String url) async {
     try {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('Error launching URL: $e');
     }
@@ -312,9 +309,7 @@ class AboutScreen extends StatelessWidget {
             ? 'subject=${Uri.encodeComponent(subject)}'
             : null,
       );
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      }
+      await launchUrl(uri);
     } catch (e) {
       debugPrint('Error launching email: $e');
     }

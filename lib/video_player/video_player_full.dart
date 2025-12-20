@@ -849,12 +849,7 @@ class _RSNewVideoPlayerScreenState extends State<RSNewVideoPlayerScreen> {
                   final url = widget.mediaUrl;
                   if (url != null) {
                     final uri = Uri.parse(url);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                    }
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 }
               },

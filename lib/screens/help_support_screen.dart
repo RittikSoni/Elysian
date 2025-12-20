@@ -102,7 +102,7 @@ class HelpSupportScreen extends StatelessWidget {
                     color: Colors.blue,
                     theme: theme,
                     isDark: isDark,
-                    onTap: () => _launchEmail('support@elysian.app'),
+                    onTap: () => _launchEmail('contact.kingrittik@gmail.com'),
                   ),
                   const SizedBox(height: 12),
                   _ActionCard(
@@ -113,7 +113,7 @@ class HelpSupportScreen extends StatelessWidget {
                     theme: theme,
                     isDark: isDark,
                     onTap: () => _launchEmail(
-                      'support@elysian.app',
+                      'contact.kingrittik@gmail.com',
                       subject: 'Bug Report',
                     ),
                   ),
@@ -126,7 +126,7 @@ class HelpSupportScreen extends StatelessWidget {
                     theme: theme,
                     isDark: isDark,
                     onTap: () => _launchEmail(
-                      'support@elysian.app',
+                      'contact.kingrittik@gmail.com',
                       subject: 'Feature Request',
                     ),
                   ),
@@ -202,27 +202,27 @@ class HelpSupportScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _ResourceLink(
-                    icon: Icons.description,
-                    title: 'Terms of Service',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchUrl('https://www.elysian.app/terms'),
-                  ),
-                  _ResourceLink(
-                    icon: Icons.privacy_tip,
-                    title: 'Privacy Policy',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchUrl('https://www.elysian.app/privacy'),
-                  ),
-                  _ResourceLink(
-                    icon: Icons.article,
-                    title: 'User Guide',
-                    theme: theme,
-                    isDark: isDark,
-                    onTap: () => _launchUrl('https://www.elysian.app/guide'),
-                  ),
+                  // _ResourceLink(
+                  //   icon: Icons.description,
+                  //   title: 'Terms of Service',
+                  //   theme: theme,
+                  //   isDark: isDark,
+                  //   onTap: () => _launchUrl('https://www.elysian.app/terms'),
+                  // ),
+                  // _ResourceLink(
+                  //   icon: Icons.privacy_tip,
+                  //   title: 'Privacy Policy',
+                  //   theme: theme,
+                  //   isDark: isDark,
+                  //   onTap: () => _launchUrl('https://www.elysian.app/privacy'),
+                  // ),
+                  // _ResourceLink(
+                  //   icon: Icons.article,
+                  //   title: 'User Guide',
+                  //   theme: theme,
+                  //   isDark: isDark,
+                  //   onTap: () => _launchUrl('https://www.elysian.app/guide'),
+                  // ),
                 ],
               ),
             ),
@@ -292,9 +292,7 @@ class HelpSupportScreen extends StatelessWidget {
   Future<void> _launchUrl(String url) async {
     try {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('Error launching URL: $e');
     }
@@ -309,9 +307,7 @@ class HelpSupportScreen extends StatelessWidget {
             ? 'subject=${Uri.encodeComponent(subject)}'
             : null,
       );
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      }
+      await launchUrl(uri);
     } catch (e) {
       debugPrint('Error launching email: $e');
     }

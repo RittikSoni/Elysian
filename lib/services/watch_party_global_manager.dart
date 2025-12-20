@@ -110,12 +110,10 @@ class WatchPartyGlobalManager {
         );
       } else {
         // External link
-        if (await canLaunchUrl(Uri.parse(videoUrl))) {
-          await launchUrl(
-            Uri.parse(videoUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        }
+        await launchUrl(
+          Uri.parse(videoUrl),
+          mode: LaunchMode.externalApplication,
+        );
       }
     } catch (e) {
       debugPrint('Error navigating to video: $e');

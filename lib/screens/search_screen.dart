@@ -37,7 +37,7 @@ class SearchScreenState extends State<SearchScreen> {
           _scrollOffset = _scrollController.offset;
         });
       });
-    _searchController.addListener(_onSearchChanged);
+    // _searchController.addListener(_onSearchChanged);
     _loadRecentSearches();
   }
 
@@ -159,6 +159,7 @@ class SearchScreenState extends State<SearchScreen> {
                     builder: (context, value, child) {
                       return TextField(
                         controller: _searchController,
+                        onEditingComplete: _onSearchChanged,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16.0,
